@@ -30,7 +30,11 @@ struct RootView: View {
         }
         .toolbar {
             ToolbarItem {
-                if model.areHooksDisabled {
+                if model.isChangingHookState {
+                    ProgressView()
+                        .controlSize(.small)
+                        .accessibilityLabel("Updating installed hooks")
+                } else if model.areHooksDisabled {
                     Button {
                         model.setHooksDisabled(false)
                     } label: {
@@ -105,6 +109,7 @@ struct RootView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(.green)
+            .disabled(model.isChangingHookState)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
@@ -125,7 +130,10 @@ struct RootView: View {
         } else if let snapshot = model.snapshot {
             switch model.selection ?? .overview {
             case .overview:
-                OverviewView(snapshot: snapshot)
+                OverviewView(
+                    snapshot: snapshot,
+                    installedHookReleaseID: model.installedHookReleaseID
+                )
             case .hooks:
                 HookCatalogPane(model: model)
             case .validation:
@@ -156,7 +164,7 @@ private struct HookCatalogPane: View {
             HookListView(model: model)
                 .frame(minWidth: 340, idealWidth: 420)
             if let hook = model.selectedHook {
-                HookDetailView(hook: hook, revealSource: model.revealSelectedSource)
+                HookDetailView(model: model, hook: hook, revealSource: model.revealSelectedSource)
                     .frame(maxWidth: .infinity)
             } else {
                 ContentUnavailableView(
@@ -171,6 +179,7 @@ private struct HookCatalogPane: View {
 
 private struct OverviewView: View {
     let snapshot: CatalogSnapshot
+    let installedHookReleaseID: String?
 
     private var blockingCount: Int {
         snapshot.catalog.hooks.filter(\.isBlocking).count
@@ -209,6 +218,12 @@ private struct OverviewView: View {
                         )
                     }
                     Divider()
+                    LabeledContent(
+                        "Installed hooks",
+                        value: installedHookReleaseID.map { String($0.prefix(12)) }
+                            ?? "Not installed by Tama"
+                    )
+                    Divider()
                     LabeledContent("Warnings", value: snapshot.validation.warnings.count.formatted())
                     Divider()
                     LabeledContent("Errors", value: snapshot.validation.errors.count.formatted())
@@ -217,7 +232,7 @@ private struct OverviewView: View {
                 }
 
                 GroupBox("Boundary") {
-                    Text("This read-only app ships a catalog snapshot generated from hooks-rotator at build time. It does not install hooks, modify runtime configuration, or import logs, credentials, settings, or caches. Live runtime validation remains in the hooks-rotator CLI.")
+                    Text("Tama displays a catalog snapshot generated from hooks-rotator at build time. Re-enable verifies and installs the integrity-sealed hook release bundled with the current Tama build, preserves non-hook settings, updates agent, editor, OMP, and Git dispatchers, then restarts and resumes agent sessions. The app does not import logs, credentials, settings, or caches.")
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -271,6 +286,7 @@ private struct HookListView: View {
 }
 
 private struct HookDetailView: View {
+    @ObservedObject var model: AppModel
     let hook: HookRecord
     let revealSource: () -> Void
 
@@ -298,6 +314,7 @@ private struct HookDetailView: View {
                 if let sideEffects = hook.sideEffects {
                     DetailSection(title: "Side effects", text: sideEffects)
                 }
+                SessionHookControlView(model: model, hook: hook)
 
                 GroupBox("Events") {
                     VStack(alignment: .leading) {
@@ -345,6 +362,98 @@ private struct HookDetailView: View {
             .padding()
         }
         .navigationTitle("Hook")
+    }
+}
+
+private struct SessionHookControlView: View {
+    @ObservedObject var model: AppModel
+    let hook: HookRecord
+    @State private var pendingEnabledState: Bool?
+
+    var body: some View {
+        GroupBox("OMP session control") {
+            VStack(alignment: .leading, spacing: 10) {
+                if model.ompSessions.isEmpty {
+                    Label("No active OMP sessions", systemImage: "terminal")
+                        .foregroundStyle(.secondary)
+                    Text("Start or resume OMP after Tama installs the session controller. Active sessions will appear here automatically.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Button("Refresh sessions", systemImage: "arrow.clockwise") {
+                        Task { await model.refreshOMPSessions() }
+                    }
+                } else {
+                    Picker("Session", selection: $model.selectedOMPSessionID) {
+                        ForEach(model.ompSessions) { session in
+                            Text(session.displayName)
+                                .tag(Optional(session.id))
+                        }
+                    }
+                    if let session = model.selectedOMPSession,
+                       let isEnabled = model.isHookEnabledInSelectedSession(hook.id) {
+                        LabeledContent("Session ID") {
+                            Text(session.sessionId)
+                                .font(.caption.monospaced())
+                                .textSelection(.enabled)
+                                .lineLimit(1)
+                        }
+                        LabeledContent("Project") {
+                            Text(session.cwd)
+                                .font(.caption.monospaced())
+                                .textSelection(.enabled)
+                                .lineLimit(1)
+                        }
+                        HStack {
+                            StatusLabel(
+                                text: isEnabled ? "Enabled in this session" : "Disabled in this session",
+                                isHealthy: isEnabled
+                            )
+                            Spacer()
+                            if model.isChangingSessionHook {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Button(isEnabled ? "Disable for this session" : "Enable for this session") {
+                                    pendingEnabledState = !isEnabled
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(isEnabled ? .red : .green)
+                            }
+                        }
+                        Text(
+                            model.areHooksDisabled
+                                ? "All hooks are globally disabled. Enabling creates an allowlist entry only for this OMP session."
+                                : "The session override is stored with this OMP session and restored when the same session is resumed."
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .confirmationDialog(
+            pendingEnabledState == true ? "Enable this hook?" : "Disable this hook?",
+            isPresented: Binding(
+                get: { pendingEnabledState != nil },
+                set: { if !$0 { pendingEnabledState = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            if let enabled = pendingEnabledState {
+                Button(enabled ? "Enable for this session" : "Disable for this session") {
+                    pendingEnabledState = nil
+                    model.setSelectedSessionHook(hook.id, enabled: enabled)
+                }
+                Button("Cancel", role: .cancel) {
+                    pendingEnabledState = nil
+                }
+            }
+        } message: {
+            Text(
+                "This changes only hook \(hook.id) in OMP session \(model.selectedOMPSession?.sessionId ?? "unknown"). Other sessions are unaffected."
+            )
+        }
     }
 }
 

@@ -1,6 +1,25 @@
 #!/bin/sh
 set -eu
 
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ -z "${TAMA_HOOK_RELEASE_ROOT:-}" ]; then
+    if [ -d "$SCRIPT_DIR/hooks-release" ]; then
+        TAMA_HOOK_RELEASE_ROOT="$SCRIPT_DIR/hooks-release"
+    else
+        TAMA_HOOK_RELEASE_ROOT="$SCRIPT_DIR/../.build/Tama.app/Contents/Resources/hooks-release"
+    fi
+fi
+TAMA_HOOK_INSTALLER=${TAMA_HOOK_INSTALLER:-"$SCRIPT_DIR/install_hook_release.py"}
+export TAMA_HOOK_RELEASE_ROOT TAMA_HOOK_INSTALLER
+
+ACTION=${TAMA_EMERGENCY_ACTION:-disable}
+case "$ACTION" in
+    disable|enable) ;;
+    *) printf '%s\n' "Unsupported Tama emergency action: $ACTION" >&2; exit 2 ;;
+esac
+export TAMA_EMERGENCY_ACTION="$ACTION"
+export TAMA_SKIP_SESSION_RESTART=${TAMA_SKIP_SESSION_RESTART:-0}
+
 python3 - <<'PY'
 from pathlib import Path
 from datetime import datetime, timezone
@@ -10,9 +29,12 @@ import os
 import shutil
 import signal
 import subprocess
+import sys
 import time
 
-home = Path.home()
+action = os.environ["TAMA_EMERGENCY_ACTION"]
+
+home = Path(os.environ.get("TAMA_HOME") or Path.home())
 tama = home / "Library/Application Support/Tama"
 backup = tama / "emergency-backup"
 backup.mkdir(parents=True, exist_ok=True)
@@ -51,6 +73,11 @@ def open_session_file(pid):
     return None
 
 
+def process_is_running(pid):
+    state = output(["ps", "-p", str(pid), "-o", "stat="]).strip()
+    return bool(state) and not state.startswith("Z")
+
+
 def interactive_omp_processes():
     records = []
     for raw_pid in output(["pgrep", "-x", "omp"]).split():
@@ -82,14 +109,45 @@ def disable_config(label, path, manifest):
 
 
 def disable_entrypoint(path, manifest):
-    if not path.exists():
-        return
     destination = path.with_name(path.name + ".tama-disabled")
     if destination.exists():
+        if path.exists():
+            raise SystemExit(
+                f"Both active and disabled hook entrypoints exist: {path}"
+            )
+        manifest["moved"].append(
+            {"source": str(path), "disabled": str(destination)}
+        )
+        return
+    if not path.exists():
         return
     os.replace(path, destination)
     manifest["moved"].append({"source": str(path), "disabled": str(destination)})
 
+
+
+def restore_config(label, path):
+    saved = backup / label
+    if not saved.exists():
+        raise SystemExit(f"Missing Tama backup for {path}: {saved}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(path.name + ".tama-restore")
+    shutil.copy2(saved, temporary)
+    os.replace(temporary, path)
+
+
+def restore_entrypoint(item):
+    source = Path(item["source"])
+    disabled = Path(item["disabled"])
+    if source.exists():
+        if disabled.exists():
+            raise SystemExit(
+                f"Both active and disabled hook entrypoints exist: {source}"
+            )
+        return
+    if not disabled.exists():
+        raise SystemExit(f"Missing disabled hook entrypoint: {disabled}")
+    os.replace(disabled, source)
 
 def log_session_records(processes, offset):
     pids = {record["pid"] for record in processes}
@@ -155,9 +213,24 @@ def ancestor_pids():
     return ancestors
 
 
-processes = interactive_omp_processes()
-if not processes:
-    raise SystemExit("No interactive OMP sessions were found in VS Code.")
+manifest_path = backup / "manifest.json"
+if action == "enable":
+    if not manifest_path.exists():
+        raise SystemExit("Tama has no emergency backup manifest to restore.")
+    previous_manifest = json.loads(manifest_path.read_text())
+elif manifest_path.exists():
+    print("Tama hooks are already disabled.")
+    raise SystemExit(0)
+else:
+    (backup / "claude-settings.json").unlink(missing_ok=True)
+    (backup / "codex-hooks.json").unlink(missing_ok=True)
+
+
+processes = (
+    []
+    if os.environ["TAMA_SKIP_SESSION_RESTART"] == "1"
+    else interactive_omp_processes()
+)
 runner_pids = ancestor_pids().intersection(record["pid"] for record in processes)
 if runner_pids:
     raise SystemExit(
@@ -174,28 +247,39 @@ manifest = {
 }
 
 
-for record in processes:
-    try:
-        os.kill(record["pid"], signal.SIGTERM)
-    except ProcessLookupError:
-        pass
-
-deadline = time.time() + 30
-while time.time() < deadline:
-    alive = []
+if action == "disable":
     for record in processes:
         try:
-            os.kill(record["pid"], 0)
-            alive.append(record["pid"])
+            os.kill(record["pid"], signal.SIGTERM)
         except ProcessLookupError:
             pass
-    if not alive:
-        break
-    time.sleep(0.2)
-else:
-    raise SystemExit(f"OMP sessions did not stop cleanly: {alive}")
 
-time.sleep(1)
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        alive = [
+            record["pid"]
+            for record in processes
+            if process_is_running(record["pid"])
+        ]
+        if not alive:
+            break
+        time.sleep(0.2)
+    else:
+        for pid in alive:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        deadline = time.time() + 5
+        while time.time() < deadline and any(
+            process_is_running(pid) for pid in alive
+        ):
+            time.sleep(0.2)
+        stubborn = [pid for pid in alive if process_is_running(pid)]
+        if stubborn:
+            raise SystemExit(f"OMP sessions could not be terminated: {stubborn}")
+
+    time.sleep(1)
 sessions_by_pid = log_session_records(processes, log_offset)
 missing = [
     record
@@ -209,35 +293,75 @@ if missing:
         "Could not identify every OMP session; VS Code was left open. Missing PIDs: "
         + ", ".join(str(record["pid"]) for record in missing)
     )
-disable_config("claude-settings.json", home / ".claude/settings.json", manifest)
-disable_config("codex-hooks.json", home / ".codex/hooks.json", manifest)
-disable_entrypoint(home / ".omp/agent/hooks", manifest)
+if action == "disable":
+    disable_config("claude-settings.json", home / ".claude/settings.json", manifest)
+    disable_config("codex-hooks.json", home / ".codex/hooks.json", manifest)
+    disable_entrypoint(home / ".omp/agent/hooks", manifest)
 
-registry_path = home / ".shared-hooks/registry.json"
-if registry_path.exists():
-    registry = json.loads(registry_path.read_text())
-    for hook in registry.get("catalog", {}).get("gitHooks", []):
-        source = hook.get("source")
-        if source:
-            disable_entrypoint(Path(source).expanduser(), manifest)
+    registry_path = home / ".shared-hooks/registry.json"
+    if registry_path.exists():
+        registry = json.loads(registry_path.read_text())
+        for hook in registry.get("catalog", {}).get("gitHooks", []):
+            source = hook.get("source")
+            if source:
+                disable_entrypoint(Path(source).expanduser(), manifest)
 
-pid_path = home / ".shared-hooks/editor-hooks.pid"
-if pid_path.exists():
-    try:
-        os.kill(int(pid_path.read_text().strip()), signal.SIGTERM)
-        manifest["editorWatcherStopped"] = True
-    except (OSError, ValueError):
-        pass
-    pid_path.unlink(missing_ok=True)
+    pid_path = home / ".shared-hooks/editor-hooks.pid"
+    if pid_path.exists():
+        try:
+            os.kill(int(pid_path.read_text().strip()), signal.SIGTERM)
+            manifest["editorWatcherStopped"] = True
+        except (OSError, ValueError):
+            pass
+        pid_path.unlink(missing_ok=True)
 
-launch_agent = home / "Library/LaunchAgents/com.wisent.editor-hooks.plist"
-if launch_agent.exists():
-    subprocess.run(
-        ["launchctl", "bootout", f"gui/{os.getuid()}", str(launch_agent)],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+    launch_agent = home / "Library/LaunchAgents/com.wisent.editor-hooks.plist"
+    if launch_agent.exists():
+        subprocess.run(
+            ["launchctl", "bootout", f"gui/{os.getuid()}", str(launch_agent)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        disable_entrypoint(launch_agent, manifest)
+else:
+    installer = Path(os.environ["TAMA_HOOK_INSTALLER"])
+    release_root = Path(os.environ["TAMA_HOOK_RELEASE_ROOT"])
+    if not installer.is_file():
+        raise SystemExit(f"Tama hook release installer is missing: {installer}")
+    if not (release_root / "release.json").is_file():
+        raise SystemExit(f"Tama approved hook release is missing: {release_root}")
+    install = subprocess.run(
+        [
+            sys.executable,
+            str(installer),
+            "--release",
+            str(release_root),
+            "--home",
+            str(home),
+            "--emergency-manifest",
+            str(manifest_path),
+        ],
+        capture_output=True,
+        text=True,
         check=False,
     )
+    if install.returncode != 0:
+        raise SystemExit(
+            install.stderr.strip()
+            or install.stdout.strip()
+            or "Tama could not install the approved hook release."
+        )
+    installed_release = json.loads(install.stdout)["installed"]
+
+    launch_agent = home / "Library/LaunchAgents/com.wisent.editor-hooks.plist"
+    if launch_agent.exists():
+        subprocess.run(
+            ["launchctl", "bootstrap", f"gui/{os.getuid()}", str(launch_agent)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
 
 groups = {}
 for record in processes:
@@ -357,20 +481,45 @@ module.exports = { activate, deactivate };
 ''')
 
 manifest["sessionPlan"] = plan
-atomic_json(backup / "manifest.json", manifest)
-atomic_json(
-    tama / "hook-emergency-state.json",
-    {
-        "schema": "ai.wisent.tama.hook-emergency-state.v1",
-        "disabled": True,
-        "changedAt": datetime.now(timezone.utc).isoformat(),
-    },
-)
-print(
-    f"Prepared {sum(len(group['sessions']) for group in plan['windows'])} sessions "
-    f"across {len(plan['windows'])} VS Code windows."
-)
+state_path = tama / "hook-emergency-state.json"
+if action == "disable":
+    atomic_json(manifest_path, manifest)
+    atomic_json(
+        state_path,
+        {
+            "schema": "ai.wisent.tama.hook-emergency-state.v1",
+            "disabled": True,
+            "changedAt": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+else:
+    state_path.unlink(missing_ok=True)
+    manifest_path.unlink(missing_ok=True)
+    (backup / "claude-settings.json").unlink(missing_ok=True)
+    (backup / "codex-hooks.json").unlink(missing_ok=True)
+    if os.environ["TAMA_SKIP_SESSION_RESTART"] == "1":
+        shutil.rmtree(
+            home / ".vscode/extensions/tama.emergency-resume-1.0.0",
+            ignore_errors=True,
+        )
+        shutil.rmtree(resume_root, ignore_errors=True)
+if action == "enable":
+    print(
+        f"Enabled approved hook release {installed_release['releaseId'][:12]} and prepared "
+        f"{sum(len(group['sessions']) for group in plan['windows'])} sessions "
+        f"across {len(plan['windows'])} VS Code windows."
+    )
+else:
+    print(
+        f"Disabled hooks and prepared "
+        f"{sum(len(group['sessions']) for group in plan['windows'])} sessions "
+        f"across {len(plan['windows'])} VS Code windows."
+    )
 PY
+if [ "$TAMA_SKIP_SESSION_RESTART" = "1" ]; then
+    exit 0
+fi
+
 
 osascript -e 'tell application "Visual Studio Code" to quit' >/dev/null 2>&1 || true
 
@@ -378,7 +527,7 @@ attempt=0
 while [ "$(osascript -e 'application "Visual Studio Code" is running' 2>/dev/null)" = "true" ]; do
     attempt=$((attempt + 1))
     if [ "$attempt" -ge 300 ]; then
-        printf '%s\n' "VS Code did not quit; hooks are disabled and sessions are checkpointed, but restart was not completed." >&2
+        printf '%s\n' "VS Code did not quit; hook state changed and sessions are checkpointed, but restart was not completed." >&2
         exit 1
     fi
     sleep 1
@@ -399,11 +548,13 @@ sleep 8
 python3 - <<'PY'
 from pathlib import Path
 import json
+import os
 import shutil
 import subprocess
 import time
 
-home = Path.home()
+home = Path(os.environ.get("TAMA_HOME") or Path.home())
+action = os.environ["TAMA_EMERGENCY_ACTION"]
 root = home / "Library/Application Support/Tama/vscode-resume"
 plan = json.loads((root / "plan.json").read_text())
 code = shutil.which("code") or "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
@@ -437,4 +588,11 @@ if remaining:
         "VS Code did not resume these windows: "
         + ", ".join(group["key"] for group in remaining)
     )
+
+if action == "enable":
+    shutil.rmtree(
+        home / ".vscode/extensions/tama.emergency-resume-1.0.0",
+        ignore_errors=True,
+    )
+    shutil.rmtree(root, ignore_errors=True)
 PY

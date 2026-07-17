@@ -12,9 +12,15 @@ final class AppModel: ObservableObject {
     @Published var searchText = ""
     @Published var hookFilter: HookFilter = .all
     @Published private(set) var areHooksDisabled = false
+    @Published private(set) var isChangingHookState = false
+    @Published private(set) var installedHookReleaseID: String?
+    @Published private(set) var ompSessions: [OMPSessionRecord] = []
+    @Published var selectedOMPSessionID: OMPSessionRecord.ID?
+    @Published private(set) var isChangingSessionHook = false
 
     private let client = HookCatalogClient()
     private let emergencySwitch = HookEmergencySwitch()
+    private var sessionPollingTask: Task<Void, Never>?
 
     var filteredHooks: [HookRecord] {
         guard let hooks = snapshot?.catalog.hooks else { return [] }
@@ -40,11 +46,33 @@ final class AppModel: ObservableObject {
 
     init() {
         areHooksDisabled = emergencySwitch.isDisabled
-        Task { await refresh() }
+        installedHookReleaseID = emergencySwitch.installedReleaseID
+        Task {
+            await refresh()
+            do {
+                try await Task.detached(priority: .utility) {
+                    try HookEmergencySwitch().installSessionController()
+                }.value
+            } catch {
+                errorMessage = (error as? LocalizedError)?.errorDescription
+                    ?? error.localizedDescription
+            }
+        }
+        sessionPollingTask = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.refreshOMPSessions()
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+    deinit {
+        sessionPollingTask?.cancel()
     }
 
     func refresh() async {
         guard !isRefreshing else { return }
+        areHooksDisabled = emergencySwitch.isDisabled
+        installedHookReleaseID = emergencySwitch.installedReleaseID
         isRefreshing = true
         errorMessage = nil
         do {
@@ -61,15 +89,77 @@ final class AppModel: ObservableObject {
         isRefreshing = false
     }
     func setHooksDisabled(_ disabled: Bool) {
-        do {
-            try emergencySwitch.setDisabled(disabled)
-            areHooksDisabled = emergencySwitch.isDisabled
-            guard areHooksDisabled == disabled else {
-                throw HookEmergencyError.stateDidNotPersist
+        guard !isChangingHookState else { return }
+        isChangingHookState = true
+        let emergencySwitch = emergencySwitch
+        Task {
+            defer { isChangingHookState = false }
+            do {
+                try await Task.detached(priority: .userInitiated) {
+                    try emergencySwitch.setDisabled(disabled)
+                }.value
+                areHooksDisabled = emergencySwitch.isDisabled
+                installedHookReleaseID = emergencySwitch.installedReleaseID
+                guard areHooksDisabled == disabled else {
+                    throw HookEmergencyError.stateDidNotPersist
+                }
+                errorMessage = nil
+            } catch {
+                areHooksDisabled = emergencySwitch.isDisabled
+                errorMessage = (error as? LocalizedError)?.errorDescription
+                    ?? error.localizedDescription
             }
-            errorMessage = nil
+        }
+    }
+
+    var selectedOMPSession: OMPSessionRecord? {
+        guard let selectedOMPSessionID else { return ompSessions.first }
+        return ompSessions.first(where: { $0.id == selectedOMPSessionID })
+    }
+
+    func isHookEnabledInSelectedSession(_ hookId: String) -> Bool? {
+        selectedOMPSession?.isHookEnabled(hookId, globallyDisabled: areHooksDisabled)
+    }
+
+    func refreshOMPSessions() async {
+        do {
+            let loaded = try await Task.detached(priority: .utility) {
+                try SessionControlClient().liveSessions()
+            }.value
+            ompSessions = loaded
+            if !loaded.contains(where: { $0.id == selectedOMPSessionID }) {
+                selectedOMPSessionID = loaded.first?.id
+            }
         } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            ompSessions = []
+            selectedOMPSessionID = nil
+        }
+    }
+
+    func setSelectedSessionHook(_ hookId: String, enabled: Bool) {
+        guard !isChangingSessionHook, let session = selectedOMPSession else { return }
+        isChangingSessionHook = true
+        Task {
+            defer { isChangingSessionHook = false }
+            do {
+                let updated = try await Task.detached(priority: .userInitiated) {
+                    try await SessionControlClient().setHookEnabled(
+                        enabled,
+                        hookId: hookId,
+                        session: session
+                    )
+                }.value
+                if let index = ompSessions.firstIndex(where: { $0.id == updated.id }) {
+                    ompSessions[index] = updated
+                } else {
+                    ompSessions.append(updated)
+                }
+                errorMessage = nil
+            } catch {
+                errorMessage = (error as? LocalizedError)?.errorDescription
+                    ?? error.localizedDescription
+                await refreshOMPSessions()
+            }
         }
     }
 
@@ -97,12 +187,13 @@ final class AppModel: ObservableObject {
     }
 }
 
-private struct HookEmergencySwitch {
+private struct HookEmergencySwitch: @unchecked Sendable {
     private static let schema = "ai.wisent.tama.hook-emergency-state.v1"
     private let manager = FileManager.default
 
     var isDisabled: Bool {
         guard
+            manager.fileExists(atPath: manifestURL.path),
             let data = try? Data(contentsOf: stateURL),
             let state = try? JSONDecoder().decode(State.self, from: data)
         else {
@@ -111,29 +202,104 @@ private struct HookEmergencySwitch {
         return state.schema == Self.schema && state.disabled
     }
 
+    var installedReleaseID: String? {
+        guard
+            let data = try? Data(contentsOf: installedReleaseURL),
+            let release = try? JSONDecoder().decode(InstalledRelease.self, from: data)
+        else {
+            return nil
+        }
+        return release.releaseId
+    }
+
     func setDisabled(_ disabled: Bool) throws {
-        if disabled {
-            try manager.createDirectory(
-                at: stateURL.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            let state = State(
-                schema: Self.schema,
-                disabled: true,
-                changedAt: ISO8601DateFormatter().string(from: Date())
-            )
-            let encoder = JSONEncoder()
-            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-            try encoder.encode(state).write(to: stateURL, options: .atomic)
-        } else if manager.fileExists(atPath: stateURL.path) {
-            try manager.removeItem(at: stateURL)
+        guard let scriptURL = Bundle.main.url(
+            forResource: "emergency_disable_hooks",
+            withExtension: nil
+        ) else {
+            throw HookEmergencyError.scriptMissing
+        }
+
+        let process = Process()
+        let output = Pipe()
+        var environment = ProcessInfo.processInfo.environment
+        environment["TAMA_EMERGENCY_ACTION"] = disabled ? "disable" : "enable"
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = [scriptURL.path]
+        process.environment = environment
+        process.standardOutput = output
+        process.standardError = output
+        try process.run()
+        process.waitUntilExit()
+
+        let message = String(
+            data: output.fileHandleForReading.readDataToEndOfFile(),
+            encoding: .utf8
+        )?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard process.terminationStatus == 0 else {
+            throw HookEmergencyError.commandFailed(message)
+        }
+    }
+    func installSessionController() throws {
+        guard
+            let installerURL = Bundle.main.url(
+                forResource: "install_hook_release",
+                withExtension: "py"
+            ),
+            let resourcesURL = Bundle.main.resourceURL
+        else {
+            throw HookEmergencyError.controllerInstallerMissing
+        }
+        let releaseURL = resourcesURL.appendingPathComponent(
+            "hooks-release",
+            isDirectory: true
+        )
+        guard manager.fileExists(atPath: releaseURL.appendingPathComponent("release.json").path) else {
+            throw HookEmergencyError.controllerReleaseMissing
+        }
+
+        let process = Process()
+        let output = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/python3")
+        process.arguments = [
+            installerURL.path,
+            "--release", releaseURL.path,
+            "--home", NSHomeDirectory(),
+            "--session-control-only",
+        ]
+        process.standardOutput = output
+        process.standardError = output
+        try process.run()
+        process.waitUntilExit()
+
+        let message = String(
+            data: output.fileHandleForReading.readDataToEndOfFile(),
+            encoding: .utf8
+        )?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard process.terminationStatus == 0 else {
+            throw HookEmergencyError.commandFailed(message)
         }
     }
 
-    private var stateURL: URL {
+    private var supportURL: URL {
         manager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Tama", isDirectory: true)
-            .appendingPathComponent("hook-emergency-state.json")
+    }
+
+    private var stateURL: URL {
+        supportURL.appendingPathComponent("hook-emergency-state.json")
+    }
+
+    private var manifestURL: URL {
+        supportURL
+            .appendingPathComponent("emergency-backup", isDirectory: true)
+            .appendingPathComponent("manifest.json")
+    }
+
+    private var installedReleaseURL: URL {
+        supportURL
+            .appendingPathComponent("hooks-runtime", isDirectory: true)
+            .appendingPathComponent("installed.json")
     }
 
     private struct State: Codable {
@@ -141,12 +307,33 @@ private struct HookEmergencySwitch {
         let disabled: Bool
         let changedAt: String
     }
+
+    private struct InstalledRelease: Decodable {
+        let releaseId: String
+    }
 }
 
 private enum HookEmergencyError: LocalizedError {
     case stateDidNotPersist
+    case scriptMissing
+    case controllerInstallerMissing
+    case controllerReleaseMissing
+    case commandFailed(String)
 
     var errorDescription: String? {
-        "Tama could not persist the emergency hook state."
+        switch self {
+        case .stateDidNotPersist:
+            "Tama could not persist the emergency hook state."
+        case .scriptMissing:
+            "The Tama bundle does not contain the emergency hook controller."
+        case .controllerInstallerMissing:
+            "The Tama bundle does not contain the OMP session-controller installer."
+        case .controllerReleaseMissing:
+            "The Tama bundle does not contain an approved hook release for the OMP session controller."
+        case let .commandFailed(message):
+            message.isEmpty
+                ? "Tama could not update the installed hook configuration."
+                : message
+        }
     }
 }
