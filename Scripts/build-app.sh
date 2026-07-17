@@ -35,9 +35,17 @@ if [ -n "${WISENT_GROUND_TRUTH_API:-${GROUND_TRUTH_API:-}}" ]; then
 else
     printf '%s\n' "Skipping AppIcon import: canonical asset resolver is not configured." >&2
 fi
-if command -v codesign >/dev/null 2>&1; then
-    codesign --force --deep --sign - "$APP_BUNDLE"
+CODESIGN_IDENTITY=${WISENT_CODESIGN_IDENTITY:-}
+if [ -z "$CODESIGN_IDENTITY" ]; then
+    CODESIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null \
+        | awk -F '"' '/Apple Development:/ { print $2; exit }')
 fi
+if [ -z "$CODESIGN_IDENTITY" ] || [ "$CODESIGN_IDENTITY" = "-" ]; then
+    printf '%s\n' "Stable Apple Development signing identity is required; refusing ad-hoc signing." >&2
+    exit 1
+fi
+codesign --force --deep --sign "$CODESIGN_IDENTITY" --timestamp=none "$APP_BUNDLE"
+codesign --verify --strict --deep "$APP_BUNDLE"
 printf 'Built %s\n' "$APP_BUNDLE"
 
 RESTART_APP=${WISENT_RESTART_APP:-"$SCRIPT_DIR/wisent-restart-app"}
