@@ -14,10 +14,12 @@ struct HookCatalogClient: Sendable {
             HookCatalog.self,
             from: Data(contentsOf: catalogURL)
         )
+        let justifications = loadJustifications(for: catalog)
         return CatalogSnapshot(
             catalog: catalog,
             validation: validateSnapshot(catalog),
-            loadedAt: Date()
+            loadedAt: Date(),
+            justifications: justifications
         )
     }
 
@@ -37,6 +39,78 @@ struct HookCatalogClient: Sendable {
             throw ClientError.repositoryNotFound
         }
         return root
+    }
+
+    func loadJustifications(
+        for catalog: HookCatalog,
+        homeDirectory: URL? = nil,
+        now: Date = Date()
+    ) -> [JustificationCollection] {
+        let home = homeDirectory ?? manager.homeDirectoryForCurrentUser
+        var seen: Set<JustificationRequirement.ID> = []
+        let requirements = catalog.hooks
+            .filter { $0.type == "requires_justification" }
+            .flatMap(\.requirements)
+            .filter { seen.insert($0.id).inserted }
+
+        return requirements.map { requirement in
+            do {
+                let registryURL = resolvedURL(requirement.registryPath, homeDirectory: home)
+                let data = try Data(contentsOf: registryURL)
+                guard let registry = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    throw JustificationRegistryError.invalidRoot(registryURL.path)
+                }
+                let entries = registry.keys.sorted().map { key in
+                    let fields = registry[key] as? [String: Any]
+                    let justification = fields?[requirement.field] as? String ?? ""
+                    let expiresAt = parseDate(fields?["expires_at"] as? String)
+                    let directUserQuote = requirement.directUserQuoteField
+                        .flatMap { fields?[$0] as? String }
+                    let targetURL = resolvedURL(key, homeDirectory: home)
+                    return JustificationEntry(
+                        kind: requirement.kind,
+                        registryKey: key,
+                        justification: justification,
+                        wordCount: justification.split(whereSeparator: \.isWhitespace).count,
+                        directUserQuote: directUserQuote,
+                        expiresAt: expiresAt,
+                        targetExists: manager.fileExists(atPath: targetURL.path),
+                        isExpired: expiresAt.map { $0 <= now } ?? false
+                    )
+                }
+                return JustificationCollection(
+                    requirement: requirement,
+                    entries: entries,
+                    loadError: nil
+                )
+            } catch {
+                return JustificationCollection(
+                    requirement: requirement,
+                    entries: [],
+                    loadError: error.localizedDescription
+                )
+            }
+        }
+    }
+
+    private func resolvedURL(_ path: String, homeDirectory: URL) -> URL {
+        if path == "~" {
+            return homeDirectory
+        }
+        if path.hasPrefix("~/") {
+            return homeDirectory.appendingPathComponent(String(path.dropFirst(2)))
+        }
+        return URL(fileURLWithPath: path)
+    }
+
+    private func parseDate(_ value: String?) -> Date? {
+        guard let value else { return nil }
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let parsed = fractional.date(from: value) {
+            return parsed
+        }
+        return ISO8601DateFormatter().date(from: value)
     }
 
     private func validateSnapshot(_ catalog: HookCatalog) -> ValidationResult {
@@ -67,6 +141,17 @@ struct HookCatalogClient: Sendable {
     }
 }
 
+
+private enum JustificationRegistryError: LocalizedError {
+    case invalidRoot(String)
+
+    var errorDescription: String? {
+        switch self {
+        case let .invalidRoot(path):
+            "Justification registry must contain a JSON object: \(path)"
+        }
+    }
+}
 
 enum ClientError: LocalizedError {
     case repositoryNotFound

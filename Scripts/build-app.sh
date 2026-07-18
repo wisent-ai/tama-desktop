@@ -4,6 +4,19 @@ set -eu
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 DESKTOP_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 APP_BUNDLE="$DESKTOP_ROOT/.build/Tama.app"
+INSTALLED_BUNDLE=${TAMA_INSTALL_APP_PATH:-"$HOME/Applications/Tama.app"}
+LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+
+unregister_bundle() {
+    if output=$("$LSREGISTER" -u "$1" 2>&1); then
+        return 0
+    fi
+    case "$output" in
+        *-10814*) return 0 ;;
+    esac
+    printf '%s\n' "$output" >&2
+    return 1
+}
 CONTENTS="$APP_BUNDLE/Contents"
 MACOS="$CONTENTS/MacOS"
 RESOURCES="$CONTENTS/Resources"
@@ -30,11 +43,7 @@ done
 python3 "$SCRIPT_DIR/seal_hook_release.py" "$HOOK_RELEASE" >/dev/null
 install -m 0755 "$SCRIPT_DIR/emergency_disable_hooks" "$RESOURCES/emergency_disable_hooks"
 install -m 0755 "$SCRIPT_DIR/install_hook_release.py" "$RESOURCES/install_hook_release.py"
-if [ -n "${WISENT_GROUND_TRUTH_API:-${GROUND_TRUTH_API:-}}" ]; then
-    sh "$SCRIPT_DIR/import-brand-icon.sh" tama-desktop "$RESOURCES/AppIcon.icns"
-else
-    printf '%s\n' "Skipping AppIcon import: canonical asset resolver is not configured." >&2
-fi
+sh "$SCRIPT_DIR/import-brand-icon.sh" tama-desktop "$RESOURCES/AppIcon.icns"
 CODESIGN_IDENTITY=${WISENT_CODESIGN_IDENTITY:-}
 if [ -z "$CODESIGN_IDENTITY" ]; then
     CODESIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null \
@@ -47,8 +56,14 @@ fi
 codesign --force --deep --sign "$CODESIGN_IDENTITY" --timestamp=none "$APP_BUNDLE"
 codesign --verify --strict --deep "$APP_BUNDLE"
 printf 'Built %s\n' "$APP_BUNDLE"
-
+rm -rf "$INSTALLED_BUNDLE"
+mkdir -p "$(dirname "$INSTALLED_BUNDLE")"
+ditto "$APP_BUNDLE" "$INSTALLED_BUNDLE"
+codesign --verify --strict --deep "$INSTALLED_BUNDLE"
+unregister_bundle "$APP_BUNDLE"
+"$LSREGISTER" -f "$INSTALLED_BUNDLE"
+printf 'Installed %s\n' "$INSTALLED_BUNDLE"
 RESTART_APP=${WISENT_RESTART_APP:-"$SCRIPT_DIR/wisent-restart-app"}
 if [ "${WISENT_RESTART_AFTER_BUILD:-1}" != 0 ] && [ -x "$RESTART_APP" ]; then
-    "$RESTART_APP" --if-running "$APP_BUNDLE"
+    "$RESTART_APP" --if-running "$INSTALLED_BUNDLE"
 fi

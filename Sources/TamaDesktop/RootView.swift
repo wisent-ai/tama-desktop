@@ -11,6 +11,8 @@ struct RootView: View {
                     .tag(SidebarSelection.overview)
                 Label("Hook catalog", systemImage: "list.bullet.rectangle")
                     .tag(SidebarSelection.hooks)
+                Label("Justifications", systemImage: "text.badge.checkmark")
+                    .tag(SidebarSelection.justifications)
                 Label("Snapshot validation", systemImage: "checkmark.seal")
                     .tag(SidebarSelection.validation)
                 Label("Repository hooks", systemImage: "point.3.connected.trianglepath.dotted")
@@ -136,6 +138,8 @@ struct RootView: View {
                 )
             case .hooks:
                 HookCatalogPane(model: model)
+            case .justifications:
+                JustificationsView(collections: snapshot.justifications)
             case .validation:
                 ValidationView(result: snapshot.validation)
             case .repositories:
@@ -150,6 +154,7 @@ struct RootView: View {
         switch model.selection ?? .overview {
         case .overview: "Overview"
         case .hooks: "Hook catalog"
+        case .justifications: "Justifications"
         case .validation: "Snapshot validation"
         case .repositories: "Repository hooks"
         }
@@ -303,6 +308,9 @@ private struct HookDetailView: View {
                     }
                     Spacer()
                     StatusLabel(text: hook.status.capitalized, isHealthy: hook.status == "active")
+                    Text(hook.type)
+                        .font(.caption.monospaced())
+                        .foregroundStyle(.secondary)
                 }
 
                 if let description = hook.description {
@@ -369,28 +377,30 @@ private struct SessionHookControlView: View {
     @ObservedObject var model: AppModel
     let hook: HookRecord
     @State private var pendingEnabledState: Bool?
+    @State private var isConfirmingEnableAll = false
 
     var body: some View {
-        GroupBox("OMP session control") {
+        GroupBox("Session control") {
             VStack(alignment: .leading, spacing: 10) {
-                if model.ompSessions.isEmpty {
-                    Label("No active OMP sessions", systemImage: "terminal")
+                if model.agentSessions.isEmpty {
+                    Label("No active agent sessions", systemImage: "terminal")
                         .foregroundStyle(.secondary)
-                    Text("Start or resume OMP after Tama installs the session controller. Active sessions will appear here automatically.")
+                    Text("Start or resume OMP, Claude, or Codex after Tama installs the session controllers. Active sessions appear here automatically.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Button("Refresh sessions", systemImage: "arrow.clockwise") {
-                        Task { await model.refreshOMPSessions() }
+                        Task { await model.refreshAgentSessions() }
                     }
                 } else {
-                    Picker("Session", selection: $model.selectedOMPSessionID) {
-                        ForEach(model.ompSessions) { session in
+                    Picker("Session", selection: $model.selectedAgentSessionID) {
+                        ForEach(model.agentSessions) { session in
                             Text(session.displayName)
                                 .tag(Optional(session.id))
                         }
                     }
-                    if let session = model.selectedOMPSession,
+                    if let session = model.selectedAgentSession,
                        let isEnabled = model.isHookEnabledInSelectedSession(hook.id) {
+                        LabeledContent("Provider", value: session.providerDisplayName)
                         LabeledContent("Session ID") {
                             Text(session.sessionId)
                                 .font(.caption.monospaced())
@@ -402,6 +412,40 @@ private struct SessionHookControlView: View {
                                 .font(.caption.monospaced())
                                 .textSelection(.enabled)
                                 .lineLimit(1)
+                        }
+                        if let runtime = session.runtime {
+                            LabeledContent("Hook runtime") {
+                                StatusLabel(
+                                    text: runtime.reloadRequired ? "Reload required" : "Loaded",
+                                    isHealthy: !runtime.reloadRequired && runtime.registryLoadError == nil
+                                )
+                            }
+                            LabeledContent("Release") {
+                                Text(
+                                    "\(runtime.loadedReleaseId.prefix(12)) loaded / "
+                                        + "\(runtime.installedReleaseId?.prefix(12) ?? "none") installed"
+                                )
+                                .font(.caption.monospaced())
+                                .textSelection(.enabled)
+                            }
+                            LabeledContent(
+                                "Hooks",
+                                value: "\(runtime.loadedHookCount) loaded / \(runtime.registeredHookCount) registered"
+                            )
+                            if let checksum = runtime.catalogChecksum {
+                                LabeledContent("Catalog checksum") {
+                                    Text(checksum)
+                                        .font(.caption.monospaced())
+                                        .textSelection(.enabled)
+                                        .lineLimit(1)
+                                }
+                            }
+                            if !runtime.unknownHookIds.isEmpty {
+                                LabeledContent(
+                                    "Unknown hook IDs",
+                                    value: runtime.unknownHookIds.joined(separator: ", ")
+                                )
+                            }
                         }
                         HStack {
                             StatusLabel(
@@ -418,12 +462,18 @@ private struct SessionHookControlView: View {
                                 }
                                 .buttonStyle(.borderedProminent)
                                 .tint(isEnabled ? .red : .green)
+                                Button("Enable all hooks and reload") {
+                                    isConfirmingEnableAll = true
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .controlSize(.large)
+                                .tint(.green)
                             }
                         }
                         Text(
                             model.areHooksDisabled
-                                ? "All hooks are globally disabled. Enabling creates an allowlist entry only for this OMP session."
-                                : "The session override is stored with this OMP session and restored when the same session is resumed."
+                                ? "All hooks are globally disabled. Enabling creates an allowlist entry only for this agent session."
+                                : "The session override is stored for this agent session and restored when the same session is resumed."
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -451,7 +501,27 @@ private struct SessionHookControlView: View {
             }
         } message: {
             Text(
-                "This changes only hook \(hook.id) in OMP session \(model.selectedOMPSession?.sessionId ?? "unknown"). Other sessions are unaffected."
+                "This changes only hook \(hook.id) in \(model.selectedAgentSession?.providerDisplayName ?? "agent") session \(model.selectedAgentSession?.sessionId ?? "unknown"). Other sessions are unaffected."
+            )
+        }
+        .confirmationDialog(
+            "Enable every hook and reload this session?",
+            isPresented: $isConfirmingEnableAll,
+            titleVisibility: .visible
+        ) {
+            Button("Enable all hooks and reload") {
+                isConfirmingEnableAll = false
+                model.enableAllHooksInSelectedSession()
+            }
+            Button("Cancel", role: .cancel) {
+                isConfirmingEnableAll = false
+            }
+        } message: {
+            Text(
+                "One approved operation enables every registered hook, persists the override only in "
+                    + "\(model.selectedAgentSession?.providerDisplayName ?? "agent") session "
+                    + "\(model.selectedAgentSession?.sessionId ?? "unknown"), and reloads its OMP runtime. "
+                    + "Other sessions are unaffected."
             )
         }
     }

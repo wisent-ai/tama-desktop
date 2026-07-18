@@ -18,5 +18,10 @@ let package = Package(
             ],
             path: "Sources/TamaDesktop"
         ),
+        .testTarget(
+            name: "TamaDesktopTests",
+            dependencies: ["TamaDesktop"],
+            path: "Tests/TamaDesktopTests"
+        ),
     ]
 )

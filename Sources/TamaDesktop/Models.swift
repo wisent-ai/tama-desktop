@@ -4,6 +4,7 @@ struct CatalogSnapshot: Sendable {
     let catalog: HookCatalog
     let validation: ValidationResult
     let loadedAt: Date
+    let justifications: [JustificationCollection]
 }
 
 struct HookCatalog: Decodable, Sendable {
@@ -25,6 +26,11 @@ struct HookRecord: Decodable, Identifiable, Sendable {
     let why: String?
     let sideEffects: String?
     let events: [HookEvent]
+    let justificationRequirements: [JustificationRequirement]?
+
+    var requirements: [JustificationRequirement] {
+        justificationRequirements ?? []
+    }
 
     var isBlocking: Bool {
         events.contains(where: \.blocking)
@@ -32,6 +38,44 @@ struct HookRecord: Decodable, Identifiable, Sendable {
 
     var eventNames: String {
         events.map(\.event).joined(separator: ", ")
+    }
+}
+
+struct JustificationRequirement: Decodable, Hashable, Identifiable, Sendable {
+    let kind: String
+    let title: String
+    let registryPath: String
+    let field: String
+    let minimumWords: Int
+    let directUserQuoteField: String?
+
+    var id: String {
+        "\(kind):\(registryPath):\(field)"
+    }
+}
+
+struct JustificationCollection: Identifiable, Sendable {
+    let requirement: JustificationRequirement
+    let entries: [JustificationEntry]
+    let loadError: String?
+
+    var id: String {
+        requirement.id
+    }
+}
+
+struct JustificationEntry: Identifiable, Sendable {
+    let kind: String
+    let registryKey: String
+    let justification: String
+    let wordCount: Int
+    let directUserQuote: String?
+    let expiresAt: Date?
+    let targetExists: Bool
+    let isExpired: Bool
+
+    var id: String {
+        "\(kind):\(registryKey)"
     }
 }
 
@@ -67,6 +111,7 @@ struct ValidationResult: Decodable, Sendable {
 enum SidebarSelection: Hashable {
     case overview
     case hooks
+    case justifications
     case validation
     case repositories
 }

@@ -3,10 +3,10 @@ set -eu
 
 PRODUCT=${1:?"Usage: import-brand-icon.sh PRODUCT OUTPUT.icns"}
 OUTPUT=${2:?"Usage: import-brand-icon.sh PRODUCT OUTPUT.icns"}
-API_BASE=${WISENT_GROUND_TRUTH_API:-${GROUND_TRUTH_API:-}}
+API_BASE=${WISENT_GROUND_TRUTH_API:-}
 
 if [ -z "$API_BASE" ]; then
-    printf '%s\n' 'WISENT_GROUND_TRUTH_API (or GROUND_TRUTH_API) must point to the canonical asset resolver.' >&2
+    printf '%s\n' 'WISENT_GROUND_TRUTH_API must point to the canonical asset resolver.' >&2
     exit 64
 fi
 

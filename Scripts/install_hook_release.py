@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import shlex
 import subprocess
 import sys
 
@@ -39,6 +40,17 @@ def atomic_json(path: Path, value: object) -> None:
     os.replace(temporary, path)
 
 
+def registry_checksum(registry: dict) -> str:
+    value = {key: item for key, item in registry.items() if key != "catalogChecksum"}
+    encoded = json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def tree_digest(root: Path) -> str:
     digest = hashlib.sha256()
     for path in sorted(item for item in root.rglob("*") if item.is_file() and item.name != "release.json"):
@@ -60,25 +72,36 @@ def load_json(path: Path) -> dict:
     return value
 
 
-def transformed(value, replacements: list[tuple[str, str]]):
+def transformed(value, replacements: list[tuple[str, str]], field: str | None = None):
     if isinstance(value, str):
         markers = []
         for index, (source, target) in enumerate(replacements):
             marker = f"\u0000TAMA_PATH_{index}\u0000"
             value = value.replace(source, marker)
-            markers.append((marker, target))
+            replacement = shlex.quote(target) if field == "command" else target
+            markers.append((marker, replacement))
         for marker, target in markers:
             value = value.replace(marker, target)
         return value
     if isinstance(value, list):
-        return [transformed(item, replacements) for item in value]
+        return [transformed(item, replacements, field) for item in value]
     if isinstance(value, dict):
-        return {key: transformed(item, replacements) for key, item in value.items()}
+        return {key: transformed(item, replacements, key) for key, item in value.items()}
     return value
 
 
-def hook_config(hook: dict) -> dict:
-    result = {"type": hook.get("type") or "command", "command": hook["command"]}
+def hook_config(event: str, hook: dict, provider: str) -> dict:
+    command = " ".join(
+        [
+            "env",
+            f"TAMA_PROVIDER={shlex.quote(provider)}",
+            f"TAMA_ONLY_HOOK_ID={shlex.quote(str(hook['id']))}",
+            'node \"$HOME/.shared-hooks/run-hook.mjs\"',
+            shlex.quote(event),
+            shlex.quote(provider),
+        ]
+    )
+    result = {"type": hook.get("type") or "command", "command": command}
     if hook.get("timeout"):
         result["timeout"] = hook["timeout"]
     if hook.get("statusMessage"):
@@ -86,14 +109,19 @@ def hook_config(hook: dict) -> dict:
     return result
 
 
-def build_hooks(registry: dict) -> dict:
+def build_hooks(registry: dict, provider: str) -> dict:
     result: dict[str, list[dict]] = {}
     for event, entry in registry.get("events", {}).items():
         target = EVENT_TO_CODEX.get(event)
         if target is None:
             continue
         key, matcher = target
-        group = {"hooks": [hook_config(hook) for hook in entry.get("hooks", [])]}
+        group = {
+            "hooks": [
+                hook_config(event, hook, provider)
+                for hook in entry.get("hooks", [])
+            ]
+        }
         if matcher:
             group["matcher"] = matcher
         result.setdefault(key, []).append(group)
@@ -146,10 +174,19 @@ def release_file_map(release_root: Path, home: Path, registry: dict) -> dict[Pat
     return files
 
 
-def base_config(target: Path, label: str, emergency_manifest: dict, backup_root: Path) -> dict:
+def base_config(
+    target: Path,
+    label: str,
+    emergency_manifest: dict,
+    backup_root: Path | None,
+) -> dict:
     configured = set(emergency_manifest.get("configs", []))
-    saved = backup_root / label
-    source = saved if str(target) in configured and saved.is_file() else target
+    saved = backup_root / label if backup_root is not None else None
+    source = (
+        saved
+        if saved is not None and str(target) in configured and saved.is_file()
+        else target
+    )
     if not source.is_file():
         return {}
     return load_json(source)
@@ -181,6 +218,18 @@ if [ -x "$BACKUP" ]; then
   "$BACKUP" "$@" < "$INPUT_FILE"
 fi
 exit 0
+'''
+    return body.encode()
+
+
+def supervisor_launcher_body(home: Path) -> bytes:
+    supervisor = home / ".shared-hooks/agent-session-supervisor.py"
+    body = f'''#!/bin/sh
+# Tama-managed process and session supervisor
+set -eu
+SUPERVISOR={json.dumps(str(supervisor))}
+[ -x "$SUPERVISOR" ] || {{ printf 'Tama session supervisor is missing: %s\\n' "$SUPERVISOR" >&2; exit 66; }}
+exec /usr/bin/python3 "$SUPERVISOR" "$@"
 '''
     return body.encode()
 
@@ -341,10 +390,13 @@ def install_release(
     )
     replacements.sort(key=lambda item: len(item[0]), reverse=True)
     registry = transformed(registry_raw, replacements)
+    registry["releaseId"] = release["releaseId"]
     registry.setdefault("catalog", {})["maintainedIn"] = str(home / ".shared-hooks/registry.json")
     registry["catalog"]["generatedDocs"] = str(home / ".shared-hooks/HOOKS.md")
-    hooks = build_hooks(registry)
-    if not hooks or not any(group.get("hooks") for groups in hooks.values() for group in groups):
+    registry["catalogChecksum"] = registry_checksum(registry)
+    claude_hooks = build_hooks(registry, "claude")
+    codex_hooks = build_hooks(registry, "codex")
+    if not claude_hooks or not codex_hooks:
         raise RuntimeError("Approved hook release generated an empty runtime configuration")
 
     releases_root = runtime_root / "releases"
@@ -372,15 +424,39 @@ def install_release(
         backup_root = manifest_path.parent
 
     writes = release_file_map(release_root, home, registry)
-    if not session_control_only:
-        claude_target = home / ".claude/settings.json"
-        codex_target = home / ".codex/hooks.json"
-        claude_config = base_config(claude_target, "claude-settings.json", emergency_manifest, backup_root)
-        codex_config = base_config(codex_target, "codex-hooks.json", emergency_manifest, backup_root)
-        claude_config["hooks"] = hooks
-        codex_config["hooks"] = hooks
-        writes[claude_target] = ((json.dumps(claude_config, indent=2, sort_keys=True) + "\n").encode(), 0o600)
-        writes[codex_target] = ((json.dumps(codex_config, indent=2, sort_keys=True) + "\n").encode(), 0o600)
+    supervisor_target = home / ".shared-hooks/agent-session-supervisor.py"
+    if supervisor_target not in writes:
+        raise RuntimeError("Approved hook release is missing the Tama session supervisor")
+    launcher_target = home / ".local/bin/tama-agent"
+    writes[launcher_target] = (supervisor_launcher_body(home), 0o755)
+    legacy_launchers = {
+        home / ".local/bin/tama-omp",
+        home / ".local/bin/tama-agent-supervisor",
+    }
+    claude_target = home / ".claude/settings.json"
+    codex_target = home / ".codex/hooks.json"
+    claude_config = base_config(
+        claude_target,
+        "claude-settings.json",
+        emergency_manifest,
+        backup_root,
+    )
+    codex_config = base_config(
+        codex_target,
+        "codex-hooks.json",
+        emergency_manifest,
+        backup_root,
+    )
+    claude_config["hooks"] = claude_hooks
+    codex_config["hooks"] = codex_hooks
+    writes[claude_target] = (
+        (json.dumps(claude_config, indent=2, sort_keys=True) + "\n").encode(),
+        0o600,
+    )
+    writes[codex_target] = (
+        (json.dumps(codex_config, indent=2, sort_keys=True) + "\n").encode(),
+        0o600,
+    )
 
     moved = [] if session_control_only else [
         (Path(item["source"]), Path(item["disabled"]))
@@ -435,12 +511,14 @@ def install_release(
                         approved.read_bytes(),
                         approved.stat().st_mode & 0o777,
                     )
+    managed_launchers = {launcher_target}
     new_source_files = {
         str(path)
         for path in writes
         if path.is_relative_to(home / ".shared-hooks")
         or path.is_relative_to(home / ".claude/hooks")
         or path.is_relative_to(home / ".codex/hooks")
+        or path in managed_launchers
     }
     obsolete_source_files = {
         Path(path)
@@ -449,7 +527,7 @@ def install_release(
     }
     safe_roots = (home / ".shared-hooks", home / ".claude/hooks", home / ".codex/hooks")
     for path in obsolete_source_files:
-        if not any(path.is_relative_to(root) for root in safe_roots):
+        if path not in managed_launchers | legacy_launchers and not any(path.is_relative_to(root) for root in safe_roots):
             raise RuntimeError(f"Refusing to remove an obsolete path outside managed roots: {path}")
 
     transaction_root = runtime_root / f"transaction-{os.getpid()}"
@@ -462,11 +540,18 @@ def install_release(
         home / ".omp/agent/hooks/pre/shared-hooks.js",
         home / ".omp/agent/hooks.tama-disabled/pre/shared-hooks.js",
     )
+    legacy_restart_artifacts = (
+        home / "Library/Application Support/Tama/vscode-resume",
+        home / ".vscode/extensions/tama.emergency-resume-1.0.0",
+    )
     try:
         for path in sorted(obsolete_source_files, key=str):
             if path.exists() or path.is_symlink():
                 transaction.delete(path)
         for path in old_omp_adapters:
+            if path.exists() or path.is_symlink():
+                transaction.delete(path)
+        for path in legacy_restart_artifacts:
             if path.exists() or path.is_symlink():
                 transaction.delete(path)
         for path, (data, mode) in sorted(writes.items(), key=lambda item: str(item[0])):
@@ -522,6 +607,7 @@ def install_release(
         installed = {
             "schema": INSTALLED_SCHEMA,
             "releaseId": release_id,
+            "catalogChecksum": registry["catalogChecksum"],
             "packageVersion": release.get("packageVersion"),
             "catalogVersion": release.get("catalogVersion"),
             "catalogUpdatedAt": release.get("catalogUpdatedAt"),

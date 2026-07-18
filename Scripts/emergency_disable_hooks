@@ -19,18 +19,43 @@ case "$ACTION" in
 esac
 export TAMA_EMERGENCY_ACTION="$ACTION"
 export TAMA_SKIP_SESSION_RESTART=${TAMA_SKIP_SESSION_RESTART:-0}
+TAMA_SESSION_SUPERVISOR=${TAMA_SESSION_SUPERVISOR:-"$TAMA_HOOK_RELEASE_ROOT/shared-hooks/agent-session-supervisor.py"}
+TAMA_SUPERVISOR_HOME=${TAMA_HOME:-"$HOME"}
+export TAMA_SESSION_SUPERVISOR TAMA_SUPERVISOR_HOME
+
+supervisor_paused=0
+resume_supervised_sessions() {
+    if [ "$supervisor_paused" = 1 ]; then
+        python3 "$TAMA_SESSION_SUPERVISOR" control resume \
+            --home "$TAMA_SUPERVISOR_HOME" >/dev/null \
+            || printf '%s\n' "Tama could not resume one or more supervised agent sessions." >&2
+    fi
+}
+
+if [ "$TAMA_SKIP_SESSION_RESTART" != 1 ]; then
+    [ -f "$TAMA_SESSION_SUPERVISOR" ] || {
+        printf 'Tama session supervisor is missing: %s\n' "$TAMA_SESSION_SUPERVISOR" >&2
+        exit 66
+    }
+    supervisor_paused=1
+    trap resume_supervised_sessions EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
+    python3 "$TAMA_SESSION_SUPERVISOR" control pause \
+        --home "$TAMA_SUPERVISOR_HOME" \
+        --require-all >/dev/null
+fi
 
 python3 - <<'PY'
 from pathlib import Path
 from datetime import datetime, timezone
-import hashlib
 import json
 import os
 import shutil
-import signal
 import subprocess
+import signal
 import sys
-import time
 
 action = os.environ["TAMA_EMERGENCY_ACTION"]
 
@@ -38,12 +63,8 @@ home = Path(os.environ.get("TAMA_HOME") or Path.home())
 tama = home / "Library/Application Support/Tama"
 backup = tama / "emergency-backup"
 backup.mkdir(parents=True, exist_ok=True)
-log_path = home / ".omp/logs" / f"omp.{datetime.now().strftime('%Y-%m-%d')}.log"
-sessions_root = home / ".omp/agent/sessions"
 
 
-def output(arguments):
-    return subprocess.run(arguments, capture_output=True, text=True, check=False).stdout
 
 
 def atomic_json(path, value):
@@ -53,47 +74,6 @@ def atomic_json(path, value):
     os.replace(temporary, path)
 
 
-def process_cwd(pid):
-    for line in output(["lsof", "-a", "-p", str(pid), "-d", "cwd", "-Fn"]).splitlines():
-        if line.startswith("n"):
-            return str(Path(line[1:]).resolve())
-    return ""
-
-
-def open_session_file(pid):
-    marker = str(sessions_root) + "/"
-    for line in output(["lsof", "-p", str(pid), "-Fn"]).splitlines():
-        if (
-            line.startswith("n")
-            and marker in line
-            and line.endswith(".jsonl")
-            and not line.endswith("/__advisor.jsonl")
-        ):
-            return line[1:]
-    return None
-
-
-def process_is_running(pid):
-    state = output(["ps", "-p", str(pid), "-o", "stat="]).strip()
-    return bool(state) and not state.startswith("Z")
-
-
-def interactive_omp_processes():
-    records = []
-    for raw_pid in output(["pgrep", "-x", "omp"]).split():
-        pid = int(raw_pid)
-        tty = output(["ps", "-p", str(pid), "-o", "tty="]).strip()
-        if not tty or tty == "??":
-            continue
-        records.append(
-            {
-                "pid": pid,
-                "tty": tty,
-                "cwd": process_cwd(pid),
-                "openSession": open_session_file(pid),
-            }
-        )
-    return records
 
 
 def disable_config(label, path, manifest):
@@ -103,8 +83,16 @@ def disable_config(label, path, manifest):
     if not destination.exists():
         shutil.copy2(path, destination)
     value = json.loads(path.read_text())
-    value["hooks"] = {}
-    atomic_json(path, value)
+    commands = [
+        hook.get("command", "")
+        for groups in value.get("hooks", {}).values()
+        for group in groups
+        for hook in group.get("hooks", [])
+        if isinstance(hook, dict)
+    ]
+    if not commands or any("run-hook.mjs" not in command for command in commands):
+        value["hooks"] = {}
+        atomic_json(path, value)
     manifest["configs"].append(str(path))
 
 
@@ -126,98 +114,14 @@ def disable_entrypoint(path, manifest):
 
 
 
-def restore_config(label, path):
-    saved = backup / label
-    if not saved.exists():
-        raise SystemExit(f"Missing Tama backup for {path}: {saved}")
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_name(path.name + ".tama-restore")
-    shutil.copy2(saved, temporary)
-    os.replace(temporary, path)
 
-
-def restore_entrypoint(item):
-    source = Path(item["source"])
-    disabled = Path(item["disabled"])
-    if source.exists():
-        if disabled.exists():
-            raise SystemExit(
-                f"Both active and disabled hook entrypoints exist: {source}"
-            )
-        return
-    if not disabled.exists():
-        raise SystemExit(f"Missing disabled hook entrypoint: {disabled}")
-    os.replace(disabled, source)
-
-def log_session_records(processes, offset):
-    pids = {record["pid"] for record in processes}
-    by_pid = {}
-    latest_session_ids = {}
-    if log_path.exists():
-        with log_path.open("r", errors="replace") as handle:
-            for line in handle:
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                pid = entry.get("pid")
-                if pid in pids and entry.get("sessionId"):
-                    latest_session_ids[pid] = entry["sessionId"]
-            handle.seek(offset)
-            for line in handle:
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                if (
-                    entry.get("pid") in pids
-                    and entry.get("message") == "Session exit recorded"
-                    and entry.get("sessionFile")
-                ):
-                    by_pid[entry["pid"]] = entry["sessionFile"]
-    for record in processes:
-        pid = record["pid"]
-        if pid in by_pid:
-            continue
-        if record["openSession"]:
-            by_pid[pid] = record["openSession"]
-            continue
-        session_id = latest_session_ids.get(pid)
-        if session_id:
-            matches = list(sessions_root.rglob(f"*_{session_id}.jsonl"))
-            if len(matches) == 1:
-                by_pid[pid] = str(matches[0])
-    return by_pid
-
-
-def window_key(cwd):
-    resolved = str(Path(cwd).resolve()) if cwd else ""
-    if resolved == "/private/tmp":
-        return "__empty__"
-    return resolved
-
-
-def marker_name(key):
-    return hashlib.sha256(key.encode()).hexdigest() + ".done"
-
-
-def ancestor_pids():
-    ancestors = set()
-    pid = os.getppid()
-    while pid > 1 and pid not in ancestors:
-        ancestors.add(pid)
-        raw_parent = output(["ps", "-p", str(pid), "-o", "ppid="]).strip()
-        if not raw_parent:
-            break
-        pid = int(raw_parent)
-    return ancestors
 
 
 manifest_path = backup / "manifest.json"
 if action == "enable":
     if not manifest_path.exists():
         raise SystemExit("Tama has no emergency backup manifest to restore.")
-    previous_manifest = json.loads(manifest_path.read_text())
+    json.loads(manifest_path.read_text())
 elif manifest_path.exists():
     print("Tama hooks are already disabled.")
     raise SystemExit(0)
@@ -225,75 +129,35 @@ else:
     (backup / "claude-settings.json").unlink(missing_ok=True)
     (backup / "codex-hooks.json").unlink(missing_ok=True)
 
-
-processes = (
-    []
-    if os.environ["TAMA_SKIP_SESSION_RESTART"] == "1"
-    else interactive_omp_processes()
-)
-runner_pids = ancestor_pids().intersection(record["pid"] for record in processes)
-if runner_pids:
-    raise SystemExit(
-        "Run this script from Tama or an external terminal, not from an OMP session. "
-        "Refusing to terminate the process that is running the script."
-    )
-
-log_offset = log_path.stat().st_size if log_path.exists() else 0
 manifest = {
     "configs": [],
     "moved": [],
     "editorWatcherStopped": False,
-    "ompProcesses": processes,
 }
 
-
 if action == "disable":
-    for record in processes:
-        try:
-            os.kill(record["pid"], signal.SIGTERM)
-        except ProcessLookupError:
-            pass
-
-    deadline = time.time() + 5
-    while time.time() < deadline:
-        alive = [
-            record["pid"]
-            for record in processes
-            if process_is_running(record["pid"])
-        ]
-        if not alive:
-            break
-        time.sleep(0.2)
-    else:
-        for pid in alive:
-            try:
-                os.kill(pid, signal.SIGKILL)
-            except ProcessLookupError:
-                pass
-        deadline = time.time() + 5
-        while time.time() < deadline and any(
-            process_is_running(pid) for pid in alive
-        ):
-            time.sleep(0.2)
-        stubborn = [pid for pid in alive if process_is_running(pid)]
-        if stubborn:
-            raise SystemExit(f"OMP sessions could not be terminated: {stubborn}")
-
-    time.sleep(1)
-sessions_by_pid = log_session_records(processes, log_offset)
-missing = [
-    record
-    for record in processes
-    if record["pid"] not in sessions_by_pid
-    or not Path(sessions_by_pid[record["pid"]]).is_file()
-]
-if missing:
-    atomic_json(backup / "manifest.json", {**manifest, "missingSessions": missing})
-    raise SystemExit(
-        "Could not identify every OMP session; VS Code was left open. Missing PIDs: "
-        + ", ".join(str(record["pid"]) for record in missing)
+    installer = Path(os.environ["TAMA_HOOK_INSTALLER"])
+    release_root = Path(os.environ["TAMA_HOOK_RELEASE_ROOT"])
+    install = subprocess.run(
+        [
+            sys.executable,
+            str(installer),
+            "--release",
+            str(release_root),
+            "--home",
+            str(home),
+            "--session-control-only",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
     )
-if action == "disable":
+    if install.returncode != 0:
+        raise SystemExit(
+            install.stderr.strip()
+            or install.stdout.strip()
+            or "Tama could not install provider session controllers."
+        )
     disable_config("claude-settings.json", home / ".claude/settings.json", manifest)
     disable_config("codex-hooks.json", home / ".codex/hooks.json", manifest)
     disable_entrypoint(home / ".omp/agent/hooks", manifest)
@@ -363,124 +227,6 @@ else:
             check=False,
         )
 
-groups = {}
-for record in processes:
-    key = window_key(record["cwd"])
-    group = groups.setdefault(
-        key,
-        {
-            "key": key,
-            "workspace": None if key == "__empty__" else key,
-            "cwd": "/tmp" if key == "__empty__" else key,
-            "mode": "editor" if key.endswith("/backends") else "panel",
-            "sessions": [],
-            "marker": marker_name(key),
-        },
-    )
-    group["sessions"].append(sessions_by_pid[record["pid"]])
-
-plan = {
-    "schema": "ai.wisent.tama.vscode-session-resume.v1",
-    "createdAt": datetime.now(timezone.utc).isoformat(),
-    "omp": shutil.which("omp") or str(home / ".local/bin/omp"),
-    "windows": list(groups.values()),
-}
-resume_root = tama / "vscode-resume"
-consumed = resume_root / "consumed"
-if consumed.exists():
-    shutil.rmtree(consumed)
-consumed.mkdir(parents=True)
-atomic_json(resume_root / "plan.json", plan)
-
-extension_root = home / ".vscode/extensions/tama.emergency-resume-1.0.0"
-extension_root.mkdir(parents=True, exist_ok=True)
-atomic_json(
-    extension_root / "package.json",
-    {
-        "name": "emergency-resume",
-        "displayName": "Tama Emergency Session Resume",
-        "description": "One-shot restoration of OMP sessions after Tama disables hooks.",
-        "version": "1.0.0",
-        "publisher": "tama",
-        "engines": {"vscode": "^1.90.0"},
-        "main": "./extension.js",
-        "activationEvents": ["onStartupFinished"],
-    },
-)
-(extension_root / "extension.js").write_text(
-r'''const vscode = require('vscode');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-
-const root = path.join(os.homedir(), 'Library', 'Application Support', 'Tama', 'vscode-resume');
-const planPath = path.join(root, 'plan.json');
-const logPath = path.join(root, 'extension.log');
-const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
-
-function log(value) {
-  try { fs.appendFileSync(logPath, `${new Date().toISOString()} ${String(value)}\n`); } catch {}
-}
-
-function currentKey() {
-  const folders = vscode.workspace.workspaceFolders;
-  if (!folders || folders.length === 0) return '__empty__';
-  return fs.realpathSync.native(folders[0].uri.fsPath);
-}
-
-async function activate() {
-  let inProgress;
-  try {
-    if (!fs.existsSync(planPath)) return;
-    const plan = JSON.parse(fs.readFileSync(planPath, 'utf8'));
-    const key = currentKey();
-    const group = plan.windows.find(candidate => candidate.key === key);
-    if (!group) return;
-    const marker = path.join(root, 'consumed', group.marker);
-    if (fs.existsSync(marker)) return;
-    inProgress = `${marker}.in-progress`;
-    fs.rmSync(inProgress, { force: true });
-    fs.writeFileSync(inProgress, new Date().toISOString(), { flag: 'wx' });
-
-    for (const terminal of vscode.window.terminals) {
-      if (terminal.name.toLowerCase().startsWith('omp')) terminal.dispose();
-    }
-    await sleep(750);
-
-    for (const session of group.sessions) {
-      const terminal = vscode.window.createTerminal({
-        name: 'omp',
-        cwd: group.cwd,
-        shellPath: plan.omp,
-        shellArgs: ['--resume', session],
-      });
-      terminal.show(false);
-      const processId = await Promise.race([
-        terminal.processId,
-        sleep(10000).then(() => undefined),
-      ]);
-      if (!processId) throw new Error(`OMP did not start for ${session}`);
-      if (group.mode === 'editor') {
-        await vscode.commands.executeCommand('workbench.action.terminal.moveToEditor');
-      }
-      await sleep(250);
-    }
-    fs.renameSync(inProgress, marker);
-    inProgress = undefined;
-    log(`restored ${group.sessions.length} sessions for ${key}`);
-  } catch (error) {
-    if (inProgress) {
-      try { fs.rmSync(inProgress, { force: true }); } catch {}
-    }
-    log(error && error.stack ? error.stack : error);
-  }
-}
-
-function deactivate() {}
-module.exports = { activate, deactivate };
-''')
-
-manifest["sessionPlan"] = plan
 state_path = tama / "hook-emergency-state.json"
 if action == "disable":
     atomic_json(manifest_path, manifest)
@@ -492,107 +238,26 @@ if action == "disable":
             "changedAt": datetime.now(timezone.utc).isoformat(),
         },
     )
+    print("Disabled hooks. Supervised agent sessions will resume without an editor restart.")
 else:
     state_path.unlink(missing_ok=True)
     manifest_path.unlink(missing_ok=True)
     (backup / "claude-settings.json").unlink(missing_ok=True)
     (backup / "codex-hooks.json").unlink(missing_ok=True)
-    if os.environ["TAMA_SKIP_SESSION_RESTART"] == "1":
-        shutil.rmtree(
-            home / ".vscode/extensions/tama.emergency-resume-1.0.0",
-            ignore_errors=True,
-        )
-        shutil.rmtree(resume_root, ignore_errors=True)
-if action == "enable":
     print(
-        f"Enabled approved hook release {installed_release['releaseId'][:12]} and prepared "
-        f"{sum(len(group['sessions']) for group in plan['windows'])} sessions "
-        f"across {len(plan['windows'])} VS Code windows."
+        f"Enabled approved hook release {installed_release['releaseId'][:12]}. "
+        "Supervised agent sessions will resume without an editor restart."
     )
-else:
-    print(
-        f"Disabled hooks and prepared "
-        f"{sum(len(group['sessions']) for group in plan['windows'])} sessions "
-        f"across {len(plan['windows'])} VS Code windows."
-    )
+
+shutil.rmtree(tama / "vscode-resume", ignore_errors=True)
+shutil.rmtree(
+    home / ".vscode/extensions/tama.emergency-resume-1.0.0",
+    ignore_errors=True,
+)
 PY
-if [ "$TAMA_SKIP_SESSION_RESTART" = "1" ]; then
-    exit 0
+if [ "$supervisor_paused" = 1 ]; then
+    python3 "$TAMA_SESSION_SUPERVISOR" control resume \
+        --home "$TAMA_SUPERVISOR_HOME" >/dev/null
+    supervisor_paused=0
+    trap - EXIT HUP INT TERM
 fi
-
-
-osascript -e 'tell application "Visual Studio Code" to quit' >/dev/null 2>&1 || true
-
-attempt=0
-while [ "$(osascript -e 'application "Visual Studio Code" is running' 2>/dev/null)" = "true" ]; do
-    attempt=$((attempt + 1))
-    if [ "$attempt" -ge 300 ]; then
-        printf '%s\n' "VS Code did not quit; hook state changed and sessions are checkpointed, but restart was not completed." >&2
-        exit 1
-    fi
-    sleep 1
-done
-
-pkill -x codex >/dev/null 2>&1 || true
-pkill -x claude >/dev/null 2>&1 || true
-open -a "Visual Studio Code"
-
-attempt=0
-until [ "$(osascript -e 'application "Visual Studio Code" is running' 2>/dev/null)" = "true" ]; do
-    attempt=$((attempt + 1))
-    [ "$attempt" -ge 30 ] && exit 1
-    sleep 1
-done
-sleep 8
-
-python3 - <<'PY'
-from pathlib import Path
-import json
-import os
-import shutil
-import subprocess
-import time
-
-home = Path(os.environ.get("TAMA_HOME") or Path.home())
-action = os.environ["TAMA_EMERGENCY_ACTION"]
-root = home / "Library/Application Support/Tama/vscode-resume"
-plan = json.loads((root / "plan.json").read_text())
-code = shutil.which("code") or "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
-
-
-def missing_groups():
-    return [
-        group
-        for group in plan["windows"]
-        if not (root / "consumed" / group["marker"]).exists()
-    ]
-
-
-deadline = time.time() + 30
-while time.time() < deadline and missing_groups():
-    time.sleep(1)
-
-for group in missing_groups():
-    arguments = [code, "--new-window"]
-    if group["workspace"]:
-        arguments.append(group["workspace"])
-    subprocess.Popen(arguments, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-deadline = time.time() + 30
-while time.time() < deadline and missing_groups():
-    time.sleep(1)
-
-remaining = missing_groups()
-if remaining:
-    raise SystemExit(
-        "VS Code did not resume these windows: "
-        + ", ".join(group["key"] for group in remaining)
-    )
-
-if action == "enable":
-    shutil.rmtree(
-        home / ".vscode/extensions/tama.emergency-resume-1.0.0",
-        ignore_errors=True,
-    )
-    shutil.rmtree(root, ignore_errors=True)
-PY

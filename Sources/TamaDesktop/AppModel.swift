@@ -14,8 +14,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var areHooksDisabled = false
     @Published private(set) var isChangingHookState = false
     @Published private(set) var installedHookReleaseID: String?
-    @Published private(set) var ompSessions: [OMPSessionRecord] = []
-    @Published var selectedOMPSessionID: OMPSessionRecord.ID?
+    @Published private(set) var agentSessions: [AgentSessionRecord] = []
+    @Published var selectedAgentSessionID: AgentSessionRecord.ID?
     @Published private(set) var isChangingSessionHook = false
 
     private let client = HookCatalogClient()
@@ -60,7 +60,7 @@ final class AppModel: ObservableObject {
         }
         sessionPollingTask = Task { [weak self] in
             while !Task.isCancelled {
-                await self?.refreshOMPSessions()
+                await self?.refreshAgentSessions()
                 try? await Task.sleep(for: .seconds(1))
             }
         }
@@ -112,53 +112,103 @@ final class AppModel: ObservableObject {
         }
     }
 
-    var selectedOMPSession: OMPSessionRecord? {
-        guard let selectedOMPSessionID else { return ompSessions.first }
-        return ompSessions.first(where: { $0.id == selectedOMPSessionID })
+    var selectedAgentSession: AgentSessionRecord? {
+        guard let selectedAgentSessionID else { return agentSessions.first }
+        return agentSessions.first(where: { $0.id == selectedAgentSessionID })
     }
 
     func isHookEnabledInSelectedSession(_ hookId: String) -> Bool? {
-        selectedOMPSession?.isHookEnabled(hookId, globallyDisabled: areHooksDisabled)
+        selectedAgentSession?.isHookEnabled(hookId, globallyDisabled: areHooksDisabled)
     }
 
-    func refreshOMPSessions() async {
+    var areAllHooksEnabledInSelectedSession: Bool {
+        guard
+            let session = selectedAgentSession,
+            let hooks = snapshot?.catalog.hooks,
+            !hooks.isEmpty
+        else {
+            return false
+        }
+        return hooks.allSatisfy {
+            session.isHookEnabled($0.id, globallyDisabled: areHooksDisabled)
+        }
+    }
+
+    func refreshAgentSessions() async {
         do {
             let loaded = try await Task.detached(priority: .utility) {
                 try SessionControlClient().liveSessions()
             }.value
-            ompSessions = loaded
-            if !loaded.contains(where: { $0.id == selectedOMPSessionID }) {
-                selectedOMPSessionID = loaded.first?.id
+            agentSessions = loaded
+            if !loaded.contains(where: { $0.id == selectedAgentSessionID }) {
+                selectedAgentSessionID = loaded.first?.id
             }
         } catch {
-            ompSessions = []
-            selectedOMPSessionID = nil
+            agentSessions = []
+            selectedAgentSessionID = nil
         }
     }
 
     func setSelectedSessionHook(_ hookId: String, enabled: Bool) {
-        guard !isChangingSessionHook, let session = selectedOMPSession else { return }
+        guard !isChangingSessionHook, let session = selectedAgentSession else { return }
         isChangingSessionHook = true
         Task {
             defer { isChangingSessionHook = false }
             do {
+                let globallyDisabled = areHooksDisabled
                 let updated = try await Task.detached(priority: .userInitiated) {
-                    try await SessionControlClient().setHookEnabled(
+                    try SessionControlClient().setHookEnabled(
                         enabled,
                         hookId: hookId,
-                        session: session
+                        session: session,
+                        globallyDisabled: globallyDisabled
                     )
                 }.value
-                if let index = ompSessions.firstIndex(where: { $0.id == updated.id }) {
-                    ompSessions[index] = updated
+                if let index = agentSessions.firstIndex(where: { $0.id == updated.id }) {
+                    agentSessions[index] = updated
                 } else {
-                    ompSessions.append(updated)
+                    agentSessions.append(updated)
                 }
                 errorMessage = nil
             } catch {
                 errorMessage = (error as? LocalizedError)?.errorDescription
                     ?? error.localizedDescription
-                await refreshOMPSessions()
+                await refreshAgentSessions()
+            }
+        }
+    }
+
+    func enableAllHooksInSelectedSession() {
+        guard
+            !isChangingSessionHook,
+            let session = selectedAgentSession,
+            let hookIds = snapshot?.catalog.hooks.map(\.id),
+            !hookIds.isEmpty
+        else {
+            return
+        }
+        isChangingSessionHook = true
+        Task {
+            defer { isChangingSessionHook = false }
+            do {
+                let globallyDisabled = areHooksDisabled
+                let updated = try await Task.detached(priority: .userInitiated) {
+                    try SessionControlClient().setAllHooksEnabled(
+                        hookIds,
+                        session: session,
+                        globallyDisabled: globallyDisabled
+                    )
+                }.value
+                if let index = agentSessions.firstIndex(where: { $0.id == updated.id }) {
+                    agentSessions[index] = updated
+                } else {
+                    agentSessions.append(updated)
+                }
+                errorMessage = nil
+            } catch {
+                errorMessage = (error as? LocalizedError)?.errorDescription
+                    ?? error.localizedDescription
+                await refreshAgentSessions()
             }
         }
     }
@@ -327,9 +377,9 @@ private enum HookEmergencyError: LocalizedError {
         case .scriptMissing:
             "The Tama bundle does not contain the emergency hook controller."
         case .controllerInstallerMissing:
-            "The Tama bundle does not contain the OMP session-controller installer."
+            "The Tama bundle does not contain the agent session-controller installer."
         case .controllerReleaseMissing:
-            "The Tama bundle does not contain an approved hook release for the OMP session controller."
+            "The Tama bundle does not contain an approved hook release for agent session control."
         case let .commandFailed(message):
             message.isEmpty
                 ? "Tama could not update the installed hook configuration."
