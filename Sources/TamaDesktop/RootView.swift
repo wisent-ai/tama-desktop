@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootView: View {
     @ObservedObject var model: AppModel
+    @ObservedObject var violationsModel: ViolationsModel
     @State private var isShowingDisableConfirmation = false
 
     var body: some View {
@@ -17,6 +18,8 @@ struct RootView: View {
                     .tag(SidebarSelection.validation)
                 Label("Repository hooks", systemImage: "point.3.connected.trianglepath.dotted")
                     .tag(SidebarSelection.repositories)
+                Label("Violations", systemImage: "ladybug")
+                    .tag(SidebarSelection.violations)
             }
             .navigationTitle("Tama")
             .navigationSplitViewColumnWidth(min: 180, ideal: 210)
@@ -144,6 +147,8 @@ struct RootView: View {
                 ValidationView(result: snapshot.validation)
             case .repositories:
                 RepositoryHooksView(hooks: snapshot.catalog.repoGitHooks)
+            case .violations:
+                ViolationsView(model: violationsModel)
             }
         } else {
             ContentUnavailableView("Loading", systemImage: "shield")
@@ -157,6 +162,7 @@ struct RootView: View {
         case .justifications: "Justifications"
         case .validation: "Snapshot validation"
         case .repositories: "Repository hooks"
+        case .violations: "Violations"
         }
     }
 }

@@ -114,6 +114,7 @@ enum SidebarSelection: Hashable {
     case justifications
     case validation
     case repositories
+    case violations
 }
 
 enum HookFilter: String, CaseIterable, Identifiable {

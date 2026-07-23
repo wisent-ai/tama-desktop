@@ -14,7 +14,7 @@ struct SessionControlClientTests {
         let now = Date()
         try writeSession(
             root: root,
-            provider: "omp",
+            agentId: "omp",
             sessionId: "omp-session",
             controlKey: String(repeating: "a", count: 64),
             pid: Int32(getpid()),
@@ -23,7 +23,7 @@ struct SessionControlClientTests {
         )
         try writeSession(
             root: root,
-            provider: "claude",
+            agentId: "claude",
             sessionId: "claude-session",
             controlKey: String(repeating: "b", count: 64),
             pid: 0,
@@ -32,7 +32,7 @@ struct SessionControlClientTests {
         )
         try writeSession(
             root: root,
-            provider: "codex",
+            agentId: "codex",
             sessionId: "codex-session",
             controlKey: String(repeating: "c", count: 64),
             pid: 0,
@@ -42,14 +42,14 @@ struct SessionControlClientTests {
 
         let client = SessionControlClient(root: root)
         let sessions = try client.liveSessions(now: now)
-        #expect(sessions.map(\.provider) == ["claude", "codex", "omp"])
+        #expect(sessions.map(\.agentId) == ["claude", "codex", "omp"])
         #expect(Set(sessions.map(\.id)) == [
             "claude:claude-session",
             "codex:codex-session",
             "omp:omp-session",
         ])
 
-        let claude = try #require(sessions.first(where: { $0.provider == "claude" }))
+        let claude = try #require(sessions.first(where: { $0.agentId == "claude" }))
         let updated = try client.setHookEnabled(
             true,
             hookId: "block-temporary-path-operations",
@@ -62,7 +62,7 @@ struct SessionControlClientTests {
         let value = try #require(
             JSONSerialization.jsonObject(with: Data(contentsOf: overrideURL)) as? [String: Any]
         )
-        #expect(value["provider"] as? String == "claude")
+        #expect(value["agentId"] as? String == "claude")
         #expect(value["sessionId"] as? String == "claude-session")
         #expect(value["enabledHookIds"] as? [String] == ["block-temporary-path-operations"])
         let preservedCapability = try #require(value["capability"] as? [String: Any])
@@ -97,7 +97,7 @@ struct SessionControlClientTests {
 
     private func writeSession(
         root: URL,
-        provider: String,
+        agentId: String,
         sessionId: String,
         controlKey: String,
         pid: Int32,
@@ -105,12 +105,12 @@ struct SessionControlClientTests {
         updatedAt: Date
     ) throws {
         var value: [String: Any] = [
-            "schema": "ai.wisent.tama.session-control.v1",
-            "provider": provider,
+            "schema": "ai.wisent.tama.session-control.v2",
+            "agentId": agentId,
             "sessionId": sessionId,
             "controlKey": controlKey,
             "pid": pid,
-            "cwd": "/tmp/\(provider)-project",
+            "cwd": "/tmp/\(agentId)-project",
             "livenessMode": livenessMode,
             "heartbeatTTLSeconds": 900,
             "globallyDisabled": true,
@@ -118,12 +118,16 @@ struct SessionControlClientTests {
             "enabledHookIds": [],
             "updatedAt": ISO8601DateFormatter().string(from: updatedAt),
         ]
-        if provider == "claude" {
+        if agentId == "claude" {
             value["capability"] = [
                 "schemaVersion": 1,
                 "issuedBy": "test-user-approval",
                 "nonce": "test-nonce",
                 "sessionId": sessionId,
+                "controlKey": controlKey,
+                "releaseId": "test-release",
+                "catalogChecksum": "test-checksum",
+                "lifetime": "test-lifetime",
                 "expiresAt": "approved-expiration",
                 "grants": [
                     [
