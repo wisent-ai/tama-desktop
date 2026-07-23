@@ -33,10 +33,38 @@ struct HookRuntimeStatus: Codable, Sendable, Equatable {
     let registryLoadError: String?
 }
 
+struct SemanticEventSummary: Codable, Sendable, Equatable {
+    let eventId: String
+    let event: String
+    let timestamp: String
+    let decision: String
+    let blockedHookId: String?
+    let reason: String?
+}
+
+struct SemanticRuntimeStatus: Codable, Sendable, Equatable {
+    let observationSchema: String
+    let semanticEventSchema: String
+    let eventSequence: Int
+    let recentEvents: [SemanticEventSummary]
+}
+
+
+struct SystemPolicyStatus: Codable, Sendable, Equatable {
+    let schema: String
+    let configured: Bool
+    let required: Bool?
+    let ready: Bool
+    let backend: String?
+    let capabilities: [String]
+    let error: String?
+    let mode: String
+    let supportPullRequestURL: String?
+}
 
 struct AgentSessionRecord: Decodable, Identifiable, Sendable {
     let schema: String
-    let provider: String
+    let agentId: String
     let sessionId: String
     let controlKey: String
     let pid: Int32
@@ -48,22 +76,22 @@ struct AgentSessionRecord: Decodable, Identifiable, Sendable {
     let enabledHookIds: [String]
     let capability: SessionCapability?
     let runtime: HookRuntimeStatus?
+    let semanticRuntime: SemanticRuntimeStatus?
+    let systemPolicy: SystemPolicyStatus?
     let updatedAt: String
 
-    var id: String { "\(provider):\(sessionId)" }
+    var id: String { "\(agentId):\(sessionId)" }
 
-    var providerDisplayName: String {
-        switch provider {
-        case "omp": "OMP"
-        case "claude": "Claude"
-        case "codex": "Codex"
-        default: provider.capitalized
-        }
+    var agentDisplayName: String {
+        agentId
+            .split(separator: "-")
+            .map { $0.prefix(1).uppercased() + $0.dropFirst() }
+            .joined(separator: " ")
     }
 
     var displayName: String {
         let project = URL(fileURLWithPath: cwd).lastPathComponent
-        return "\(providerDisplayName) · \(project.isEmpty ? cwd : project) · \(sessionId.prefix(8))"
+        return "\(agentDisplayName) · \(project.isEmpty ? cwd : project) · \(sessionId.prefix(8))"
     }
 
     func isHookEnabled(_ hookId: String, globallyDisabled: Bool) -> Bool {
@@ -74,7 +102,7 @@ struct AgentSessionRecord: Decodable, Identifiable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case schema
-        case provider
+        case agentId
         case sessionId
         case controlKey
         case pid
@@ -86,13 +114,15 @@ struct AgentSessionRecord: Decodable, Identifiable, Sendable {
         case enabledHookIds
         case capability
         case runtime
+        case semanticRuntime
+        case systemPolicy
         case updatedAt
     }
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         schema = try values.decode(String.self, forKey: .schema)
-        provider = try values.decodeIfPresent(String.self, forKey: .provider) ?? "omp"
+        agentId = try values.decode(String.self, forKey: .agentId)
         sessionId = try values.decode(String.self, forKey: .sessionId)
         controlKey = try values.decode(String.self, forKey: .controlKey)
         pid = try values.decode(Int32.self, forKey: .pid)
@@ -104,6 +134,8 @@ struct AgentSessionRecord: Decodable, Identifiable, Sendable {
         enabledHookIds = try values.decode([String].self, forKey: .enabledHookIds)
         capability = try values.decodeIfPresent(SessionCapability.self, forKey: .capability)
         runtime = try values.decodeIfPresent(HookRuntimeStatus.self, forKey: .runtime)
+        semanticRuntime = try values.decodeIfPresent(SemanticRuntimeStatus.self, forKey: .semanticRuntime)
+        systemPolicy = try values.decodeIfPresent(SystemPolicyStatus.self, forKey: .systemPolicy)
         updatedAt = try values.decode(String.self, forKey: .updatedAt)
     }
 
@@ -115,7 +147,7 @@ struct AgentSessionRecord: Decodable, Identifiable, Sendable {
         updatedAt: String
     ) {
         schema = session.schema
-        provider = session.provider
+        agentId = session.agentId
         sessionId = session.sessionId
         controlKey = session.controlKey
         pid = session.pid
@@ -127,6 +159,8 @@ struct AgentSessionRecord: Decodable, Identifiable, Sendable {
         self.enabledHookIds = enabledHookIds
         capability = session.capability
         runtime = session.runtime
+        semanticRuntime = session.semanticRuntime
+        systemPolicy = session.systemPolicy
         self.updatedAt = updatedAt
     }
 
@@ -147,7 +181,7 @@ struct AgentSessionRecord: Decodable, Identifiable, Sendable {
 }
 
 struct SessionControlClient: Sendable {
-    private static let schema = "ai.wisent.tama.session-control.v1"
+    private static let schema = "ai.wisent.tama.session-control.v2"
     private let rootOverride: URL?
 
     init(root: URL? = nil) {
@@ -170,9 +204,10 @@ struct SessionControlClient: Sendable {
                 let data = try? Data(contentsOf: url),
                 let session = try? decoder.decode(AgentSessionRecord.self, from: data),
                 session.schema == Self.schema,
-                isSafeProvider(session.provider),
+                isSafeAgentId(session.agentId),
                 isSafeControlKey(session.controlKey)
             else {
+                try? manager.removeItem(at: url)
                 continue
             }
             if sessionIsLive(session, now: now) {
@@ -182,8 +217,8 @@ struct SessionControlClient: Sendable {
             }
         }
         return sessions.sorted {
-            if $0.provider != $1.provider {
-                return $0.provider.localizedStandardCompare($1.provider) == .orderedAscending
+            if $0.agentId != $1.agentId {
+                return $0.agentId.localizedStandardCompare($1.agentId) == .orderedAscending
             }
             if $0.cwd == $1.cwd { return $0.sessionId < $1.sessionId }
             return $0.cwd.localizedStandardCompare($1.cwd) == .orderedAscending
@@ -198,23 +233,13 @@ struct SessionControlClient: Sendable {
     ) throws -> AgentSessionRecord {
         guard
             isSafeControlKey(session.controlKey),
-            isSafeProvider(session.provider),
+            isSafeAgentId(session.agentId),
             !hookId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         else {
             throw SessionControlError.invalidSession
         }
         let manager = FileManager.default
         let root = try controlRoot(manager: manager)
-        if session.provider == "omp" {
-            return try performRequest(
-                operation: "set-hook",
-                session: session,
-                manager: manager,
-                root: root,
-                hookId: hookId,
-                enabled: enabled
-            )
-        }
         let overrideURL = root.appendingPathComponent("\(session.controlKey).override.json")
         let decoder = JSONDecoder()
         let existing = (try? Data(contentsOf: overrideURL))
@@ -251,7 +276,7 @@ struct SessionControlClient: Sendable {
     ) throws -> AgentSessionRecord {
         guard
             isSafeControlKey(session.controlKey),
-            isSafeProvider(session.provider),
+            isSafeAgentId(session.agentId),
             !hookIds.isEmpty,
             hookIds.allSatisfy({
                 !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -261,14 +286,6 @@ struct SessionControlClient: Sendable {
         }
         let manager = FileManager.default
         let root = try controlRoot(manager: manager)
-        if session.provider == "omp" {
-            return try performRequest(
-                operation: "enable-all",
-                session: session,
-                manager: manager,
-                root: root
-            )
-        }
         let overrideURL = root.appendingPathComponent("\(session.controlKey).override.json")
         let decoder = JSONDecoder()
         let existing = (try? Data(contentsOf: overrideURL))
@@ -299,7 +316,7 @@ struct SessionControlClient: Sendable {
         let enabled = enabledHookIds.sorted()
         let value = SessionControlOverride(
             schema: Self.schema,
-            provider: session.provider,
+            agentId: session.agentId,
             sessionId: session.sessionId,
             controlKey: session.controlKey,
             releaseId: session.runtime?.loadedReleaseId,
@@ -321,55 +338,6 @@ struct SessionControlClient: Sendable {
         )
     }
 
-    private func performRequest(
-        operation: String,
-        session: AgentSessionRecord,
-        manager: FileManager,
-        root: URL,
-        hookId: String? = nil,
-        enabled: Bool? = nil
-    ) throws -> AgentSessionRecord {
-        let requestId = UUID().uuidString.lowercased()
-        let requestURL = root.appendingPathComponent(
-            "\(session.controlKey).\(requestId).request.json"
-        )
-        let responseURL = root.appendingPathComponent(
-            "\(session.controlKey).\(requestId).response.json"
-        )
-        let request = SessionControlRequest(
-            schema: Self.schema,
-            sessionId: session.sessionId,
-            controlKey: session.controlKey,
-            requestId: requestId,
-            operation: operation,
-            hookId: hookId,
-            enabled: enabled,
-            confirmed: true
-        )
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        try encoder.encode(request).write(to: requestURL, options: .atomic)
-        try manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: requestURL.path)
-        defer {
-            try? manager.removeItem(at: requestURL)
-            try? manager.removeItem(at: responseURL)
-        }
-        let deadline = Date().addingTimeInterval(10)
-        let decoder = JSONDecoder()
-        while Date() < deadline {
-            if let data = try? Data(contentsOf: responseURL),
-               let response = try? decoder.decode(SessionControlResponse.self, from: data) {
-                guard response.ok, let state = response.state else {
-                    throw SessionControlError.runtimeRejected(
-                        response.error ?? "Tama runtime rejected the operation."
-                    )
-                }
-                return state
-            }
-            Thread.sleep(forTimeInterval: 0.05)
-        }
-        throw SessionControlError.runtimeTimeout
-    }
 
 
     private func controlRoot(manager: FileManager) throws -> URL {
@@ -421,7 +389,7 @@ struct SessionControlClient: Sendable {
         return errno == EPERM
     }
 
-    private func isSafeProvider(_ value: String) -> Bool {
+    private func isSafeAgentId(_ value: String) -> Bool {
         guard let first = value.first, first.isASCII, first.isLetter, value.count <= 32 else {
             return false
         }
@@ -437,7 +405,7 @@ struct SessionControlClient: Sendable {
 
 private struct SessionControlOverride: Codable {
     let schema: String
-    let provider: String
+    let agentId: String
     let sessionId: String
     let controlKey: String
     let releaseId: String?
@@ -449,43 +417,18 @@ private struct SessionControlOverride: Codable {
 
     func matches(session: AgentSessionRecord) -> Bool {
         schema == session.schema
-            && provider == session.provider
+            && agentId == session.agentId
             && sessionId == session.sessionId
             && controlKey == session.controlKey
     }
 }
 
-private struct SessionControlRequest: Encodable {
-    let schema: String
-    let sessionId: String
-    let controlKey: String
-    let requestId: String
-    let operation: String
-    let hookId: String?
-    let enabled: Bool?
-    let confirmed: Bool
-}
-
-private struct SessionControlResponse: Decodable {
-    let ok: Bool
-    let error: String?
-    let state: AgentSessionRecord?
-}
 
 
 enum SessionControlError: LocalizedError {
     case invalidSession
-    case runtimeRejected(String)
-    case runtimeTimeout
 
     var errorDescription: String? {
-        switch self {
-        case .invalidSession:
-            "Tama rejected an invalid agent session control endpoint."
-        case .runtimeRejected(let reason):
-            reason
-        case .runtimeTimeout:
-            "The active OMP session did not acknowledge the Tama control request."
-        }
+        "Tama rejected an invalid agent session control endpoint."
     }
 }

@@ -9,7 +9,7 @@ if (!repositoryRoot || !outputPath) {
   throw new Error('usage: export-catalog.mjs <hooks-rotator-root> <output-path>');
 }
 
-const catalogModuleURL = pathToFileURL(join(repositoryRoot, 'src', 'catalog.mjs')).href;
+const catalogModuleURL = pathToFileURL(join(repositoryRoot, 'src', 'core', 'catalog.mjs')).href;
 const { buildCatalog } = await import(catalogModuleURL);
 const sourceCatalog = buildCatalog(repositoryRoot);
 const catalog = {

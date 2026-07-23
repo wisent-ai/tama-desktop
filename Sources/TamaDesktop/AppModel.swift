@@ -17,6 +17,7 @@ final class AppModel: ObservableObject {
     @Published private(set) var agentSessions: [AgentSessionRecord] = []
     @Published var selectedAgentSessionID: AgentSessionRecord.ID?
     @Published private(set) var isChangingSessionHook = false
+    @Published private(set) var systemPolicyServiceStatus = "Checking"
 
     private let client = HookCatalogClient()
     private let emergencySwitch = HookEmergencySwitch()
@@ -48,6 +49,7 @@ final class AppModel: ObservableObject {
         areHooksDisabled = emergencySwitch.isDisabled
         installedHookReleaseID = emergencySwitch.installedReleaseID
         Task {
+            await installSystemPolicyService()
             await refresh()
             do {
                 try await Task.detached(priority: .utility) {
@@ -67,6 +69,22 @@ final class AppModel: ObservableObject {
     }
     deinit {
         sessionPollingTask?.cancel()
+    }
+
+    func installSystemPolicyService() async {
+        do {
+            systemPolicyServiceStatus = try await SystemPolicyServiceManager().register()
+        } catch {
+            systemPolicyServiceStatus = "Registration failed: \(error.localizedDescription)"
+        }
+    }
+
+    func openSystemPolicyApprovalSettings() {
+        SystemPolicyServiceManager().openApprovalSettings()
+    }
+
+    func openFullDiskAccessSettings() {
+        SystemPolicyServiceManager().openFullDiskAccessSettings()
     }
 
     func refresh() async {

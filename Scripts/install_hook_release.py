@@ -14,23 +14,6 @@ import sys
 
 SCHEMA = "ai.wisent.tama.hook-release.v1"
 INSTALLED_SCHEMA = "ai.wisent.tama.installed-hook-release.v1"
-EVENT_TO_CODEX = {
-    "stop": ("Stop", None),
-    "user_prompt_submit": ("UserPromptSubmit", None),
-    "post_tool_use:bash": ("PostToolUse", "Bash"),
-    "session_start:compact": ("SessionStart", "compact"),
-    "pre_tool_use:bash": ("PreToolUse", "Bash"),
-    "pre_tool_use:read": ("PreToolUse", "Read"),
-    "pre_tool_use:edit": ("PreToolUse", "apply_patch|Edit|Write"),
-    "pre_tool_use:task": ("PreToolUse", "Task|Agent"),
-    "pre_tool_use:todo": ("PreToolUse", "Todo|todo"),
-    "pre_tool_use:goal": ("PreToolUse", "Goal|goal"),
-    "pre_tool_use:lookup": ("PreToolUse", "Grep|grep|Glob|glob|Search|LSP|lsp|AstGrep|ast_grep"),
-    "pre_tool_use:notebook": ("PreToolUse", "NotebookEdit"),
-    "pre_tool_use:wait": ("PreToolUse", "Monitor|ScheduleWakeup"),
-    "pre_tool_use:eval": ("PreToolUse", "Eval|eval|execute_code|mcp__node_repl_js|node_repl/js"),
-    "pre_tool_use:ssh": ("PreToolUse", "SSH|ssh"),
-}
 
 
 def atomic_json(path: Path, value: object) -> None:
@@ -90,42 +73,6 @@ def transformed(value, replacements: list[tuple[str, str]], field: str | None = 
     return value
 
 
-def hook_config(event: str, hook: dict, provider: str) -> dict:
-    command = " ".join(
-        [
-            "env",
-            f"TAMA_PROVIDER={shlex.quote(provider)}",
-            f"TAMA_ONLY_HOOK_ID={shlex.quote(str(hook['id']))}",
-            'node \"$HOME/.shared-hooks/run-hook.mjs\"',
-            shlex.quote(event),
-            shlex.quote(provider),
-        ]
-    )
-    result = {"type": hook.get("type") or "command", "command": command}
-    if hook.get("timeout"):
-        result["timeout"] = hook["timeout"]
-    if hook.get("statusMessage"):
-        result["statusMessage"] = hook["statusMessage"]
-    return result
-
-
-def build_hooks(registry: dict, provider: str) -> dict:
-    result: dict[str, list[dict]] = {}
-    for event, entry in registry.get("events", {}).items():
-        target = EVENT_TO_CODEX.get(event)
-        if target is None:
-            continue
-        key, matcher = target
-        group = {
-            "hooks": [
-                hook_config(event, hook, provider)
-                for hook in entry.get("hooks", [])
-            ]
-        }
-        if matcher:
-            group["matcher"] = matcher
-        result.setdefault(key, []).append(group)
-    return result
 
 
 def source_candidate(source: str, release_root: Path, old_root: Path, old_home: Path, home: Path) -> Path:
@@ -163,6 +110,12 @@ def release_file_map(release_root: Path, home: Path, registry: dict) -> dict[Pat
             if item.is_file()
             and item.suffix != ".pyc"
             and "__pycache__" not in item.parts
+            and item.name not in {
+                "generate-configs.mjs",
+                "omp-shared-hooks.js",
+                "providers.json",
+                "run-one-session-hook.js",
+            }
         ):
             target = target_root / source.relative_to(source_root)
             files[target] = (source.read_bytes(), source.stat().st_mode & 0o777)
@@ -190,6 +143,43 @@ def base_config(
     if not source.is_file():
         return {}
     return load_json(source)
+
+
+def without_tama_agent_hooks(config: dict) -> dict:
+    hooks = config.get("hooks")
+    if not isinstance(hooks, dict):
+        return config
+    cleaned_events = {}
+    for event, groups in hooks.items():
+        if not isinstance(groups, list):
+            cleaned_events[event] = groups
+            continue
+        cleaned_groups = []
+        for group in groups:
+            if not isinstance(group, dict) or not isinstance(group.get("hooks"), list):
+                cleaned_groups.append(group)
+                continue
+            retained = [
+                hook
+                for hook in group["hooks"]
+                if not (
+                    isinstance(hook, dict)
+                    and ".shared-hooks/run-hook.mjs" in str(hook.get("command") or "")
+                )
+            ]
+            if retained:
+                cleaned_group = dict(group)
+                cleaned_group["hooks"] = retained
+                cleaned_groups.append(cleaned_group)
+        if cleaned_groups:
+            cleaned_events[event] = cleaned_groups
+    cleaned = dict(config)
+    if cleaned_events:
+        cleaned["hooks"] = cleaned_events
+    else:
+        cleaned.pop("hooks", None)
+    return cleaned
+
 
 
 def dispatcher_body(runtime_root: Path, hook_name: str, backup_path: Path) -> bytes:
@@ -225,11 +215,13 @@ exit 0
 def supervisor_launcher_body(home: Path) -> bytes:
     supervisor = home / ".shared-hooks/agent-session-supervisor.py"
     body = f'''#!/bin/sh
-# Tama-managed process and session supervisor
+# Tama-managed universal process and semantic hook runtime
 set -eu
 SUPERVISOR={json.dumps(str(supervisor))}
 [ -x "$SUPERVISOR" ] || {{ printf 'Tama session supervisor is missing: %s\\n' "$SUPERVISOR" >&2; exit 66; }}
-exec /usr/bin/python3 "$SUPERVISOR" "$@"
+PYTHON="${{TAMA_PYTHON:-$(command -v python3 || true)}}"
+[ -n "$PYTHON" ] || {{ printf 'Tama requires Python 3 for the universal session runtime.\\n' >&2; exit 66; }}
+exec "$PYTHON" "$SUPERVISOR" "$@"
 '''
     return body.encode()
 
@@ -391,13 +383,10 @@ def install_release(
     replacements.sort(key=lambda item: len(item[0]), reverse=True)
     registry = transformed(registry_raw, replacements)
     registry["releaseId"] = release["releaseId"]
-    registry.setdefault("catalog", {})["maintainedIn"] = str(home / ".shared-hooks/registry.json")
+    registry["catalog"].pop("ompAdapters", None)
+    registry.pop("adapters", None)
     registry["catalog"]["generatedDocs"] = str(home / ".shared-hooks/HOOKS.md")
     registry["catalogChecksum"] = registry_checksum(registry)
-    claude_hooks = build_hooks(registry, "claude")
-    codex_hooks = build_hooks(registry, "codex")
-    if not claude_hooks or not codex_hooks:
-        raise RuntimeError("Approved hook release generated an empty runtime configuration")
 
     releases_root = runtime_root / "releases"
     installed_path = runtime_root / "installed.json"
@@ -427,6 +416,9 @@ def install_release(
     supervisor_target = home / ".shared-hooks/agent-session-supervisor.py"
     if supervisor_target not in writes:
         raise RuntimeError("Approved hook release is missing the Tama session supervisor")
+    runtime_target = home / ".shared-hooks/universal_agent_runtime.py"
+    if runtime_target not in writes:
+        raise RuntimeError("Approved hook release is missing the universal Tama runtime")
     launcher_target = home / ".local/bin/tama-agent"
     writes[launcher_target] = (supervisor_launcher_body(home), 0o755)
     legacy_launchers = {
@@ -435,20 +427,18 @@ def install_release(
     }
     claude_target = home / ".claude/settings.json"
     codex_target = home / ".codex/hooks.json"
-    claude_config = base_config(
+    claude_config = without_tama_agent_hooks(base_config(
         claude_target,
         "claude-settings.json",
         emergency_manifest,
         backup_root,
-    )
-    codex_config = base_config(
+    ))
+    codex_config = without_tama_agent_hooks(base_config(
         codex_target,
         "codex-hooks.json",
         emergency_manifest,
         backup_root,
-    )
-    claude_config["hooks"] = claude_hooks
-    codex_config["hooks"] = codex_hooks
+    ))
     writes[claude_target] = (
         (json.dumps(claude_config, indent=2, sort_keys=True) + "\n").encode(),
         0o600,
@@ -539,6 +529,7 @@ def install_release(
     old_omp_adapters = (
         home / ".omp/agent/hooks/pre/shared-hooks.js",
         home / ".omp/agent/hooks.tama-disabled/pre/shared-hooks.js",
+        home / ".shared-hooks/omp-shared-hooks.js",
     )
     legacy_restart_artifacts = (
         home / "Library/Application Support/Tama/vscode-resume",
@@ -569,12 +560,10 @@ def install_release(
         for source, disabled in moved:
             transaction.move(disabled, source)
 
-        if os.environ.get("TAMA_SKIP_OMP_CONFIG") != "1":
-            omp = os.environ.get("TAMA_OMP") or shutil.which("omp")
-            if not omp and (home / ".local/bin/omp").is_file():
-                omp = str(home / ".local/bin/omp")
-            if not omp:
-                raise RuntimeError("Could not locate omp to register the approved hook adapter")
+        omp = os.environ.get("TAMA_OMP") or shutil.which("omp")
+        if not omp and (home / ".local/bin/omp").is_file():
+            omp = str(home / ".local/bin/omp")
+        if omp:
             command_env = {**os.environ, "HOME": str(home)}
             current = subprocess.run(
                 [omp, "config", "get", "extensions", "--json"],
@@ -587,11 +576,11 @@ def install_release(
                 raise RuntimeError(current.stderr.strip() or "Could not read OMP extensions")
             parsed = json.loads(current.stdout or "{}")
             omp_previous = parsed.get("value") if isinstance(parsed.get("value"), list) else []
-            old_adapter = str(home / ".omp/agent/hooks/pre/shared-hooks.js")
-            stable_adapter = str(home / ".shared-hooks/omp-shared-hooks.js")
-            updated = [path for path in omp_previous if path != old_adapter]
-            if stable_adapter not in updated:
-                updated.append(stable_adapter)
+            obsolete_adapters = {
+                str(home / ".omp/agent/hooks/pre/shared-hooks.js"),
+                str(home / ".shared-hooks/omp-shared-hooks.js"),
+            }
+            updated = [path for path in omp_previous if path not in obsolete_adapters]
             if updated != omp_previous:
                 result = subprocess.run(
                     [omp, "config", "set", "extensions", json.dumps(updated)],
@@ -601,7 +590,7 @@ def install_release(
                     env=command_env,
                 )
                 if result.returncode != 0:
-                    raise RuntimeError(result.stderr.strip() or "Could not register OMP session controller")
+                    raise RuntimeError(result.stderr.strip() or "Could not remove OMP hook adapters")
                 omp_changed = True
 
         installed = {

@@ -243,7 +243,7 @@ private struct OverviewView: View {
                 }
 
                 GroupBox("Boundary") {
-                    Text("Tama displays a catalog snapshot generated from hooks-rotator at build time. Re-enable verifies and installs the integrity-sealed hook release bundled with the current Tama build, preserves non-hook settings, updates agent, editor, OMP, and Git dispatchers, then restarts and resumes agent sessions. The app does not import logs, credentials, settings, or caches.")
+                    Text("Tama displays a catalog snapshot generated from hooks-rotator at build time. Re-enable verifies and installs the integrity-sealed hook release bundled with the current Tama build, preserves non-hook settings, updates every managed dispatcher, then restarts and resumes supervised sessions. The app does not import logs, credentials, settings, or caches.")
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -388,12 +388,35 @@ private struct SessionHookControlView: View {
     var body: some View {
         GroupBox("Session control") {
             VStack(alignment: .leading, spacing: 10) {
+                LabeledContent("Privileged backend") {
+                    StatusLabel(
+                        text: model.systemPolicyServiceStatus,
+                        isHealthy: model.systemPolicyServiceStatus == "Enabled"
+                    )
+                }
+                if model.systemPolicyServiceStatus != "Enabled" {
+                    HStack {
+                        Button("Register backend") {
+                            Task { await model.installSystemPolicyService() }
+                        }
+                        Button("Open approval settings") {
+                            model.openSystemPolicyApprovalSettings()
+                        }
+                        Button("Open Full Disk Access") {
+                            model.openFullDiskAccessSettings()
+                        }
+                    }
+                }
                 if model.agentSessions.isEmpty {
                     Label("No active agent sessions", systemImage: "terminal")
                         .foregroundStyle(.secondary)
-                    Text("Start or resume OMP, Claude, or Codex after Tama installs the session controllers. Active sessions appear here automatically.")
+                    Text("Tama refuses to start an agent unless the platform has a ready kernel-enforcement backend. Unsupported platforms must add a real backend and submit a support pull request.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    if let supportURL = URL(string: "https://github.com/wisent-ai/tama-desktop/compare") {
+                        Link("Submit platform support pull request", destination: supportURL)
+                            .font(.caption)
+                    }
                     Button("Refresh sessions", systemImage: "arrow.clockwise") {
                         Task { await model.refreshAgentSessions() }
                     }
@@ -406,7 +429,7 @@ private struct SessionHookControlView: View {
                     }
                     if let session = model.selectedAgentSession,
                        let isEnabled = model.isHookEnabledInSelectedSession(hook.id) {
-                        LabeledContent("Provider", value: session.providerDisplayName)
+                        LabeledContent("Agent", value: session.agentDisplayName)
                         LabeledContent("Session ID") {
                             Text(session.sessionId)
                                 .font(.caption.monospaced())
@@ -418,6 +441,47 @@ private struct SessionHookControlView: View {
                                 .font(.caption.monospaced())
                                 .textSelection(.enabled)
                                 .lineLimit(1)
+                        }
+                        if let semanticRuntime = session.semanticRuntime {
+                            LabeledContent(
+                                "Semantic events",
+                                value: String(semanticRuntime.eventSequence)
+                            )
+                            if let lastEvent = semanticRuntime.recentEvents.last {
+                                LabeledContent("Last event", value: lastEvent.event)
+                            }
+                        }
+                        if let systemPolicy = session.systemPolicy {
+                            LabeledContent("System policy") {
+                                StatusLabel(
+                                    text: systemPolicy.ready ? "Kernel-gated" : "Unavailable",
+                                    isHealthy: systemPolicy.ready && systemPolicy.mode == "kernel-gated"
+                                )
+                            }
+                            if let backend = systemPolicy.backend {
+                                LabeledContent("Policy backend", value: backend)
+                            }
+                            if !systemPolicy.capabilities.isEmpty {
+                                LabeledContent(
+                                    "Backend capabilities",
+                                    value: systemPolicy.capabilities.joined(separator: ", ")
+                                )
+                            }
+                            if let error = systemPolicy.error {
+                                Text(error)
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                                    .textSelection(.enabled)
+                            }
+                            if let rawURL = systemPolicy.supportPullRequestURL,
+                               let supportURL = URL(string: rawURL) {
+                                Link("Submit platform support pull request", destination: supportURL)
+                                    .font(.caption)
+                            }
+                        } else {
+                            LabeledContent("System policy") {
+                                StatusLabel(text: "Backend status unavailable", isHealthy: false)
+                            }
                         }
                         if let runtime = session.runtime {
                             LabeledContent("Hook runtime") {
@@ -507,7 +571,7 @@ private struct SessionHookControlView: View {
             }
         } message: {
             Text(
-                "This changes only hook \(hook.id) in \(model.selectedAgentSession?.providerDisplayName ?? "agent") session \(model.selectedAgentSession?.sessionId ?? "unknown"). Other sessions are unaffected."
+                "This changes only hook \(hook.id) in \(model.selectedAgentSession?.agentDisplayName ?? "agent") session \(model.selectedAgentSession?.sessionId ?? "unknown"). Other sessions are unaffected."
             )
         }
         .confirmationDialog(
@@ -515,7 +579,7 @@ private struct SessionHookControlView: View {
             isPresented: $isConfirmingEnableAll,
             titleVisibility: .visible
         ) {
-            Button("Enable all hooks and reload") {
+            Button("Enable all hooks") {
                 isConfirmingEnableAll = false
                 model.enableAllHooksInSelectedSession()
             }
@@ -525,8 +589,8 @@ private struct SessionHookControlView: View {
         } message: {
             Text(
                 "One approved operation enables every registered hook, persists the override only in "
-                    + "\(model.selectedAgentSession?.providerDisplayName ?? "agent") session "
-                    + "\(model.selectedAgentSession?.sessionId ?? "unknown"), and reloads its OMP runtime. "
+                    + "\(model.selectedAgentSession?.agentDisplayName ?? "agent") session "
+                    + "\(model.selectedAgentSession?.sessionId ?? "unknown"). "
                     + "Other sessions are unaffected."
             )
         }
