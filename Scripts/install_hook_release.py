@@ -112,7 +112,6 @@ def release_file_map(release_root: Path, home: Path, registry: dict) -> dict[Pat
             and "__pycache__" not in item.parts
             and item.name not in {
                 "generate-configs.mjs",
-                "omp-shared-hooks.js",
                 "providers.json",
                 "run-one-session-hook.js",
             }
@@ -419,6 +418,9 @@ def install_release(
     runtime_target = home / ".shared-hooks/universal_agent_runtime.py"
     if runtime_target not in writes:
         raise RuntimeError("Approved hook release is missing the universal Tama runtime")
+    omp_adapter_target = home / ".shared-hooks/omp-shared-hooks.js"
+    if omp_adapter_target not in writes:
+        raise RuntimeError("Approved hook release is missing the OMP Tama adapter")
     launcher_target = home / ".local/bin/tama-agent"
     writes[launcher_target] = (supervisor_launcher_body(home), 0o755)
     legacy_launchers = {
@@ -529,7 +531,6 @@ def install_release(
     old_omp_adapters = (
         home / ".omp/agent/hooks/pre/shared-hooks.js",
         home / ".omp/agent/hooks.tama-disabled/pre/shared-hooks.js",
-        home / ".shared-hooks/omp-shared-hooks.js",
     )
     legacy_restart_artifacts = (
         home / "Library/Application Support/Tama/vscode-resume",
@@ -578,9 +579,12 @@ def install_release(
             omp_previous = parsed.get("value") if isinstance(parsed.get("value"), list) else []
             obsolete_adapters = {
                 str(home / ".omp/agent/hooks/pre/shared-hooks.js"),
-                str(home / ".shared-hooks/omp-shared-hooks.js"),
+                str(home / ".omp/agent/hooks.tama-disabled/pre/shared-hooks.js"),
             }
             updated = [path for path in omp_previous if path not in obsolete_adapters]
+            adapter_path = str(omp_adapter_target)
+            if adapter_path not in updated:
+                updated.append(adapter_path)
             if updated != omp_previous:
                 result = subprocess.run(
                     [omp, "config", "set", "extensions", json.dumps(updated)],
@@ -590,7 +594,7 @@ def install_release(
                     env=command_env,
                 )
                 if result.returncode != 0:
-                    raise RuntimeError(result.stderr.strip() or "Could not remove OMP hook adapters")
+                    raise RuntimeError(result.stderr.strip() or "Could not register OMP hook adapter")
                 omp_changed = True
 
         installed = {

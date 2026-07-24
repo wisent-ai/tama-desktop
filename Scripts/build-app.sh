@@ -53,7 +53,6 @@ for directory in shared-hooks claude-hooks codex-hooks repo-githooks; do
 done
 rm -f \
     "$HOOK_RELEASE/shared-hooks/generate-configs.mjs" \
-    "$HOOK_RELEASE/shared-hooks/omp-shared-hooks.js" \
     "$HOOK_RELEASE/shared-hooks/providers.json" \
     "$HOOK_RELEASE/shared-hooks/run-one-session-hook.js"
 SYSTEM_POLICY_SOURCE="$DESKTOP_ROOT/SystemPolicy/macOS"
