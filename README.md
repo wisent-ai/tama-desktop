@@ -35,7 +35,7 @@ Explicit non-goals:
 - replacing the Wisent identity service;
 - claiming kernel enforcement on unsupported operating systems.
 
-Supported environment: Apple-silicon macOS 14 or newer. The current release does not support Intel Macs, Linux, or Windows. Policy-changing workflows require a current `owner`, `admin`, or `member` role in the selected Wisent organization; unknown or absent roles are denied. Node.js 20 or newer and Python 3 are required only when installing or using the bundled hook runtime. Administrator approval and Full Disk Access are required only for the macOS policy backend.
+Supported environment: Apple-silicon macOS 14 or newer. The current release does not support Intel Macs, Linux, or Windows. Policy-changing workflows require a current `owner`, `admin`, or `member` role in the selected Wisent organization; unknown or absent roles are denied. Node.js 20 or newer is required when using the bundled hook runtime or repository scan/cleanup workflows. `/usr/bin/python3` is required to install or restore local enforcement. Administrator approval and Full Disk Access are required only for the macOS policy backend.
 
 ## Core use cases
 

@@ -13,14 +13,14 @@ Required for every supported installation:
 - access to the private `wisent-ai/tama-desktop` GitHub releases;
 - at least 500 MB free local storage; check with `df -h "$HOME"`.
 
+Required for local enforcement or repository scan/cleanup:
+
+- Node.js 20 or newer available on `PATH`, `/opt/homebrew/bin`, `/usr/local/bin`, or `~/.local/bin`.
+
 Required only for local enforcement:
 
 - Python 3 available at `/usr/bin/python3`;
 - permission to approve Login Items, a System Extension, Network filtering, and Full Disk Access in macOS settings.
-
-Required only for repository scan or agent-assisted cleanup:
-
-- Node.js 20 or newer available on `PATH`, `/opt/homebrew/bin`, `/usr/local/bin`, or `~/.local/bin`.
 
 Required only for agent-assisted cleanup:
 
@@ -70,11 +70,12 @@ Starting state:
 - no Tama runtime is installed;
 - no Tama daemon or Network Extension is registered;
 - no supervised agent is running.
+- Node.js 20 or newer and `/usr/bin/python3` are available in the documented locations.
 
 Steps:
 
 1. Open **Overview**. Confirm the catalog status is **Valid**, the product version/source revision are displayed, and installed hooks read **Not installed by Tama**.
-2. Select **Install local runtime**. Review the listed target directories and confirm. Expected result: Overview displays the installed hook release ID; unrelated agent settings are preserved.
+2. Select **Install local runtime**. Tama checks the Python installer prerequisite before mutation; Node must already satisfy the documented prerequisite before a supervised session uses the installed hooks. Review the listed target directories and confirm. Expected result: Overview displays the installed hook release ID and unrelated agent settings are preserved.
 3. Select a catalog hook and open **Session control**. Choose **Register backend**, review the macOS components, and confirm.
 4. Approve the daemon/System Extension and Network filter in macOS settings. Grant Full Disk Access only to the named Tama component when prompted.
 5. Start one supported supervised coding-agent session using its normal launcher.

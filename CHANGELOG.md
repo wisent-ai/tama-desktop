@@ -32,6 +32,7 @@ All user-visible changes follow the categories required by `docs/releases.md`. A
 - Optional violation tooling no longer depends on a hard-coded maintainer directory.
 - Nonzero cleanup-agent exits cannot be reported as successful cleanup even when partial edits remove the final violation.
 - Hook registration now rejects invalid timeout and registry-path arguments before mutation, reports registry-load, registry-I/O, or mutator-launch failures without an unhandled stack trace, preserves registry permissions across atomic replacement, and retains the primary error if temporary-file cleanup also fails.
+- Runtime prerequisites now consistently distinguish local Node.js execution, Python-based installation/restoration, and macOS backend approval across README, onboarding, core, and integration contracts.
 - Violations command output is retained within explicit bounds and output-limit failures remain visible.
 - Cleanup rejects changed HEAD, checked-out branch, or local branch refs and states the remaining external-provider verification boundary.
 - Backend status exposes partial installation, and deactivation attempts every privileged component while preserving aggregate failure and restart-required recovery.

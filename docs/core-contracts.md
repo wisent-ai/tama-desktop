@@ -20,7 +20,7 @@ The app bundle is authoritative for the displayed catalog. The repository checko
 
 ### Runtime installation
 
-Initial state: authenticated authorized operator, valid bundled hook release, no operation already running. Input: explicit confirmation. The installer verifies the release digest before any managed mutation, stages release bytes, preserves original files, atomically writes replacements, and atomically changes the `current` symlink.
+Initial state: authenticated authorized operator, valid bundled hook release, documented Node and Python prerequisites available, no operation already running. Input: explicit confirmation. The installer verifies the release digest before any managed mutation, stages release bytes, preserves original files, atomically writes replacements, and atomically changes the `current` symlink.
 
 Success: `installed.json` records schema, release ID, checksum, hook package version, catalog version, timestamp, previous release ID, and managed files. Failure: original files and symlink are restored. Retrying is safe after the previous transaction has completed.
 
