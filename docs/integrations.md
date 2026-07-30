@@ -99,4 +99,4 @@ Timeout, cancellation, nonzero exit, policy-gaming detection, remaining violatio
 
 Changing a normalized contract follows Tama versioning. Provider-only compatible corrections may be patch changes. Removal requires disabling new calls, revoking credentials/capabilities, stopping jobs, preserving understandable core state, removing adapter files, and documenting any lost capability and migration path in release notes.
 
-Every supported integration capability and unavailable-dependency path maps to the canonical coverage matrix in [`../examples/README.md`](../examples/README.md). Integration examples remain isolated, declare credentials and risk, and cannot claim executed evidence until controlled qualification.
+Every CLI-exposed integration capability and unavailable-dependency path has a command example in [`../examples/`](../examples/). Scripts declare mutation and provider risk inline; their presence is not executed qualification evidence.

@@ -105,6 +105,20 @@ Every error includes the failed operation, whether retry is safe, and one correc
 - Installed releases are content-addressed; unknown files outside managed roots are never removed.
 - Emergency disable is the recovery control for hook-induced loss of availability.
 
+## CLI policy surface
+
+`tama status` validates the immutable catalog without treating absent local provider
+configuration as catalog corruption. `tama status --runtime` additionally checks local
+Claude and Codex installation drift; JSON output states `runtimeInstallChecked` so
+automation cannot confuse the two scopes. `tama provider coverage` reports
+registry-declared hook/event mappings only and explicitly does not claim live execution.
+
+Hook inspection is read-only. `tama hooks add` and `tama hooks remove` are maintainer
+operations: both require an explicit writable `--root`, refuse implicit signed bundles or
+installed releases, keep one command identity per hook ID, preserve occurrences on other
+events, write the complete resealed registry atomically, and expose an exact rollback
+command in the corresponding example.
+
 ## Observability and bounds
 
 Primary operations expose requested scope, current state, final result, failure class, and required action. Child-process output is drained concurrently and bounded before display. Local setup and emergency commands have a bounded runtime and terminate their process tree on timeout. Polling uses one task per authorized control model and stops when that control surface disappears. Session TTL is clamped to 5–3600 seconds. Repository cleanup agents have a bounded execution time defined by the bundled CLI.
@@ -115,4 +129,4 @@ The app does not promise a repository size or scan latency until measured releas
 
 Schema changes follow the version policy in `releases.md`. Readers reject unsupported schema roots before mutation. Clean migrations replace old representations; permanent aliases and silent cross-provider fallbacks are prohibited. Integration types are translated at the adapter boundary and do not become the shared product vocabulary.
 
-Every distinct core outcome, failure, and recovery transition maps to the canonical coverage matrix and public-boundary task in [`../examples/README.md`](../examples/README.md). A contract change updates that matrix and every affected example before tests.
+Every public CLI outcome has a directly runnable command example in [`../examples/`](../examples/). A contract change updates the affected script before tests.

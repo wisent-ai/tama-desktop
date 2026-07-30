@@ -89,19 +89,20 @@ No supported binary has been published yet. The steps below are the contract for
    ```
 
    Expected output ends with `OK`.
-3. Expand the archive, move `Tama.app` to `~/Applications`, and open it.
-4. Read the welcome screen and choose **Inspect bundled policy**. The read-only Overview must show a valid bundled catalog and `Not installed by Tama`; displaying or refreshing it does not start session monitoring or change local policy.
-5. Choose **Sign in for controls** only when a policy-changing workflow is intended, then complete Wisent sign-in.
+3. Expand the archive and move `Tama.app` to `~/Applications`.
+4. Install the bundled CLI entrypoint with [`examples/getting-started/install-cli.sh`](examples/getting-started/install-cli.sh), then run `tama status`. After provider adapters are configured, `tama status --runtime` additionally checks local install drift.
+5. Open Tama, read the welcome screen, and choose **Inspect bundled policy**. The read-only Overview must show a valid bundled catalog and `Not installed by Tama`; displaying or refreshing it does not start session monitoring or change local policy.
+6. Choose **Sign in for controls** only when a policy-changing workflow is intended, then complete Wisent sign-in.
 
 Full prerequisites, first-success steps, failure recovery, reset, and uninstall instructions are in [`docs/onboarding.md`](docs/onboarding.md).
 
 ## Primary interfaces
 
 - **SwiftUI application:** canonical human interface for inspection, setup, session control, emergency recovery, and violation scans.
+- **Tama CLI:** public machine interface for catalog status, hook inspection, provider coverage, Git dispatcher installation, repository scans/cleanup, adaptive recovery, and MCP configuration. Maintainer hook registration additionally requires an explicit writable policy source tree.
 - **Session-control JSON protocol:** machine interface between Tama and supported local agent supervisors. Its schema and ownership rules are defined in [`docs/core-contracts.md`](docs/core-contracts.md).
-- **Bundled violations CLI:** internal adapter invoked by the app; it is not a stable public CLI contract.
 - **Release manifests:** machine-readable build and artifact identity described in [`docs/releases.md`](docs/releases.md).
-- **Canonical examples:** outcome-by-outcome operating tasks, risk labels, coverage, failure paths, and cleanup in [`examples/README.md`](examples/README.md).
+- **Command examples:** directly runnable shell commands with inline risk and side-effect comments in [`examples/`](examples/).
 
 ## Operational model
 

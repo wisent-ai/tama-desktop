@@ -87,4 +87,4 @@ A reset removes Tama-owned welcome or stopped-session override state without unr
 
 Use the versioned procedure in `onboarding.md`; do not delete managed hook files blindly because existing non-Tama settings and dispatchers may need restoration.
 
-Canonical bounded tasks for backup-sensitive operations, upgrade, rollback, emergency recovery, reset, and removal are indexed in [`../examples/README.md`](../examples/README.md).
+Public CLI operations are demonstrated as runnable, commented shell scripts in [`../examples/`](../examples/); mutation examples require explicit environment inputs before they act.

@@ -10,8 +10,8 @@ All user-visible changes follow the categories required by `docs/releases.md`. A
 - Explicit welcome and setup flow before any local policy mutation.
 - Unauthenticated bundled-policy inspector with no session monitoring or mutation controls.
 - Desktop build provenance and immutable release packaging contract.
-- Bundled violations CLI independent of a maintainer source checkout.
-- Canonical `examples/` catalog with a contract-derived coverage matrix, risk labels, complete public-boundary tasks, failure paths, cleanup, and honest qualification status.
+- Public Tama CLI for portable catalog status, opt-in local runtime-drift checks, namespaced hook operations with atomic registry resealing, provider-declared coverage, Git dispatcher installation, repository workflows, adaptive recovery, and MCP configuration.
+- Runnable `examples/` shell commands with inline risk, required-input, side-effect, and rollback comments; CLI link installation is retry-safe, and prose runbooks plus the Markdown coverage matrix were removed.
 
 ### Changed
 

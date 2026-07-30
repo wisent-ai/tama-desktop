@@ -147,7 +147,7 @@ Sign out from Tama to remove its Wisent session through the normal application f
 
 After first success:
 
-- follow the canonical task catalog in [`../examples/README.md`](../examples/README.md), beginning with the first-success example;
+- start with the read-only commands in [`../examples/getting-started/status.sh`](../examples/getting-started/status.sh), then choose only the script matching the intended operation;
 - inspect hook purpose and side effects in **Hook catalog**;
 - review expiring justification records;
 - scan a repository read-only;

@@ -22,26 +22,24 @@ A source test pass alone must never be reported as full Tama verification.
 These tests use temporary local state and do not prove the signed app, real hook runtime,
 privileged backend, process boundary, cleanup provider, or public UI.
 
-## Contract coverage and required evidence
+## CLI example coverage and required evidence
 
-| Product contract | Canonical example | Required proof | Current evidence |
+The files under `examples/` are executable command examples, not prose runbooks and not
+test evidence. Each script exposes one bounded CLI outcome and states mutation or provider
+risk before the command.
+
+| CLI contract | Command example | Required proof | Current evidence |
 |---|---|---|---|
-| Exact artifact and release identity | `examples/operations/verify-release-manifests.md` | Signed/timestamped/notarized artifact; matching digest, provenance, embedded build, dependencies, examples revision, and hook identity | Missing; no preview artifact |
-| Clean install to first kernel-gated session | `examples/getting-started/first-kernel-gated-session.md` | Clean supported Mac, real Wisent sign-in, explicit runtime/backend setup, real supervisor, observable ready state | Missing; device and credential qualification required |
-| Read-only approved-policy inspection | `examples/core/inspect-approved-policy.md` | Public UI from signed app; no local policy mutation | Missing; safe local example not executed |
-| Live session discovery/status | `examples/core/inspect-live-session.md` | Real compatible supervisor plus accepted/stale/invalid records and visible diagnostics | Partial unit evidence only; no execution in current work |
-| One-session hook override and scope isolation | `examples/core/control-one-session-hook.md` | Real supervisor accepts valid override and rejects wrong key/session/release/checksum/TTL/capability; second session unchanged | Partial serialization unit evidence only |
-| Enable-all transition and reload | `examples/core/enable-all-hooks-one-session.md` | Selected session reloads complete registered set; other sessions unchanged | Missing |
-| Emergency disable and transactional restore | `examples/recovery/emergency-disable-and-reenable.md` | Real dispatchers/sessions, forced bounded partial failure, exit-trap resume, backup/manifest, verified re-enable | Missing; destructive qualification required |
-| Repository read-only scan | `examples/core/scan-repository.md` | Bundled Node/CLI process against isolated repository; clean and violation reports; tree unchanged; bounded timeout/error | Parser unit evidence only |
-| Agent cleanup and final rescan | `examples/core/clean-repository-violations.md` | Isolated recoverable repository, controlled Codex identity, real edits, unchanged HEAD/checked-out branch/local refs, independently inspected remote state, clean final rescan, provider outage/timeout, cancellation that terminates the process tree, preserves partial edits, and rescans | Missing; credentialed provider qualification required |
-| Same-version integrity recovery | `examples/recovery/recover-integrity-failure.md` | Corrupt bundle/runtime rejection followed by verified exact-artifact recovery | Missing; controlled fault qualification required |
-| Reset/sign-out | `examples/operations/reset-and-sign-out.md` | Welcome/auth state changes while policy installation remains unchanged | Missing |
-| Deactivate and uninstall | `examples/operations/deactivate-and-uninstall.md` | Dispatchers disabled, daemon/filter/system extension removed, app removed, unrelated state preserved | Missing; destructive device qualification required |
-| Upgrade and rollback | Upgrade/rollback canonical examples | Two exact signed versions, compatible state backup, forward and reverse observable identity/runtime proof, forward-only rejection | Missing; two-version qualification required |
-| Integration isolation/outages | Corresponding example failure paths | Wisent Auth, hook bundle, supervisors, macOS backend, Node/CLI, Codex, Apple, and GitHub unavailable independently without corrupting core state | Missing except bounded parser/unit fragments |
-| Security and data integrity | All mutation/recovery examples | Auth/confirmation boundaries, repository ownership, per-user modes, atomic writes, immutable releases, no secret serialization, capability expiry/revocation | Missing end-to-end evidence |
-| Canonical examples | `examples/README.md` | Every safe local example executed; controlled examples approved and recorded; documented cleanup/failure exercised | All examples honestly marked Draft |
+| Bundled CLI discovery | `examples/getting-started/install-cli.sh` | Creates or idempotently retains the matching link, refuses unrelated entries, and reports missing PATH configuration | Not executed in current work |
+| Catalog health and aggregate provider summary | `examples/getting-started/status.sh` | Stable human output, valid JSON, truthful nonzero status for an invalid catalog, and explicit optional runtime-drift scope | Not executed in current work |
+| Hook listing and exact hook inspection | `examples/core/hooks-list.sh` | Human and JSON output agree on ID, source, command, and events | Not executed in current work |
+| Hook occurrence registration and removal | `examples/core/hooks-add.sh`, `examples/core/hooks-remove.sh` | Exact event mutation, atomic resealed registry write, validation, and reversible removal | Not executed in current work |
+| Provider coverage | `examples/core/provider-coverage.sh` | Provider filtering and complete registry-declared hook/event mappings without claiming live evidence | Not executed in current work |
+| Repository read-only scan | `examples/core/scan-repository.sh` | Existing owned repository; clean and violation reports; tree unchanged; bounded error | Parser unit evidence only |
+| Provider-backed cleanup and final rescan | `examples/core/clean-repository.sh` | Recoverable repository, bounded agent execution, preserved Git identity, final independent scan | Missing; credentialed provider qualification required |
+| User-global Git dispatcher installation | `examples/operations/install-user-git-hooks.sh` | Reviewed plan, exact target writes, Git config result, post-install status | Missing; controlled mutation qualification required |
+| MCP configuration | `examples/operations/mcp-config.sh` | Emitted server command resolves to the selected release | Not executed in current work |
+| Adaptive recovery triage | `examples/recovery/adaptive-status.sh` | Status, drift, and queue remain read-only; repair/apply stay explicit | Not executed in current work |
 
 ## Required suites
 
