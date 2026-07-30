@@ -122,6 +122,7 @@ events, write the complete resealed registry atomically, and expose an exact rol
 command in the corresponding example. Missing option values are usage errors. Hook
 timeouts must be integer seconds in the inclusive range 1–3600; invalid values are
 rejected before the registry is written.
+Registry read, parse, temporary-write, and rename failures produce a bounded diagnostic and a nonzero exit without exposing a stack trace.
 
 ## Observability and bounds
 
