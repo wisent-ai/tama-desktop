@@ -26,7 +26,7 @@ struct ViolationsView: View {
                 model.resetRepoPath()
             }
             .labelStyle(.iconOnly)
-            .help("Restore the default hooks-rotator repository")
+            .help("Clear the repository path")
             .disabled(!model.isRepoPathModified)
             Button("Scan", systemImage: "magnifyingglass") {
                 Task { await model.scan() }
@@ -49,8 +49,13 @@ struct ViolationsView: View {
                 )
             )
         case .scanning:
-            ProgressView("Scanning \(model.repoPath)…")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            VStack(spacing: Int("12")!) {
+                ProgressView("Scanning \(model.repoPath)…")
+                Button("Stop scan", role: .destructive) {
+                    model.cancelScan()
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         case let .failed(message):
             ContentUnavailableView(
                 "Scan failed",

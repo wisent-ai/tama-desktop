@@ -190,7 +190,8 @@ struct SessionControlClient: Sendable {
 
     func liveSessions(now: Date = Date()) throws -> [AgentSessionRecord] {
         let manager = FileManager.default
-        let root = try controlRoot(manager: manager)
+        let root = try controlRoot(manager: manager, create: false)
+        guard manager.fileExists(atPath: root.path) else { return [] }
         let urls = try manager.contentsOfDirectory(
             at: root,
             includingPropertiesForKeys: nil,
@@ -207,13 +208,10 @@ struct SessionControlClient: Sendable {
                 isSafeAgentId(session.agentId),
                 isSafeControlKey(session.controlKey)
             else {
-                try? manager.removeItem(at: url)
                 continue
             }
             if sessionIsLive(session, now: now) {
                 sessions.append(session)
-            } else {
-                try? manager.removeItem(at: url)
             }
         }
         return sessions.sorted {
@@ -239,7 +237,7 @@ struct SessionControlClient: Sendable {
             throw SessionControlError.invalidSession
         }
         let manager = FileManager.default
-        let root = try controlRoot(manager: manager)
+        let root = try controlRoot(manager: manager, create: true)
         let overrideURL = root.appendingPathComponent("\(session.controlKey).override.json")
         let decoder = JSONDecoder()
         let existing = (try? Data(contentsOf: overrideURL))
@@ -285,7 +283,7 @@ struct SessionControlClient: Sendable {
             throw SessionControlError.invalidSession
         }
         let manager = FileManager.default
-        let root = try controlRoot(manager: manager)
+        let root = try controlRoot(manager: manager, create: true)
         let overrideURL = root.appendingPathComponent("\(session.controlKey).override.json")
         let decoder = JSONDecoder()
         let existing = (try? Data(contentsOf: overrideURL))
@@ -340,7 +338,7 @@ struct SessionControlClient: Sendable {
 
 
 
-    private func controlRoot(manager: FileManager) throws -> URL {
+    private func controlRoot(manager: FileManager, create: Bool) throws -> URL {
         let root: URL
         if let rootOverride {
             root = rootOverride
@@ -349,18 +347,20 @@ struct SessionControlClient: Sendable {
                 for: .applicationSupportDirectory,
                 in: .userDomainMask,
                 appropriateFor: nil,
-                create: true
+                create: create
             )
             root = support
                 .appendingPathComponent("Tama", isDirectory: true)
                 .appendingPathComponent("session-control", isDirectory: true)
         }
+        if create {
         try manager.createDirectory(
             at: root,
             withIntermediateDirectories: true,
             attributes: [.posixPermissions: 0o700]
         )
         try manager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root.path)
+        }
         return root
     }
 

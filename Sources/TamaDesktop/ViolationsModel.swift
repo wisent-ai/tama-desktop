@@ -12,6 +12,8 @@ final class ViolationsModel: ObservableObject {
     enum CleanState: Equatable {
         case idle
         case running
+        case cancelling
+        case rescanning
         case done(String)
         case failed(String)
     }
@@ -22,10 +24,15 @@ final class ViolationsModel: ObservableObject {
     @Published private(set) var cleanState: CleanState = .idle
 
     private let defaultRepoPath: String?
+    private let allowsOperations: Bool
+    private var scanTask: Task<ViolationReport, Error>?
+    private var cleanTask: Task<String, Error>?
+    private var cleanCancellationRequested = false
 
-    init() {
-        defaultRepoPath = try? HookCatalogClient().repositoryRoot().path
-        repoPath = defaultRepoPath ?? ""
+    init(authorization: ControlAuthorization? = nil) {
+        defaultRepoPath = nil
+        repoPath = ""
+        allowsOperations = authorization != nil
     }
 
     var isRepoPathModified: Bool {
@@ -33,9 +40,12 @@ final class ViolationsModel: ObservableObject {
     }
 
     var canScan: Bool {
-        !repoPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        allowsOperations
+            && !repoPath.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && scanState != .scanning
             && cleanState != .running
+            && cleanState != .rescanning
+            && cleanState != .cancelling
     }
 
     var hasViolations: Bool {
@@ -47,7 +57,7 @@ final class ViolationsModel: ObservableObject {
     }
 
     func scan(preservingCleanState: Bool = false) async {
-        guard scanState != .scanning else { return }
+        guard allowsOperations, scanState != .scanning else { return }
         let path = repoPath.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !path.isEmpty else {
             scanState = .failed("Enter a repository path first.")
@@ -57,34 +67,120 @@ final class ViolationsModel: ObservableObject {
             cleanState = .idle
         }
         scanState = .scanning
+        let task = Task.detached(priority: .userInitiated) {
+            try ViolationsClient().scan(repoPath: path)
+        }
+        scanTask = task
         do {
-            let loaded = try await Task.detached(priority: .userInitiated) {
-                try ViolationsClient().scan(repoPath: path)
-            }.value
-            report = loaded
+            report = try await task.value
             scanState = .done
         } catch {
             scanState = .failed(
                 (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             )
         }
+        scanTask = nil
     }
 
     func clean() async {
-        guard cleanState != .running, scanState != .scanning else { return }
+        guard
+            allowsOperations,
+            cleanState != .running,
+            cleanState != .cancelling,
+            cleanState != .rescanning,
+            scanState != .scanning
+        else { return }
         let path = repoPath.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !path.isEmpty else { return }
         cleanState = .running
+        cleanCancellationRequested = false
+        let task = Task.detached(priority: .userInitiated) {
+            try ViolationsClient().clean(repoPath: path)
+        }
+        cleanTask = task
+        let outcome: Result<String, Error>
         do {
-            let summary = try await Task.detached(priority: .userInitiated) {
-                try ViolationsClient().clean(repoPath: path)
-            }.value
-            cleanState = .done(summary)
+            outcome = .success(try await task.value)
         } catch {
+            outcome = .failure(error)
+        }
+        cleanTask = nil
+        let cancellationRequested = cleanCancellationRequested
+        cleanState = .rescanning
+        await scan(preservingCleanState: true)
+        if case let .failed(message) = scanState {
+            let commandMessage: String
+            if cancellationRequested {
+                commandMessage = ViolationsError.processCancelled.errorDescription
+                    ?? "Cleanup was cancelled."
+            } else {
+                commandMessage = switch outcome {
+                case .success:
+                    "Cleanup command completed."
+                case let .failure(error):
+                    (error as? LocalizedError)?.errorDescription
+                        ?? error.localizedDescription
+                }
+            }
+            cleanState = .failed(
+                "\(commandMessage) Final rescan failed: \(message)"
+            )
+            cleanCancellationRequested = false
+            return
+        }
+        if cancellationRequested {
+            cleanCancellationRequested = false
+            cleanState = .failed(
+                ViolationsError.processCancelled.errorDescription
+                    ?? "Cleanup was cancelled."
+            )
+            return
+        }
+        cleanCancellationRequested = false
+
+        switch outcome {
+        case let .failure(error):
             cleanState = .failed(
                 (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             )
+        case let .success(summary):
+            guard
+                let report,
+                report.totals.violations == .zero,
+                report.totals.problems == .zero
+            else {
+                cleanState = .failed(
+                    "Cleanup finished but the final scan is not clean. "
+                        + "Review the remaining report and command summary: \(summary)"
+                )
+                return
+            }
+            cleanState = .done(summary)
         }
-        await scan(preservingCleanState: true)
+    }
+
+    func cancelScan() {
+        guard scanState == .scanning else { return }
+        scanTask?.cancel()
+    }
+
+    func cancelClean() {
+        guard cleanState == .running else { return }
+        cleanState = .cancelling
+        cleanCancellationRequested = true
+        cleanTask?.cancel()
+    }
+
+    func cancelAllOperations() {
+        if cleanState == .running {
+            cleanState = .cancelling
+        }
+        if cleanState == .running
+            || cleanState == .cancelling
+            || cleanState == .rescanning {
+            cleanCancellationRequested = true
+        }
+        cleanTask?.cancel()
+        scanTask?.cancel()
     }
 }

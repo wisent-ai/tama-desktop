@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 import hashlib
 import json
+import os
 from pathlib import Path
 import sys
 import shutil
@@ -78,6 +79,9 @@ def package_external_sources(root: Path, registry: dict) -> None:
 
 def tree_digest(root: Path) -> str:
     digest = hashlib.sha256()
+    if root.is_file():
+        digest.update(root.read_bytes())
+        return digest.hexdigest()
     for path in sorted(item for item in root.rglob("*") if item.is_file() and item.name != "release.json"):
         relative = path.relative_to(root).as_posix().encode()
         digest.update(len(relative).to_bytes(8, "big"))
@@ -91,6 +95,12 @@ def tree_digest(root: Path) -> str:
 
 
 def main() -> int:
+    if "--digest-file" in sys.argv:
+        artifact = Path(next(reversed(sys.argv))).resolve()
+        if not artifact.is_file():
+            raise SystemExit(f"artifact not found: {artifact}")
+        print(tree_digest(artifact))
+        return len(())
     if len(sys.argv) != 2:
         raise SystemExit("usage: seal_hook_release.py <release-root>")
     root = Path(sys.argv[1]).resolve()
@@ -106,6 +116,8 @@ def main() -> int:
         "packageVersion": package.get("version", "unknown"),
         "catalogVersion": catalog.get("version", "unknown"),
         "catalogUpdatedAt": catalog.get("updatedAt"),
+        "sourceDirty": os.environ.get("TAMA_HOOK_SOURCE_DIRTY", "true") == "true",
+        "sourceRevision": os.environ.get("TAMA_HOOK_SOURCE_REVISION", "unknown"),
         "sealedAt": datetime.now(timezone.utc).isoformat(),
     }
     (root / "release.json").write_text(json.dumps(release, indent=2, sort_keys=True) + "\n")

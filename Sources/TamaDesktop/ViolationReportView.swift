@@ -44,8 +44,10 @@ struct ViolationReportView: View {
         } message: {
             Text(
                 "A headless model agent will edit files in \(model.repoPath) to resolve the violations. "
-                    + "It only changes the repository working tree and never commits. "
-                    + "This can take several minutes; review the result with git diff afterwards."
+                    + "Tama requests working-tree edits only and rejects changed HEAD, checked-out "
+                    + "branch, or local branch refs; it does not perform commits or pushes itself. "
+                    + "The provider remains external. Review git status, branch refs, remote state, "
+                    + "and the final diff afterwards."
             )
         }
     }
@@ -78,6 +80,16 @@ struct ViolationReportView: View {
                             .controlSize(.small)
                         Text("Cleaning… a headless model agent is editing the working tree.")
                             .foregroundStyle(.secondary)
+                    case .cancelling:
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Stopping cleanup… partial edits will be preserved and rescanned.")
+                            .foregroundStyle(.secondary)
+                    case .rescanning:
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Rescanning the working tree before reporting the result…")
+                            .foregroundStyle(.secondary)
                     case .done:
                         Label("Clean finished", systemImage: "checkmark.circle.fill")
                             .foregroundStyle(.green)
@@ -86,12 +98,19 @@ struct ViolationReportView: View {
                             .foregroundStyle(.red)
                     }
                     Spacer()
-                    if report.totals.violations > 0 {
+                    if model.cleanState == .running {
+                        Button("Stop cleanup", role: .destructive) {
+                            model.cancelClean()
+                        }
+                    } else if report.totals.violations > .zero {
                         Button("Clean violations", systemImage: "wand.and.stars") {
                             isConfirmingClean = true
                         }
                         .buttonStyle(.borderedProminent)
-                        .disabled(model.cleanState == .running)
+                        .disabled(
+                            model.cleanState == .cancelling
+                                || model.cleanState == .rescanning
+                        )
                     }
                 }
                 if case let .done(summary) = model.cleanState {

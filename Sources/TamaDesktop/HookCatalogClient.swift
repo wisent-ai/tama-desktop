@@ -3,7 +3,7 @@ import Foundation
 struct HookCatalogClient: Sendable {
     private var manager: FileManager { .default }
 
-    func load() throws -> CatalogSnapshot {
+    func load(includeLocalJustifications: Bool = true) throws -> CatalogSnapshot {
         guard let catalogURL = Bundle.main.url(
             forResource: "tama-catalog",
             withExtension: "json"
@@ -14,7 +14,7 @@ struct HookCatalogClient: Sendable {
             HookCatalog.self,
             from: Data(contentsOf: catalogURL)
         )
-        let justifications = loadJustifications(for: catalog)
+        let justifications = includeLocalJustifications ? loadJustifications(for: catalog) : []
         return CatalogSnapshot(
             catalog: catalog,
             validation: validateSnapshot(catalog),
@@ -23,17 +23,22 @@ struct HookCatalogClient: Sendable {
         )
     }
 
-    func repositoryRoot() throws -> URL {
-        if let override = ProcessInfo.processInfo.environment["TAMA_REPOSITORY_ROOT"], !override.isEmpty {
+    func hookReleaseRoot() throws -> URL {
+#if DEBUG
+        if let override = ProcessInfo.processInfo.environment["TAMA_HOOK_ROOT"], !override.isEmpty {
             let root = URL(fileURLWithPath: override, isDirectory: true).standardizedFileURL
             guard manager.fileExists(atPath: root.path) else {
                 throw ClientError.invalidRepositoryRoot(root.path)
             }
             return root
         }
+#endif
 
-        let root = manager.homeDirectoryForCurrentUser
-            .appendingPathComponent("Documents/CodingProjects/Wisent/hooks-rotator", isDirectory: true)
+        guard let resources = Bundle.main.resourceURL else {
+            throw ClientError.repositoryNotFound
+        }
+        let root = resources
+            .appendingPathComponent("hooks-release", isDirectory: true)
             .standardizedFileURL
         guard manager.fileExists(atPath: root.path) else {
             throw ClientError.repositoryNotFound
@@ -161,9 +166,9 @@ enum ClientError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .repositoryNotFound:
-            "The hooks-rotator repository could not be located."
+            "The Tama bundle does not contain its approved hook release."
         case let .invalidRepositoryRoot(path):
-            "TAMA_REPOSITORY_ROOT does not exist: \(path)"
+            "TAMA_HOOK_ROOT does not exist: \(path)"
         case .bundledCatalogMissing:
             "The Tama bundle does not contain its catalog snapshot. Rebuild with Scripts/build-app.sh."
         }

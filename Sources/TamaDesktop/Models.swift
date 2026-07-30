@@ -7,6 +7,48 @@ struct CatalogSnapshot: Sendable {
     let justifications: [JustificationCollection]
 }
 
+struct HookBuildIdentity: Decodable, Sendable {
+    let releaseId: String
+    let sourceDirty: Bool
+    let sourceRevision: String
+}
+
+struct BuildIdentity: Decodable, Sendable {
+    let architecture: String
+    let builtAt: String
+    let channel: String
+    let hookRelease: HookBuildIdentity?
+    let platform: String
+    let productVersion: String
+    let sourceDirty: Bool
+    let sourceRevision: String
+
+    static var current: BuildIdentity {
+        guard
+            let url = Bundle.main.url(forResource: "tama-build", withExtension: "json"),
+            let data = try? Data(contentsOf: url),
+            let identity = try? JSONDecoder().decode(BuildIdentity.self, from: data)
+        else {
+            return BuildIdentity(
+                architecture: "unknown",
+                builtAt: "unknown",
+                channel: "development",
+                hookRelease: nil,
+                platform: "macOS",
+                productVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+                    ?? "unknown",
+                sourceDirty: true,
+                sourceRevision: "unavailable"
+            )
+        }
+        return identity
+    }
+
+    var displayedRevision: String {
+        sourceDirty ? "\(sourceRevision) (dirty source)" : sourceRevision
+    }
+}
+
 struct HookCatalog: Decodable, Sendable {
     let version: Int
     let generatedAt: String

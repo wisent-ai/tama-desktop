@@ -4,6 +4,7 @@ struct RootView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var violationsModel: ViolationsModel
     @State private var isShowingDisableConfirmation = false
+    @State private var isShowingEnableConfirmation = false
 
     var body: some View {
         NavigationSplitView {
@@ -41,13 +42,14 @@ struct RootView: View {
                         .accessibilityLabel("Updating installed hooks")
                 } else if model.areHooksDisabled {
                     Button {
-                        model.setHooksDisabled(false)
+                        isShowingEnableConfirmation = true
                     } label: {
                         Label("Re-enable all hooks", systemImage: "power.circle.fill")
                     }
                     .labelStyle(.titleAndIcon)
                     .tint(.green)
                     .help("Restore all Tama-managed hook dispatchers")
+                    .disabled(model.isPolicyMutationInProgress)
                 } else {
                     Button {
                         isShowingDisableConfirmation = true
@@ -57,17 +59,25 @@ struct RootView: View {
                     .labelStyle(.titleAndIcon)
                     .tint(.red)
                     .help("Emergency bypass for all Tama-managed hooks")
+                    .disabled(model.isPolicyMutationInProgress)
                 }
             }
             ToolbarItemGroup {
-                Button("Reveal repository", systemImage: "folder") {
-                    model.revealRepository()
+                Button("Reveal bundled release", systemImage: "folder") {
+                    model.revealHookRelease()
                 }
                 Button("Refresh", systemImage: "arrow.clockwise") {
                     Task { await model.refresh() }
                 }
                 .disabled(model.isRefreshing)
             }
+        }
+        .onAppear {
+            model.startControlMonitoring()
+        }
+        .onDisappear {
+            model.stopControlMonitoring()
+            violationsModel.cancelAllOperations()
         }
         .overlay {
             if model.isRefreshing, model.snapshot == nil {
@@ -85,6 +95,22 @@ struct RootView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Agent, editor, and Git hook dispatchers will bypass all hooks until you re-enable them.")
+        }
+        .confirmationDialog(
+            "Re-enable every managed hook?",
+            isPresented: $isShowingEnableConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Install approved release and re-enable") {
+                model.setHooksDisabled(false)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "Tama will integrity-check and install its bundled hook release, restore "
+                    + "managed dispatchers, then resume supervised sessions. Blocking "
+                    + "policy becomes active again."
+            )
         }
         .alert(
             "Tama couldn’t update hooks",
@@ -110,11 +136,11 @@ struct RootView: View {
                 .foregroundStyle(.secondary)
             Spacer()
             Button("Re-enable all hooks") {
-                model.setHooksDisabled(false)
+                isShowingEnableConfirmation = true
             }
             .buttonStyle(.borderedProminent)
             .tint(.green)
-            .disabled(model.isChangingHookState)
+            .disabled(model.isPolicyMutationInProgress)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
@@ -136,11 +162,13 @@ struct RootView: View {
             switch model.selection ?? .overview {
             case .overview:
                 OverviewView(
+                    model: model,
                     snapshot: snapshot,
-                    installedHookReleaseID: model.installedHookReleaseID
+                    installedHookReleaseID: model.installedHookReleaseID,
+                    allowsMutations: true
                 )
             case .hooks:
-                HookCatalogPane(model: model)
+                HookCatalogPane(model: model, allowsSessionControl: true)
             case .justifications:
                 JustificationsView(collections: snapshot.justifications)
             case .validation:
@@ -167,15 +195,120 @@ struct RootView: View {
     }
 }
 
+struct ReadOnlyRootView: View {
+    @StateObject private var model = AppModel(inspectionOnly: true)
+    let continueToSignIn: () -> Void
+    @State private var selection: SidebarSelection? = .overview
+
+    var body: some View {
+        NavigationSplitView {
+            List(selection: $selection) {
+                Label("Overview", systemImage: "shield.lefthalf.filled")
+                    .tag(SidebarSelection.overview)
+                Label("Hook catalog", systemImage: "list.bullet.rectangle")
+                    .tag(SidebarSelection.hooks)
+                Label("Snapshot validation", systemImage: "checkmark.seal")
+                    .tag(SidebarSelection.validation)
+                Label("Repository hooks", systemImage: "point.3.connected.trianglepath.dotted")
+                    .tag(SidebarSelection.repositories)
+            }
+            .navigationTitle("Tama")
+        } detail: {
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .navigationTitle(contentTitle)
+        }
+        .toolbar {
+            ToolbarItem {
+                Button("Sign in for controls", systemImage: "person.badge.key") {
+                    continueToSignIn()
+                }
+                .buttonStyle(.borderedProminent)
+            }
+            ToolbarItemGroup {
+                Button("Reveal bundled release", systemImage: "folder") {
+                    model.revealHookRelease()
+                }
+                Button("Refresh", systemImage: "arrow.clockwise") {
+                    Task { await model.refresh() }
+                }
+                .disabled(model.isRefreshing)
+            }
+        }
+        .overlay {
+            if model.isRefreshing, model.snapshot == nil {
+                ProgressView("Loading the Tama catalog…")
+            }
+        }
+        .alert(
+            "Tama couldn’t load its bundled policy",
+            isPresented: Binding(
+                get: { model.errorMessage != nil },
+                set: { if !$0 { model.clearError() } }
+            )
+        ) {
+            Button("OK", role: .cancel) {
+                model.clearError()
+            }
+        } message: {
+            Text(model.errorMessage ?? "Unknown error")
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if let errorMessage = model.errorMessage, model.snapshot == nil {
+            ContentUnavailableView(
+                "Catalog unavailable",
+                systemImage: "exclamationmark.shield",
+                description: Text(errorMessage)
+            )
+        } else if let snapshot = model.snapshot {
+            switch selection ?? .overview {
+            case .overview, .justifications, .violations:
+                OverviewView(
+                    model: model,
+                    snapshot: snapshot,
+                    installedHookReleaseID: model.installedHookReleaseID,
+                    allowsMutations: false
+                )
+            case .hooks:
+                HookCatalogPane(model: model, allowsSessionControl: false)
+            case .validation:
+                ValidationView(result: snapshot.validation)
+            case .repositories:
+                RepositoryHooksView(hooks: snapshot.catalog.repoGitHooks)
+            }
+        } else {
+            ContentUnavailableView("Loading", systemImage: "shield")
+        }
+    }
+
+    private var contentTitle: String {
+        switch selection ?? .overview {
+        case .overview, .justifications, .violations: "Overview"
+        case .hooks: "Hook catalog"
+        case .validation: "Snapshot validation"
+        case .repositories: "Repository hooks"
+        }
+    }
+}
+
 private struct HookCatalogPane: View {
     @ObservedObject var model: AppModel
+    let allowsSessionControl: Bool
 
     var body: some View {
         HSplitView {
             HookListView(model: model)
                 .frame(minWidth: 340, idealWidth: 420)
             if let hook = model.selectedHook {
-                HookDetailView(model: model, hook: hook, revealSource: model.revealSelectedSource)
+                HookDetailView(
+                    model: model,
+                    hook: hook,
+                    revealSource: model.revealSelectedSource,
+                    allowsSessionControl: allowsSessionControl
+                )
                     .frame(maxWidth: .infinity)
             } else {
                 ContentUnavailableView(
@@ -189,8 +322,13 @@ private struct HookCatalogPane: View {
 }
 
 private struct OverviewView: View {
+    @ObservedObject var model: AppModel
     let snapshot: CatalogSnapshot
     let installedHookReleaseID: String?
+    let allowsMutations: Bool
+    @State private var isConfirmingRuntimeInstall = false
+    @State private var isConfirmingBackendRegistration = false
+    @State private var isConfirmingLocalDeactivation = false
 
     private var blockingCount: Int {
         snapshot.catalog.hooks.filter(\.isBlocking).count
@@ -198,6 +336,10 @@ private struct OverviewView: View {
 
     private var categories: Int {
         Set(snapshot.catalog.hooks.map(\.category)).count
+    }
+
+    private var buildIdentity: BuildIdentity {
+        .current
     }
 
     var body: some View {
@@ -221,6 +363,93 @@ private struct OverviewView: View {
                     )
                 }
 
+                GroupBox("Product build") {
+                    LabeledContent("Version", value: buildIdentity.productVersion)
+                    Divider()
+                    LabeledContent("Channel", value: buildIdentity.channel.capitalized)
+                    Divider()
+                    LabeledContent("Source revision") {
+                        Text(buildIdentity.displayedRevision)
+                            .font(.caption.monospaced())
+                            .textSelection(.enabled)
+                    }
+                    if let hookRelease = buildIdentity.hookRelease {
+                        Divider()
+                        LabeledContent("Bundled hook release") {
+                            Text(hookRelease.releaseId)
+                                .font(.caption.monospaced())
+                                .textSelection(.enabled)
+                        }
+                        Divider()
+                        LabeledContent("Hook source revision") {
+                            Text(
+                                hookRelease.sourceDirty
+                                    ? "\(hookRelease.sourceRevision) (dirty source)"
+                                    : hookRelease.sourceRevision
+                            )
+                            .font(.caption.monospaced())
+                            .textSelection(.enabled)
+                        }
+                    }
+                    Divider()
+                    LabeledContent(
+                        "Target",
+                        value: "\(buildIdentity.platform) · \(buildIdentity.architecture)"
+                    )
+                    Divider()
+                    LabeledContent("Built", value: buildIdentity.builtAt)
+                }
+
+                if allowsMutations {
+                GroupBox("Local setup") {
+                    VStack(alignment: .leading) {
+                        LabeledContent(
+                            "Local runtime",
+                            value: installedHookReleaseID == nil
+                                ? "Not installed"
+                                : "Installed"
+                        )
+                        if model.isInstallingLocalRuntime {
+                            ProgressView("Installing integrity-checked runtime…")
+                        } else {
+                            Button("Install local runtime") {
+                                isConfirmingRuntimeInstall = true
+                            }
+                            .disabled(
+                                !snapshot.validation.ok
+                                    || model.isLocalSetupOperationInProgress
+                            )
+                        }
+                        Divider()
+                        LabeledContent(
+                            "Privileged backend",
+                            value: model.systemPolicyServiceStatus
+                        )
+                        if model.isRegisteringSystemPolicyService {
+                            ProgressView("Registering privileged backend…")
+                        } else if model.systemPolicyServiceStatus != "Enabled" {
+                            Button("Register privileged backend") {
+                                isConfirmingBackendRegistration = true
+                            }
+                            .disabled(model.isLocalSetupOperationInProgress)
+                        }
+                        if installedHookReleaseID != nil
+                            || model.systemPolicyServiceStatus != "Not registered" {
+                            Divider()
+                            if model.isDeactivatingLocalSetup {
+                                ProgressView("Deactivating local policy…")
+                            } else {
+                                Button("Deactivate local setup", role: .destructive) {
+                                    isConfirmingLocalDeactivation = true
+                                }
+                                .disabled(model.isLocalSetupOperationInProgress)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                }
+
                 GroupBox("Current posture") {
                     LabeledContent("Snapshot structure") {
                         StatusLabel(
@@ -228,12 +457,15 @@ private struct OverviewView: View {
                             isHealthy: snapshot.validation.ok
                         )
                     }
-                    Divider()
-                    LabeledContent(
-                        "Installed hooks",
-                        value: installedHookReleaseID.map { String($0.prefix(12)) }
-                            ?? "Not installed by Tama"
-                    )
+                    if allowsMutations {
+                        Divider()
+                        LabeledContent(
+                            "Installed hooks",
+                            value: installedHookReleaseID.map {
+                                String($0.prefix(Int("12")!))
+                            } ?? "Not installed by Tama"
+                        )
+                    }
                     Divider()
                     LabeledContent("Warnings", value: snapshot.validation.warnings.count.formatted())
                     Divider()
@@ -249,6 +481,56 @@ private struct OverviewView: View {
                 }
             }
             .padding()
+        }
+        .confirmationDialog(
+            "Install the local Tama runtime?",
+            isPresented: $isConfirmingRuntimeInstall,
+            titleVisibility: .visible
+        ) {
+            Button("Install runtime") {
+                model.installLocalRuntime()
+            }
+            .disabled(model.isPolicyMutationInProgress)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "Tama will verify its bundled hook release, then update managed files "
+                    + "under Application Support and the documented per-user agent paths. "
+                    + "Existing unrelated settings are preserved."
+            )
+        }
+        .confirmationDialog(
+            "Register privileged macOS policy components?",
+            isPresented: $isConfirmingBackendRegistration,
+            titleVisibility: .visible
+        ) {
+            Button("Register backend") {
+                Task { await model.installSystemPolicyService() }
+            }
+            .disabled(model.isPolicyMutationInProgress)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "macOS will request approval for Tama's daemon, System Extension, "
+                    + "Network filter, and Full Disk Access where required."
+            )
+        }
+        .confirmationDialog(
+            "Deactivate Tama's local policy setup?",
+            isPresented: $isConfirmingLocalDeactivation,
+            titleVisibility: .visible
+        ) {
+            Button("Disable hooks and unregister backend", role: .destructive) {
+                model.deactivateLocalSetup()
+            }
+            .disabled(model.isPolicyMutationInProgress)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "Tama will disable managed hook dispatchers, unregister privileged macOS "
+                    + "components, and preserve recovery files. Stop supervised sessions "
+                    + "before using this action."
+            )
         }
     }
 }
@@ -300,6 +582,7 @@ private struct HookDetailView: View {
     @ObservedObject var model: AppModel
     let hook: HookRecord
     let revealSource: () -> Void
+    let allowsSessionControl: Bool
 
     var body: some View {
         ScrollView {
@@ -328,7 +611,9 @@ private struct HookDetailView: View {
                 if let sideEffects = hook.sideEffects {
                     DetailSection(title: "Side effects", text: sideEffects)
                 }
-                SessionHookControlView(model: model, hook: hook)
+                if allowsSessionControl {
+                    SessionHookControlView(model: model, hook: hook)
+                }
 
                 GroupBox("Events") {
                     VStack(alignment: .leading) {
@@ -384,6 +669,7 @@ private struct SessionHookControlView: View {
     let hook: HookRecord
     @State private var pendingEnabledState: Bool?
     @State private var isConfirmingEnableAll = false
+    @State private var isConfirmingBackendRegistration = false
 
     var body: some View {
         GroupBox("Session control") {
@@ -397,8 +683,9 @@ private struct SessionHookControlView: View {
                 if model.systemPolicyServiceStatus != "Enabled" {
                     HStack {
                         Button("Register backend") {
-                            Task { await model.installSystemPolicyService() }
+                            isConfirmingBackendRegistration = true
                         }
+                        .disabled(model.isPolicyMutationInProgress)
                         Button("Open approval settings") {
                             model.openSystemPolicyApprovalSettings()
                         }
@@ -406,6 +693,12 @@ private struct SessionHookControlView: View {
                             model.openFullDiskAccessSettings()
                         }
                     }
+                }
+                if let sessionErrorMessage = model.sessionErrorMessage {
+                    Label(sessionErrorMessage, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                        .textSelection(.enabled)
                 }
                 if model.agentSessions.isEmpty {
                     Label("No active agent sessions", systemImage: "terminal")
@@ -523,7 +816,7 @@ private struct SessionHookControlView: View {
                                 isHealthy: isEnabled
                             )
                             Spacer()
-                            if model.isChangingSessionHook {
+                            if model.isPolicyMutationInProgress {
                                 ProgressView()
                                     .controlSize(.small)
                             } else {
@@ -565,6 +858,7 @@ private struct SessionHookControlView: View {
                     pendingEnabledState = nil
                     model.setSelectedSessionHook(hook.id, enabled: enabled)
                 }
+                .disabled(model.isPolicyMutationInProgress)
                 Button("Cancel", role: .cancel) {
                     pendingEnabledState = nil
                 }
@@ -583,6 +877,7 @@ private struct SessionHookControlView: View {
                 isConfirmingEnableAll = false
                 model.enableAllHooksInSelectedSession()
             }
+            .disabled(model.isPolicyMutationInProgress)
             Button("Cancel", role: .cancel) {
                 isConfirmingEnableAll = false
             }
@@ -592,6 +887,22 @@ private struct SessionHookControlView: View {
                     + "\(model.selectedAgentSession?.agentDisplayName ?? "agent") session "
                     + "\(model.selectedAgentSession?.sessionId ?? "unknown"). "
                     + "Other sessions are unaffected."
+            )
+        }
+        .confirmationDialog(
+            "Register privileged macOS policy components?",
+            isPresented: $isConfirmingBackendRegistration,
+            titleVisibility: .visible
+        ) {
+            Button("Register backend") {
+                Task { await model.installSystemPolicyService() }
+            }
+            .disabled(model.isPolicyMutationInProgress)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(
+                "macOS will request approval for Tama's daemon, System Extension, "
+                    + "Network filter, and Full Disk Access where required."
             )
         }
     }

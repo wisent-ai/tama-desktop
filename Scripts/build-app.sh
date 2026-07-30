@@ -6,6 +6,15 @@ DESKTOP_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 APP_BUNDLE="$DESKTOP_ROOT/.build/Tama.app"
 INSTALLED_BUNDLE=${TAMA_INSTALL_APP_PATH:-"$HOME/Applications/Tama.app"}
 LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+PRODUCT_VERSION=${TAMA_RELEASE_VERSION:-$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$DESKTOP_ROOT/App/Info.plist")}
+BUILD_CHANNEL=${TAMA_BUILD_CHANNEL:-development}
+SOURCE_REVISION=$(git -C "$DESKTOP_ROOT" rev-parse HEAD)
+BUILD_NUMBER=$(git -C "$DESKTOP_ROOT" rev-list --count HEAD)
+TARGET_ARCH=$(uname -m)
+SOURCE_DIRTY=false
+if [ -n "$(git -C "$DESKTOP_ROOT" status --porcelain --untracked-files=normal)" ]; then
+    SOURCE_DIRTY=true
+fi
 
 unregister_bundle() {
     if output=$("$LSREGISTER" -u "$1" 2>&1); then
@@ -20,13 +29,26 @@ unregister_bundle() {
 CONTENTS="$APP_BUNDLE/Contents"
 MACOS="$CONTENTS/MacOS"
 RESOURCES="$CONTENTS/Resources"
-HOOKS_ROOT=${TAMA_REPOSITORY_ROOT:-"$DESKTOP_ROOT/../hooks-rotator"}
+HOOKS_ROOT=${TAMA_HOOK_ROOT:-"$DESKTOP_ROOT/../hooks-rotator"}
+if ! HOOK_SOURCE_REVISION=$(git -C "$HOOKS_ROOT" rev-parse HEAD); then
+    printf '%s\n' "Tama hook source is unavailable at $HOOKS_ROOT; set TAMA_HOOK_ROOT for a developer build."
+    false
+fi
+HOOK_SOURCE_DIRTY=false
+if [ -n "$(git -C "$HOOKS_ROOT" status --porcelain --untracked-files=normal)" ]; then
+    HOOK_SOURCE_DIRTY=true
+fi
 NODE_BIN=${TAMA_NODE:-}
 if [ -z "$NODE_BIN" ]; then
-    NODE_BIN=$(command -v node)
+    NODE_BIN=$(command -v node || true)
+fi
+if [ -z "$NODE_BIN" ] || [ ! -x "$NODE_BIN" ]; then
+    printf '%s\n' "A supported Node.js executable is required to export the bundled catalog."
+    false
 fi
 CODESIGN_IDENTITY=${WISENT_CODESIGN_IDENTITY:-}
 APP_PROVISIONING_PROFILE=${WISENT_APP_PROVISIONING_PROFILE:-}
+CODESIGN_TIMESTAMP=${TAMA_CODESIGN_TIMESTAMP:---timestamp=none}
 NETWORK_FILTER_PROVISIONING_PROFILE=${WISENT_NETWORK_FILTER_PROVISIONING_PROFILE:-}
 if [ -z "$CODESIGN_IDENTITY" ]; then
     CODESIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null \
@@ -43,18 +65,22 @@ BIN_DIR=$(swift build --package-path "$DESKTOP_ROOT" --configuration release --s
 rm -rf "$APP_BUNDLE"
 mkdir -p "$MACOS" "$RESOURCES"
 install -m 0644 "$DESKTOP_ROOT/App/Info.plist" "$CONTENTS/Info.plist"
+plutil -replace CFBundleShortVersionString -string "$PRODUCT_VERSION" "$CONTENTS/Info.plist"
+plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$CONTENTS/Info.plist"
 install -m 0755 "$BIN_DIR/Tama" "$MACOS/Tama"
 "$NODE_BIN" "$SCRIPT_DIR/export-catalog.mjs" "$HOOKS_ROOT" "$RESOURCES/tama-catalog.json"
 HOOK_RELEASE="$RESOURCES/hooks-release"
 mkdir -p "$HOOK_RELEASE"
 install -m 0644 "$HOOKS_ROOT/package.json" "$HOOK_RELEASE/package.json"
-for directory in shared-hooks claude-hooks codex-hooks repo-githooks; do
+for directory in shared-hooks claude-hooks codex-hooks repo-githooks src; do
     cp -R "$HOOKS_ROOT/$directory" "$HOOK_RELEASE/$directory"
 done
 rm -f \
     "$HOOK_RELEASE/shared-hooks/generate-configs.mjs" \
     "$HOOK_RELEASE/shared-hooks/providers.json" \
     "$HOOK_RELEASE/shared-hooks/run-one-session-hook.js"
+rm -rf "$HOOK_RELEASE/src/tests"
+rm -f "$HOOK_RELEASE/src/violations/"*tests.mjs
 SYSTEM_POLICY_SOURCE="$DESKTOP_ROOT/SystemPolicy/macOS"
 SYSTEM_POLICY_DIR="$HOOK_RELEASE/shared-hooks/system-policy"
 SYSTEM_POLICY_BACKEND="$SYSTEM_POLICY_DIR/tama-system-policy-macos"
@@ -99,6 +125,8 @@ xcrun --sdk macosx clang \
 install -m 0644 \
     "$SYSTEM_POLICY_SOURCE/TamaNetworkFilter-Info.plist" \
     "$NETWORK_FILTER_CONTENTS/Info.plist"
+plutil -replace CFBundleShortVersionString -string "$PRODUCT_VERSION" "$NETWORK_FILTER_CONTENTS/Info.plist"
+plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$NETWORK_FILTER_CONTENTS/Info.plist"
 install -m 0644 \
     "$SYSTEM_POLICY_SOURCE/ai.wisent.tama.system-policy.plist" \
     "$LAUNCH_DAEMONS/ai.wisent.tama.system-policy.plist"
@@ -107,7 +135,7 @@ for executable in "$SYSTEM_POLICY_BACKEND" "$SYSTEM_POLICY_DAEMON"; do
         --force \
         --sign "$CODESIGN_IDENTITY" \
         --options runtime \
-        --timestamp=none \
+        $CODESIGN_TIMESTAMP \
         --entitlements "$SYSTEM_POLICY_SOURCE/TamaSystemPolicy.entitlements" \
         "$executable"
     codesign --verify --strict "$executable"
@@ -127,14 +155,54 @@ codesign \
     --sign "$CODESIGN_IDENTITY" \
     --identifier ai.wisent.tama.network-filter \
     --options runtime \
-    --timestamp=none \
+    $CODESIGN_TIMESTAMP \
     --entitlements "$SYSTEM_POLICY_SOURCE/TamaNetworkFilter.entitlements" \
     "$SYSTEM_EXTENSION"
 codesign --verify --strict "$SYSTEM_EXTENSION"
+TAMA_HOOK_SOURCE_DIRTY="$HOOK_SOURCE_DIRTY" \
+TAMA_HOOK_SOURCE_REVISION="$HOOK_SOURCE_REVISION" \
 python3 "$SCRIPT_DIR/seal_hook_release.py" "$HOOK_RELEASE" >/dev/null
 install -m 0755 "$SCRIPT_DIR/emergency_disable_hooks" "$RESOURCES/emergency_disable_hooks"
 install -m 0755 "$SCRIPT_DIR/install_hook_release.py" "$RESOURCES/install_hook_release.py"
 sh "$SCRIPT_DIR/import-brand-icon.sh" tama-desktop "$RESOURCES/AppIcon.icns"
+TAMA_BUILD_DEPENDENCIES="$DESKTOP_ROOT/Package.resolved" \
+TAMA_BUILD_HOOK_RELEASE="$HOOK_RELEASE/release.json" \
+TAMA_BUILD_CHANNEL="$BUILD_CHANNEL" \
+TAMA_BUILD_DIRTY="$SOURCE_DIRTY" \
+TAMA_BUILD_REVISION="$SOURCE_REVISION" \
+TAMA_BUILD_TARGET_ARCH="$TARGET_ARCH" \
+TAMA_BUILD_VERSION="$PRODUCT_VERSION" \
+python3 - "$RESOURCES/tama-build.json" <<'PY'
+from datetime import datetime, timezone
+import json
+import os
+from pathlib import Path
+import sys
+
+manifest = {
+    "architecture": os.environ["TAMA_BUILD_TARGET_ARCH"],
+    "builtAt": datetime.now(timezone.utc).isoformat(),
+    "channel": os.environ["TAMA_BUILD_CHANNEL"],
+    "platform": "macOS",
+    "productVersion": os.environ["TAMA_BUILD_VERSION"],
+    "schema": "ai.wisent.tama.build",
+    "sourceDirty": os.environ["TAMA_BUILD_DIRTY"] == "true",
+    "sourceRevision": os.environ["TAMA_BUILD_REVISION"],
+}
+resolved = Path(os.environ["TAMA_BUILD_DEPENDENCIES"])
+manifest["dependencies"] = (
+    json.loads(resolved.read_text()).get("pins", [])
+    if resolved.is_file()
+    else []
+)
+manifest["hookRelease"] = json.loads(
+    Path(os.environ["TAMA_BUILD_HOOK_RELEASE"]).read_text()
+)
+target = next(argument for argument in sys.argv if argument != "-")
+Path(target).write_text(
+    json.dumps(manifest, indent=len("  "), sort_keys=True) + "\n"
+)
+PY
 if [ -n "$APP_PROVISIONING_PROFILE" ]; then
     if [ ! -f "$APP_PROVISIONING_PROFILE" ]; then
         printf 'Tama app provisioning profile not found: %s\n' \
@@ -148,7 +216,7 @@ if [ -n "$APP_PROVISIONING_PROFILE" ]; then
         --force \
         --sign "$CODESIGN_IDENTITY" \
         --options runtime \
-        --timestamp=none \
+        $CODESIGN_TIMESTAMP \
         --entitlements "$DESKTOP_ROOT/App/TamaDesktop.entitlements" \
         "$APP_BUNDLE"
 else
@@ -156,11 +224,14 @@ else
         --force \
         --sign "$CODESIGN_IDENTITY" \
         --options runtime \
-        --timestamp=none \
+        $CODESIGN_TIMESTAMP \
         "$APP_BUNDLE"
 fi
 codesign --verify --strict --deep "$APP_BUNDLE"
 printf 'Built %s\n' "$APP_BUNDLE"
+if [ "${TAMA_INSTALL_AFTER_BUILD:-yes}" = no ]; then
+    exit
+fi
 rm -rf "$INSTALLED_BUNDLE"
 mkdir -p "$(dirname "$INSTALLED_BUNDLE")"
 ditto "$APP_BUNDLE" "$INSTALLED_BUNDLE"
