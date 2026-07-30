@@ -8,5 +8,7 @@ tama status
 # Use JSON when another command will consume the result.
 tama status --json
 
-# After local provider adapters are configured, include install-drift checks:
+# After local provider adapters are configured, include install-drift checks for this user.
+# Supply --home <path> to inspect another explicit home:
 # tama status --runtime
+# tama status --runtime --home /Users/example

@@ -108,10 +108,12 @@ Every error includes the failed operation, whether retry is safe, and one correc
 ## CLI policy surface
 
 `tama status` validates the immutable catalog without treating absent local provider
-configuration as catalog corruption. `tama status --runtime` additionally checks local
-Claude and Codex installation drift; JSON output states `runtimeInstallChecked` so
-automation cannot confuse the two scopes. `tama provider coverage` reports
-registry-declared hook/event mappings only and explicitly does not claim live execution.
+configuration as catalog corruption. `tama status --runtime` additionally checks Claude
+and Codex installation drift at `~/.claude/settings.json` and `~/.codex/hooks.json` for
+the current user. `--home <path>` selects a different explicit home. JSON output states
+both `runtimeInstallChecked` and the resolved `runtimeHome`, so automation cannot confuse
+catalog scope with local-runtime scope. `tama provider coverage` reports registry-declared
+hook/event mappings only and explicitly does not claim live execution.
 
 Hook inspection is read-only. `tama hooks add` and `tama hooks remove` are maintainer
 operations: both require an explicit writable `--root`, refuse implicit signed bundles or

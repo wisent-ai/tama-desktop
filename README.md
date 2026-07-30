@@ -90,7 +90,7 @@ No supported binary has been published yet. The steps below are the contract for
 
    Expected output ends with `OK`.
 3. Expand the archive and move `Tama.app` to `~/Applications`.
-4. Install the bundled CLI entrypoint with [`examples/getting-started/install-cli.sh`](examples/getting-started/install-cli.sh), then run `tama status`. After provider adapters are configured, `tama status --runtime` additionally checks local install drift.
+4. Install the bundled CLI entrypoint with [`examples/getting-started/install-cli.sh`](examples/getting-started/install-cli.sh), then run `tama status`. After provider adapters are configured, `tama status --runtime` additionally checks install drift in the current user's `~/.claude/settings.json` and `~/.codex/hooks.json`; `--home <path>` selects a different explicit home.
 5. Open Tama, read the welcome screen, and choose **Inspect bundled policy**. The read-only Overview must show a valid bundled catalog and `Not installed by Tama`; displaying or refreshing it does not start session monitoring or change local policy.
 6. Choose **Sign in for controls** only when a policy-changing workflow is intended, then complete Wisent sign-in.
 

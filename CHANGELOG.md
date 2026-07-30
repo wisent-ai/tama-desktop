@@ -21,6 +21,7 @@ All user-visible changes follow the categories required by `docs/releases.md`. A
 - Policy controls now require a current recognized Wisent organization role, and mutation-capable models enforce an explicit construction-time authorization boundary.
 - Returning users enter Wisent session restoration; the explicitly selected read-only inspector uses isolated bundled-catalog state.
 - In-flight repository scans and cleanup can be stopped; scan cancellation is read-only, while cleanup preserves partial edits and performs the final rescan.
+- Runtime-drift CLI checks now resolve Claude and Codex adapter configuration from the current or explicitly selected user home instead of maintainer paths embedded in the signed catalog.
 - Local setup and emergency commands now drain output concurrently, enforce bounded output and runtime, and terminate their process tree on timeout.
 - Leaving the authenticated control surface cancels active repository scan or cleanup process trees and requires inspection plus a new read-only scan after partial cleanup.
 - Product and hook-release identities are displayed separately.
