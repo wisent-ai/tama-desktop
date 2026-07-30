@@ -119,7 +119,9 @@ Hook inspection is read-only. `tama hooks add` and `tama hooks remove` are maint
 operations: both require an explicit writable `--root`, refuse implicit signed bundles or
 installed releases, keep one command identity per hook ID, preserve occurrences on other
 events, write the complete resealed registry atomically, and expose an exact rollback
-command in the corresponding example.
+command in the corresponding example. Missing option values are usage errors. Hook
+timeouts must be integer seconds in the inclusive range 1–3600; invalid values are
+rejected before the registry is written.
 
 ## Observability and bounds
 
