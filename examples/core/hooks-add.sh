@@ -7,6 +7,7 @@ set -eu
 : "${HOOK_ID:?set HOOK_ID to an ID present in catalog-metadata.json}"
 : "${HOOK_EVENT:?set HOOK_EVENT to an existing registry event}"
 : "${HOOK_COMMAND:?set HOOK_COMMAND to the exact executable command}"
+# Optional: append --timeout "$HOOK_TIMEOUT"; Tama validates its bounded integer value.
 
 tama hooks add "$HOOK_ID" \
   --event "$HOOK_EVENT" \
