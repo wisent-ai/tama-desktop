@@ -30,7 +30,7 @@ Lifecycle: built into the app; disabled only by signing out. Leaving the authent
 
 Outcome: provide the exact catalog and runtime approved with the desktop release.
 
-The release contains a schema, content-derived release ID, hook package version, catalog version/update timestamp, and external-source mapping. Install verifies the complete tree digest before mutation. Hook source, registry, and catalog data are untrusted until schema and digest validation succeed. The release bundles hook code, not a Node.js runtime; using Node-based hooks therefore requires the supported local Node version declared by onboarding.
+The release contains a schema, content-derived release ID, hook package version, catalog version/update timestamp, and external-source mapping. Install verifies the complete tree digest before mutation. Hook source, registry, and catalog data are untrusted until schema and digest validation succeed. The release bundles hook code, not a Node.js runtime; installation therefore resolves a supported local Node from the locations declared by onboarding, rejects an older version before managed writes, pins its absolute path into Node-based installed commands, and propagates it through the supervisor launcher to semantic hook dispatch.
 
 The app publishes implemented capabilities from the catalog. Missing hooks, duplicate IDs, absent events, unknown IDs, checksum drift, and loaded/installed release mismatch are explicit diagnostics. Unsupported operations fail before override mutation.
 

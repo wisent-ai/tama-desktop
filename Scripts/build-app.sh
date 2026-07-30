@@ -3,10 +3,15 @@ set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 DESKTOP_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
-APP_BUNDLE="$DESKTOP_ROOT/.build/Tama.app"
+FINAL_APP_BUNDLE="$DESKTOP_ROOT/.build/Tama.app"
 INSTALLED_BUNDLE=${TAMA_INSTALL_APP_PATH:-"$HOME/Applications/Tama.app"}
 LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
 PRODUCT_VERSION=${TAMA_RELEASE_VERSION:-$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$DESKTOP_ROOT/App/Info.plist")}
+BUNDLE_SHORT_VERSION=${PRODUCT_VERSION%%[-+]*}
+if ! printf '%s\n' "$BUNDLE_SHORT_VERSION" | LC_ALL=C grep -Eq '^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$'; then
+    printf '%s\n' "The Apple bundle version derived from $PRODUCT_VERSION is invalid."
+    false
+fi
 BUILD_CHANNEL=${TAMA_BUILD_CHANNEL:-development}
 SOURCE_REVISION=$(git -C "$DESKTOP_ROOT" rev-parse HEAD)
 BUILD_NUMBER=$(git -C "$DESKTOP_ROOT" rev-list --count HEAD)
@@ -15,6 +20,72 @@ SOURCE_DIRTY=false
 if [ -n "$(git -C "$DESKTOP_ROOT" status --porcelain --untracked-files=normal)" ]; then
     SOURCE_DIRTY=true
 fi
+
+BUILD_STAGING_BUNDLE=
+INSTALL_STAGING_BUNDLE=
+PROMOTION_BACKUP=
+PROMOTION_BACKUP_ROOT=
+PROMOTION_SOURCE=
+PROMOTION_TARGET=
+
+cleanup_staging() {
+    status=$?
+    if [ -n "$PROMOTION_BACKUP" ] && [ ! -e "$PROMOTION_TARGET" ]; then
+        if mv "$PROMOTION_BACKUP" "$PROMOTION_TARGET"; then
+            PROMOTION_BACKUP=
+            rm -rf "$PROMOTION_BACKUP_ROOT"
+            PROMOTION_BACKUP_ROOT=
+        else
+            printf 'Previous bundle requires manual recovery from %s\n' \
+                "$PROMOTION_BACKUP"
+        fi
+    fi
+    if [ -n "$BUILD_STAGING_BUNDLE" ]; then
+        rm -rf "$BUILD_STAGING_BUNDLE" || true
+    fi
+    if [ -n "$INSTALL_STAGING_BUNDLE" ]; then
+        rm -rf "$INSTALL_STAGING_BUNDLE" || true
+    fi
+    return "$status"
+}
+
+promote_bundle() {
+    PROMOTION_BACKUP_ROOT=$(mktemp -d \
+        "$(dirname "$PROMOTION_TARGET")/.Tama.previous.XXXXXXXX")
+    PROMOTION_BACKUP="$PROMOTION_BACKUP_ROOT/bundle"
+    if [ -e "$PROMOTION_TARGET" ]; then
+        if ! mv "$PROMOTION_TARGET" "$PROMOTION_BACKUP"; then
+            rm -rf "$PROMOTION_BACKUP_ROOT"
+            PROMOTION_BACKUP_ROOT=
+            PROMOTION_BACKUP=
+            false
+        fi
+    else
+        PROMOTION_BACKUP=
+    fi
+    if mv "$PROMOTION_SOURCE" "$PROMOTION_TARGET"; then
+        rm -rf "$PROMOTION_BACKUP_ROOT"
+        PROMOTION_BACKUP_ROOT=
+        PROMOTION_BACKUP=
+        return
+    fi
+    if [ -n "$PROMOTION_BACKUP" ]; then
+        if mv "$PROMOTION_BACKUP" "$PROMOTION_TARGET"; then
+            PROMOTION_BACKUP=
+            rm -rf "$PROMOTION_BACKUP_ROOT"
+            PROMOTION_BACKUP_ROOT=
+        else
+            printf 'Previous bundle requires manual recovery from %s\n' \
+                "$PROMOTION_BACKUP"
+        fi
+    else
+        rm -rf "$PROMOTION_BACKUP_ROOT"
+        PROMOTION_BACKUP_ROOT=
+    fi
+    false
+}
+
+trap cleanup_staging EXIT
 
 unregister_bundle() {
     if output=$("$LSREGISTER" -u "$1" 2>&1); then
@@ -26,9 +97,6 @@ unregister_bundle() {
     printf '%s\n' "$output" >&2
     return 1
 }
-CONTENTS="$APP_BUNDLE/Contents"
-MACOS="$CONTENTS/MacOS"
-RESOURCES="$CONTENTS/Resources"
 HOOKS_ROOT=${TAMA_HOOK_ROOT:-"$DESKTOP_ROOT/../hooks-rotator"}
 if ! HOOK_SOURCE_REVISION=$(git -C "$HOOKS_ROOT" rev-parse HEAD); then
     printf '%s\n' "Tama hook source is unavailable at $HOOKS_ROOT; set TAMA_HOOK_ROOT for a developer build."
@@ -46,26 +114,84 @@ if [ -z "$NODE_BIN" ] || [ ! -x "$NODE_BIN" ]; then
     printf '%s\n' "A supported Node.js executable is required to export the bundled catalog."
     false
 fi
+if ! "$NODE_BIN" -e 'const major = Number.parseInt(process.versions.node.split(".")[Number("0")], Number("10")); process.exit(Number.isInteger(major) && major >= Number("20") ? Number("0") : Number("1"));'; then
+    printf '%s\n' "Node.js 20 or newer is required to export the bundled catalog."
+    false
+fi
 CODESIGN_IDENTITY=${WISENT_CODESIGN_IDENTITY:-}
 APP_PROVISIONING_PROFILE=${WISENT_APP_PROVISIONING_PROFILE:-}
 CODESIGN_TIMESTAMP=${TAMA_CODESIGN_TIMESTAMP:---timestamp=none}
 NETWORK_FILTER_PROVISIONING_PROFILE=${WISENT_NETWORK_FILTER_PROVISIONING_PROFILE:-}
+if ! CODESIGN_IDENTITIES=$(security find-identity -v -p codesigning); then
+    printf '%s\n' "Could not read code-signing identities from the Keychain."
+    false
+fi
 if [ -z "$CODESIGN_IDENTITY" ]; then
-    CODESIGN_IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null \
+    CODESIGN_IDENTITY=$(printf '%s\n' "$CODESIGN_IDENTITIES" \
         | awk -F '"' '/Apple Development:/ { print $2; exit }')
 fi
 if [ -z "$CODESIGN_IDENTITY" ] || [ "$CODESIGN_IDENTITY" = "-" ]; then
     printf '%s\n' "Stable Apple Development signing identity is required; refusing ad-hoc signing." >&2
     exit 1
 fi
+case "$CODESIGN_IDENTITY" in
+    *'
+'*|*'"'*)
+        printf '%s\n' "Code-signing identity must be an exact certificate name or hash."
+        false
+        ;;
+esac
+CODESIGN_IDENTITY_HASH=$(printf '%s' "$CODESIGN_IDENTITY" \
+    | LC_ALL=C tr '[:lower:]' '[:upper:]')
+if ! printf '%s\n' "$CODESIGN_IDENTITIES" \
+    | grep -F -e "\"$CODESIGN_IDENTITY\"" >/dev/null \
+    && ! printf '%s\n' "$CODESIGN_IDENTITIES" \
+        | LC_ALL=C tr '[:lower:]' '[:upper:]' \
+        | grep -F -e ") $CODESIGN_IDENTITY_HASH \"" >/dev/null; then
+    printf 'Code-signing identity is not available in the Keychain: %s\n' \
+        "$CODESIGN_IDENTITY"
+    false
+fi
+case "$BUILD_CHANNEL" in
+    development|preview|stable) ;;
+    *)
+        printf 'Unsupported Tama build channel: %s\n' "$BUILD_CHANNEL"
+        false
+        ;;
+esac
+case "$CODESIGN_TIMESTAMP" in
+    --timestamp|--timestamp=none) ;;
+    *)
+        printf 'Unsupported code-signing timestamp mode: %s\n' "$CODESIGN_TIMESTAMP"
+        false
+        ;;
+esac
+if [ -n "$APP_PROVISIONING_PROFILE" ] \
+    && [ ! -f "$APP_PROVISIONING_PROFILE" ]; then
+    printf 'Tama app provisioning profile not found: %s\n' \
+        "$APP_PROVISIONING_PROFILE"
+    false
+fi
+if [ -n "$NETWORK_FILTER_PROVISIONING_PROFILE" ] \
+    && [ ! -f "$NETWORK_FILTER_PROVISIONING_PROFILE" ]; then
+    printf 'Network Filter provisioning profile not found: %s\n' \
+        "$NETWORK_FILTER_PROVISIONING_PROFILE"
+    false
+fi
 
 swift build --package-path "$DESKTOP_ROOT" --configuration release --product Tama
 BIN_DIR=$(swift build --package-path "$DESKTOP_ROOT" --configuration release --show-bin-path)
+BUILD_STAGING_BUNDLE=$(mktemp -d \
+    "$DESKTOP_ROOT/.build/.Tama.building.XXXXXXXX")
+APP_BUNDLE="$BUILD_STAGING_BUNDLE"
+CONTENTS="$APP_BUNDLE/Contents"
+MACOS="$CONTENTS/MacOS"
+RESOURCES="$CONTENTS/Resources"
 
-rm -rf "$APP_BUNDLE"
 mkdir -p "$MACOS" "$RESOURCES"
 install -m 0644 "$DESKTOP_ROOT/App/Info.plist" "$CONTENTS/Info.plist"
-plutil -replace CFBundleShortVersionString -string "$PRODUCT_VERSION" "$CONTENTS/Info.plist"
+plutil -replace CFBundleShortVersionString -string "$BUNDLE_SHORT_VERSION" "$CONTENTS/Info.plist"
+plutil -replace TamaProductVersion -string "$PRODUCT_VERSION" "$CONTENTS/Info.plist"
 plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$CONTENTS/Info.plist"
 install -m 0755 "$BIN_DIR/Tama" "$MACOS/Tama"
 "$NODE_BIN" "$SCRIPT_DIR/export-catalog.mjs" "$HOOKS_ROOT" "$RESOURCES/tama-catalog.json"
@@ -125,7 +251,8 @@ xcrun --sdk macosx clang \
 install -m 0644 \
     "$SYSTEM_POLICY_SOURCE/TamaNetworkFilter-Info.plist" \
     "$NETWORK_FILTER_CONTENTS/Info.plist"
-plutil -replace CFBundleShortVersionString -string "$PRODUCT_VERSION" "$NETWORK_FILTER_CONTENTS/Info.plist"
+plutil -replace CFBundleShortVersionString -string "$BUNDLE_SHORT_VERSION" "$NETWORK_FILTER_CONTENTS/Info.plist"
+plutil -replace TamaProductVersion -string "$PRODUCT_VERSION" "$NETWORK_FILTER_CONTENTS/Info.plist"
 plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$NETWORK_FILTER_CONTENTS/Info.plist"
 install -m 0644 \
     "$SYSTEM_POLICY_SOURCE/ai.wisent.tama.system-policy.plist" \
@@ -141,11 +268,6 @@ for executable in "$SYSTEM_POLICY_BACKEND" "$SYSTEM_POLICY_DAEMON"; do
     codesign --verify --strict "$executable"
 done
 if [ -n "$NETWORK_FILTER_PROVISIONING_PROFILE" ]; then
-    if [ ! -f "$NETWORK_FILTER_PROVISIONING_PROFILE" ]; then
-        printf 'Network Filter provisioning profile not found: %s\n' \
-            "$NETWORK_FILTER_PROVISIONING_PROFILE" >&2
-        exit 1
-    fi
     install -m 0644 \
         "$NETWORK_FILTER_PROVISIONING_PROFILE" \
         "$NETWORK_FILTER_CONTENTS/embedded.provisionprofile"
@@ -204,11 +326,6 @@ Path(target).write_text(
 )
 PY
 if [ -n "$APP_PROVISIONING_PROFILE" ]; then
-    if [ ! -f "$APP_PROVISIONING_PROFILE" ]; then
-        printf 'Tama app provisioning profile not found: %s\n' \
-            "$APP_PROVISIONING_PROFILE" >&2
-        exit 1
-    fi
     install -m 0644 \
         "$APP_PROVISIONING_PROFILE" \
         "$CONTENTS/embedded.provisionprofile"
@@ -228,14 +345,24 @@ else
         "$APP_BUNDLE"
 fi
 codesign --verify --strict --deep "$APP_BUNDLE"
+PROMOTION_SOURCE="$APP_BUNDLE"
+PROMOTION_TARGET="$FINAL_APP_BUNDLE"
+promote_bundle
+BUILD_STAGING_BUNDLE=
+APP_BUNDLE="$FINAL_APP_BUNDLE"
 printf 'Built %s\n' "$APP_BUNDLE"
 if [ "${TAMA_INSTALL_AFTER_BUILD:-yes}" = no ]; then
     exit
 fi
-rm -rf "$INSTALLED_BUNDLE"
 mkdir -p "$(dirname "$INSTALLED_BUNDLE")"
-ditto "$APP_BUNDLE" "$INSTALLED_BUNDLE"
-codesign --verify --strict --deep "$INSTALLED_BUNDLE"
+INSTALL_STAGING_BUNDLE=$(mktemp -d \
+    "$(dirname "$INSTALLED_BUNDLE")/.Tama.installing.XXXXXXXX")
+ditto "$APP_BUNDLE" "$INSTALL_STAGING_BUNDLE"
+codesign --verify --strict --deep "$INSTALL_STAGING_BUNDLE"
+PROMOTION_SOURCE="$INSTALL_STAGING_BUNDLE"
+PROMOTION_TARGET="$INSTALLED_BUNDLE"
+promote_bundle
+INSTALL_STAGING_BUNDLE=
 unregister_bundle "$APP_BUNDLE"
 "$LSREGISTER" -f "$INSTALLED_BUNDLE"
 printf 'Installed %s\n' "$INSTALLED_BUNDLE"

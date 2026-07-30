@@ -20,9 +20,9 @@ The app bundle is authoritative for the displayed catalog. The repository checko
 
 ### Runtime installation
 
-Initial state: authenticated authorized operator, valid bundled hook release, documented Node and Python prerequisites available, no operation already running. Input: explicit confirmation. The installer verifies the release digest before any managed mutation, stages release bytes, preserves original files, atomically writes replacements, and atomically changes the `current` symlink.
+Initial state: authenticated authorized operator, valid bundled hook release, documented Node and Python prerequisites available, no operation already running. Input: explicit confirmation. The installer verifies the release digest, resolves and version-checks Node, canonicalizes its executable path through symlinks, and checks Python before any managed write. It then stages release bytes, preserves original files, atomically writes replacements, and atomically changes the `current` symlink. Every installed Node-based registry command names that canonical executable and preloads the sealed runtime version guard before loading its target script; the generated supervisor launcher exports the same executable and guard to its semantic dispatcher. Generated shell assignments use POSIX argument quoting, so supported paths are data rather than shell expansion.
 
-Success: `installed.json` records schema, release ID, checksum, hook package version, catalog version, timestamp, previous release ID, and managed files. Failure: original files and symlink are restored. Retrying is safe after the previous transaction has completed.
+Success: `installed.json` records schema, release ID, checksum, hook package version, catalog version, timestamp, previous release ID, managed files, and the pinned Node executable plus its validated version. Failure: original files and symlink are restored; prerequisite failures occur before managed mutation. Retrying is safe after the previous transaction has completed.
 
 Concurrent installation is rejected by the UI operation state and filesystem transaction ownership. Two Tama processes must not mutate one user's installation concurrently.
 

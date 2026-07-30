@@ -71,6 +71,7 @@ Scope: app, daemon, System Extension, bundled hook release, manifests, code sign
 resource layout. Side effects: writes `.build/Tama.app`; it must not install into
 `~/Applications`. Qualification additionally inspects signature, entitlements, embedded
 versions, dependency revisions, hook provenance, and release resource isolation.
+Qualification must exercise a supported Node executable and confirm that missing or older Node is rejected before build output is replaced. Runtime-install qualification must separately confirm pre-mutation rejection, symlink-resolved canonical executable pinning in both registry command surfaces, one sealed preload path under `hooks-runtime/current` shared by installed commands and supervised semantic dispatch, post-install downgrade rejection before target loading, matching `installed.json.nodeExecutable` and `installed.json.nodeVersion` provenance, the same values in the Overview status, and literal handling of paths containing spaces, apostrophes, dollar signs, and backticks.
 
 ### Safe local canonical examples
 
@@ -90,10 +91,10 @@ ServiceManagement, SystemExtensions, NetworkExtension preferences, and Full Disk
 
 Separately authorize and execute emergency disable/re-enable, cleanup-agent success/outage/
 timeout/cancellation with process-tree termination and partial-edit recovery, integrity
-corruption/recovery, deactivate/uninstall, notarized publication, exact upgrade, and
-compatible rollback. Use disposable repositories/accounts, dedicated
-Apple/GitHub credentials, bounded waits, and exact cleanup. Never target personal or
-production state.
+corruption/recovery, deactivate/uninstall, notarized publication including post-packaging
+and pre-upload signature, staple, and Gatekeeper rejection paths, exact upgrade, and
+compatible rollback. Use disposable repositories/accounts, dedicated Apple/GitHub
+credentials, bounded waits, and exact cleanup. Never target personal or production state.
 
 ## Isolation, determinism, and credential control
 

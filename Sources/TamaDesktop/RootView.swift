@@ -420,6 +420,18 @@ private struct OverviewView: View {
                                     || model.isLocalSetupOperationInProgress
                             )
                         }
+                        if installedHookReleaseID != nil {
+                            Divider()
+                            LabeledContent(
+                                "Node version",
+                                value: model.installedNodeVersion ?? "Not recorded"
+                            )
+                            LabeledContent("Node executable") {
+                                Text(model.installedNodeExecutable ?? "Not recorded")
+                                    .textSelection(.enabled)
+                                    .multilineTextAlignment(.trailing)
+                            }
+                        }
                         Divider()
                         LabeledContent(
                             "Privileged backend",

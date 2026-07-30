@@ -24,6 +24,8 @@
     </array>
     <key>CFBundleVersion</key>
     <string>1</string>
+    <key>TamaProductVersion</key>
+    <string>development</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
     <key>NetworkExtension</key>

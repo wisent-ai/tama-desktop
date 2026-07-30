@@ -6,29 +6,53 @@ DESKTOP_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 HOOKS_ROOT=${TAMA_HOOK_ROOT:-"$DESKTOP_ROOT/../hooks-rotator"}
 if [ ! -f "$DESKTOP_ROOT/Package.resolved" ]; then
     printf '%s\n' "A committed Package.resolved is required for release."
-    exit
+    false
 fi
-TAG=$(git -C "$DESKTOP_ROOT" describe --exact-match --tags HEAD || true)
+TAG=${TAMA_RELEASE_TAG:-}
+if [ -z "$TAG" ]; then
+    RELEASE_TAGS=$(git -C "$DESKTOP_ROOT" tag --points-at HEAD --list 'v*')
+    case "$RELEASE_TAGS" in
+        *'
+'*)
+            printf '%s\n' "More than one release tag points to HEAD; set TAMA_RELEASE_TAG explicitly."
+            false
+            ;;
+        *) TAG=$RELEASE_TAGS ;;
+    esac
+fi
 case "$TAG" in
     v*) PRODUCT_VERSION=${TAG#v} ;;
-    *) printf '%s\n' "Release commit must have an exact v<SemVer> tag."; exit ;;
+    *) printf '%s\n' "Release commit must have an exact signed v<SemVer> tag."; false ;;
 esac
+SEMVER_CORE='(0|[1-9][0-9]*)'
+SEMVER_PRERELEASE_IDENTIFIER='(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)'
+SEMVER_PATTERN="^${SEMVER_CORE}\.${SEMVER_CORE}\.${SEMVER_CORE}(-${SEMVER_PRERELEASE_IDENTIFIER}(\.${SEMVER_PRERELEASE_IDENTIFIER})*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$"
+BUNDLE_SHORT_VERSION=${PRODUCT_VERSION%%[-+]*}
+VERSION_WITHOUT_BUILD=${PRODUCT_VERSION%%+*}
+if ! printf '%s\n' "$PRODUCT_VERSION" | LC_ALL=C grep -Eq "$SEMVER_PATTERN"; then
+    printf '%s\n' "Release tag is not valid Semantic Versioning: $TAG"
+    false
+fi
 if [ -n "$(git -C "$DESKTOP_ROOT" status --porcelain --untracked-files=normal)" ]; then
     printf '%s\n' "Release checkout must be clean."
-    exit
+    false
 fi
 if [ -n "$(git -C "$HOOKS_ROOT" status --porcelain --untracked-files=normal)" ]; then
     printf '%s\n' "The bundled hook source checkout must be clean."
-    exit
+    false
 fi
 git -C "$DESKTOP_ROOT" verify-tag "$TAG"
+if [ "$(git -C "$DESKTOP_ROOT" rev-parse "$TAG^{}")" != "$(git -C "$DESKTOP_ROOT" rev-parse HEAD)" ]; then
+    printf '%s\n' "Selected release tag does not resolve to HEAD: $TAG"
+    false
+fi
 if ! grep -F "## $PRODUCT_VERSION —" "$DESKTOP_ROOT/CHANGELOG.md" >/dev/null; then
     printf '%s\n' "CHANGELOG.md has no section for $PRODUCT_VERSION."
-    exit
+    false
 fi
 if grep -F "## $PRODUCT_VERSION — Unreleased" "$DESKTOP_ROOT/CHANGELOG.md" >/dev/null; then
     printf '%s\n' "Replace the Unreleased heading before packaging."
-    exit
+    false
 fi
 : "${WISENT_CODESIGN_IDENTITY:?Set the dedicated release signing identity.}"
 : "${WISENT_APP_PROVISIONING_PROFILE:?Set the app provisioning profile.}"
@@ -36,9 +60,9 @@ fi
 NOTARY_PROFILE=${WISENT_NOTARY_PROFILE:-}
 if [ -z "$NOTARY_PROFILE" ]; then
     printf '%s\n' "Published releases require WISENT_NOTARY_PROFILE."
-    exit
+    false
 fi
-case "$PRODUCT_VERSION" in
+case "$VERSION_WITHOUT_BUILD" in
     *-*) BUILD_CHANNEL=preview ;;
     *) BUILD_CHANNEL=stable ;;
 esac
@@ -68,18 +92,23 @@ for dependency in dependencies:
 PY
 
 APP="$DESKTOP_ROOT/.build/Tama.app"
-APP_VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")
+APP_PRODUCT_VERSION=$(/usr/libexec/PlistBuddy -c 'Print :TamaProductVersion' "$APP/Contents/Info.plist")
+APP_BUNDLE_VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")
 FILTER_INFO="$APP/Contents/Library/SystemExtensions/ai.wisent.tama.network-filter.systemextension/Contents/Info.plist"
-FILTER_VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$FILTER_INFO")
-if [ "$APP_VERSION" != "$PRODUCT_VERSION" ] || [ "$FILTER_VERSION" != "$PRODUCT_VERSION" ]; then
-    printf '%s\n' "Built component versions do not match $TAG."
-    exit
+FILTER_PRODUCT_VERSION=$(/usr/libexec/PlistBuddy -c 'Print :TamaProductVersion' "$FILTER_INFO")
+FILTER_BUNDLE_VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$FILTER_INFO")
+if [ "$APP_PRODUCT_VERSION" != "$PRODUCT_VERSION" ] \
+    || [ "$FILTER_PRODUCT_VERSION" != "$PRODUCT_VERSION" ] \
+    || [ "$APP_BUNDLE_VERSION" != "$BUNDLE_SHORT_VERSION" ] \
+    || [ "$FILTER_BUNDLE_VERSION" != "$BUNDLE_SHORT_VERSION" ]; then
+    printf '%s\n' "Built component product or Apple bundle versions do not match $TAG."
+    false
 fi
 NOTARY_DIR="$DESKTOP_ROOT/.build/notary/$PRODUCT_VERSION"
 NOTARY_ZIP="$NOTARY_DIR/Tama-notarization.zip"
 if [ -e "$NOTARY_ZIP" ]; then
     printf '%s\n' "Refusing to overwrite an existing notarization submission."
-    exit
+    false
 fi
 mkdir -p "$NOTARY_DIR"
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$NOTARY_ZIP"
@@ -87,18 +116,21 @@ xcrun notarytool submit "$NOTARY_ZIP" \
     --keychain-profile "$NOTARY_PROFILE" \
     --wait
 xcrun stapler staple "$APP"
+xcrun stapler validate "$APP"
 rm -f "$NOTARY_ZIP"
 codesign --verify --strict --deep "$APP"
+spctl --assess --type execute "$APP"
 ARCH=$(uname -m)
 RELEASE_DIR="$DESKTOP_ROOT/.build/releases/$PRODUCT_VERSION"
 ARTIFACT_NAME="Tama-$PRODUCT_VERSION-macOS-$ARCH.zip"
 ARTIFACT="$RELEASE_DIR/$ARTIFACT_NAME"
 DIGEST_FILE="$ARTIFACT.digest"
 PROVENANCE_FILE="$ARTIFACT.provenance.json"
-for output in "$ARTIFACT" "$DIGEST_FILE" "$PROVENANCE_FILE"; do
+QUALIFICATION_FILE="$ARTIFACT.qualification.json"
+for output in "$ARTIFACT" "$DIGEST_FILE" "$PROVENANCE_FILE" "$QUALIFICATION_FILE"; do
     if [ -e "$output" ]; then
         printf 'Refusing to overwrite immutable release output: %s\n' "$output"
-        exit
+        false
     fi
 done
 mkdir -p "$RELEASE_DIR"

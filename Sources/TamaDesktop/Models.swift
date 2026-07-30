@@ -35,7 +35,8 @@ struct BuildIdentity: Decodable, Sendable {
                 channel: "development",
                 hookRelease: nil,
                 platform: "macOS",
-                productVersion: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+                productVersion: Bundle.main.infoDictionary?["TamaProductVersion"] as? String
+                    ?? Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
                     ?? "unknown",
                 sourceDirty: true,
                 sourceRevision: "unavailable"

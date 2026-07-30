@@ -30,6 +30,8 @@ final class AppModel: ObservableObject {
     @Published private(set) var areHooksDisabled = false
     @Published private(set) var isChangingHookState = false
     @Published private(set) var installedHookReleaseID: String?
+    @Published private(set) var installedNodeExecutable: String?
+    @Published private(set) var installedNodeVersion: String?
     @Published private(set) var agentSessions: [AgentSessionRecord] = []
     @Published var selectedAgentSessionID: AgentSessionRecord.ID?
     @Published private(set) var isChangingSessionHook = false
@@ -115,11 +117,16 @@ final class AppModel: ObservableObject {
         systemPolicyServiceStatus = "Not registered"
         areHooksDisabled = false
         installedHookReleaseID = nil
+        installedNodeExecutable = nil
+        installedNodeVersion = nil
     }
 
     private func refreshLocalPolicyState() {
+        let installedRuntime = emergencySwitch.installedRuntime
         areHooksDisabled = emergencySwitch.isDisabled
-        installedHookReleaseID = emergencySwitch.installedReleaseID
+        installedHookReleaseID = installedRuntime?.releaseID
+        installedNodeExecutable = installedRuntime?.nodeExecutable
+        installedNodeVersion = installedRuntime?.nodeVersion
     }
 
     func refreshSystemPolicyStatus() async {
@@ -137,7 +144,7 @@ final class AppModel: ObservableObject {
                 try await Task.detached(priority: .userInitiated) {
                     try HookEmergencySwitch().installSessionController()
                 }.value
-                installedHookReleaseID = emergencySwitch.installedReleaseID
+                refreshLocalPolicyState()
                 errorMessage = nil
                 await refreshAgentSessions()
             } catch {
@@ -167,11 +174,11 @@ final class AppModel: ObservableObject {
                 try await Task.detached(priority: .userInitiated) {
                     try HookEmergencySwitch().setDisabled(true)
                 }.value
-                areHooksDisabled = emergencySwitch.isDisabled
+                refreshLocalPolicyState()
                 systemPolicyServiceStatus = try await SystemPolicyServiceManager().unregister()
                 errorMessage = nil
             } catch {
-                areHooksDisabled = emergencySwitch.isDisabled
+                refreshLocalPolicyState()
                 systemPolicyServiceStatus = await SystemPolicyServiceManager().status()
                 errorMessage = (error as? LocalizedError)?.errorDescription
                     ?? error.localizedDescription
@@ -217,14 +224,13 @@ final class AppModel: ObservableObject {
                 try await Task.detached(priority: .userInitiated) {
                     try emergencySwitch.setDisabled(disabled)
                 }.value
-                areHooksDisabled = emergencySwitch.isDisabled
-                installedHookReleaseID = emergencySwitch.installedReleaseID
+                refreshLocalPolicyState()
                 guard areHooksDisabled == disabled else {
                     throw HookEmergencyError.stateDidNotPersist
                 }
                 errorMessage = nil
             } catch {
-                areHooksDisabled = emergencySwitch.isDisabled
+                refreshLocalPolicyState()
                 errorMessage = (error as? LocalizedError)?.errorDescription
                     ?? error.localizedDescription
             }
@@ -384,14 +390,18 @@ private struct HookEmergencySwitch: @unchecked Sendable {
         return state.schema == Self.schema && state.disabled
     }
 
-    var installedReleaseID: String? {
+    var installedRuntime: (
+        releaseID: String,
+        nodeExecutable: String?,
+        nodeVersion: String?
+    )? {
         guard
             let data = try? Data(contentsOf: installedReleaseURL),
             let release = try? JSONDecoder().decode(InstalledRelease.self, from: data)
         else {
             return nil
         }
-        return release.releaseId
+        return (release.releaseId, release.nodeExecutable, release.nodeVersion)
     }
 
     func setDisabled(_ disabled: Bool) throws {
@@ -544,6 +554,8 @@ private struct HookEmergencySwitch: @unchecked Sendable {
 
     private struct InstalledRelease: Decodable {
         let releaseId: String
+        let nodeExecutable: String?
+        let nodeVersion: String?
     }
 }
 

@@ -75,7 +75,7 @@ Starting state:
 Steps:
 
 1. Open **Overview**. Confirm the catalog status is **Valid**, the product version/source revision are displayed, and installed hooks read **Not installed by Tama**.
-2. Select **Install local runtime**. Tama checks the Python installer prerequisite before mutation; Node must already satisfy the documented prerequisite before a supervised session uses the installed hooks. Review the listed target directories and confirm. Expected result: Overview displays the installed hook release ID and unrelated agent settings are preserved.
+2. Select **Install local runtime**. After release-integrity validation and before any managed write, Tama resolves Node from the documented locations, rejects versions older than 20, canonicalizes the executable through symlinks, and pins it into every Node-based installed hook command and the generated supervisor launcher. Each installed hook and supervised semantic dispatch preloads the sealed version guard before its target script. Tama also checks the Python installer prerequisite before launch. Review the listed target directories and confirm. Expected result: Overview displays the installed hook release ID, validated Node version and selectable canonical executable path; unrelated agent settings are preserved.
 3. Select a catalog hook and open **Session control**. Choose **Register backend**, review the macOS components, and confirm.
 4. Approve the daemon/System Extension and Network filter in macOS settings. Grant Full Disk Access only to the named Tama component when prompted.
 5. Start one supported supervised coding-agent session using its normal launcher.
@@ -112,7 +112,7 @@ Open **Violations**, enter an absolute path to a repository owned by the current
 | Unsupported macOS or architecture | No supported kernel backend exists | Stop; use an Apple-silicon Mac with macOS 14+ |
 | Digest mismatch | Download is incomplete or not the immutable release | Delete it and download all files again from the exact tag |
 | Sign-in unavailable | Identity configuration, network, or account issue | Preserve existing Keychain state; retry later or contact the repository maintainers with the classified error |
-| Python or Node missing | Local runtime/violations dependency unavailable | Install the required runtime, then retry the explicit action; catalog inspection remains available |
+| Python or supported Node missing | Local runtime/violations dependency unavailable; installation has not mutated managed state | Install the required runtime, then retry the explicit action; catalog inspection remains available |
 | Backend requires approval | macOS has not authorized the component | Use Tama's settings buttons, approve the exact component, then refresh status |
 | Backend removal partial or restart required | One privileged component remains configured or macOS deferred System Extension removal | Stop sessions, restart if requested, reopen Tama, and repeat **Deactivate local setup** until status is `Not registered` |
 | Full Disk Access missing | Endpoint Security cannot inspect required paths | Grant access only to the named Tama component and restart the affected session |

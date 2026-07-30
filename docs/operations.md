@@ -24,7 +24,8 @@ Tama has no required environment variables for a supported binary installation. 
 |---|---|---|
 | `TAMA_HOOK_ROOT` | Select the hook source during a maintainer build | The path is not retained; runtime source override is compiled out of distributed builds |
 | `TAMA_INSTALL_APP_PATH` | Select developer installation destination | Must not be used by the release workflow |
-| `TAMA_NODE` | Select Node.js for maintainer catalog export or a debug runtime | Runtime override is compiled out of distributed builds; the executable must be Node.js 20 or newer |
+| `TAMA_NODE` | Select Node.js for maintainer catalog export or a debug runtime | Build and debug entrypoints reject versions older than Node.js 20; the runtime override is compiled out of distributed builds |
+| `TAMA_RELEASE_TAG` | Select the exact signed tag for packaging and publication | Optional when one release tag identifies `HEAD`; required to disambiguate multiple release tags on the same source commit, and rejected unless it resolves exactly to `HEAD` |
 | `WISENT_CODESIGN_IDENTITY` | Select signing identity | Release credentials stay separate from runtime identity |
 | `WISENT_APP_PROVISIONING_PROFILE` | App provisioning profile | Release operator only |
 | `WISENT_NETWORK_FILTER_PROVISIONING_PROFILE` | Network Extension profile | Release operator only |
@@ -46,7 +47,7 @@ Unknown UI configuration is rejected by construction: setup choices are explicit
 The Overview and Session control views expose:
 
 - desktop product version and source revision;
-- bundled and installed hook release IDs;
+- bundled and installed hook release IDs, plus the validated Node version and executable recorded by the installed runtime;
 - catalog checksum and registered/loaded hook counts;
 - daemon and kernel-policy readiness;
 - active agent identity, session ID, project path, and liveness mode;

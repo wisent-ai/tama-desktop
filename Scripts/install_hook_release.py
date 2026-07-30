@@ -14,6 +14,7 @@ import sys
 
 SCHEMA = "ai.wisent.tama.hook-release.v1"
 INSTALLED_SCHEMA = "ai.wisent.tama.installed-hook-release.v1"
+MINIMUM_NODE_MAJOR = int("20")
 
 
 def atomic_json(path: Path, value: object) -> None:
@@ -186,9 +187,9 @@ def dispatcher_body(runtime_root: Path, hook_name: str, backup_path: Path) -> by
     body = f'''#!/bin/sh
 # hooks-rotator managed global Git dispatcher
 set -eu
-ROOT={json.dumps(str(runtime_root))}
-HOOK_NAME={json.dumps(hook_name)}
-BACKUP={json.dumps(str(backup_path))}
+ROOT={shlex.quote(str(runtime_root))}
+HOOK_NAME={shlex.quote(hook_name)}
+BACKUP={shlex.quote(str(backup_path))}
 INPUT_FILE="${{TMPDIR:-/tmp}}/hooks-rotator-$HOOK_NAME-$$.stdin"
 cat > "$INPUT_FILE"
 trap 'rm -f "$INPUT_FILE"' EXIT
@@ -211,12 +212,23 @@ exit 0
     return body.encode()
 
 
-def supervisor_launcher_body(home: Path) -> bytes:
+def supervisor_launcher_body(home: Path, node_executable: Path) -> bytes:
     supervisor = home / ".shared-hooks/agent-session-supervisor.py"
+    node_preflight = (
+        home
+        / "Library/Application Support/Tama/hooks-runtime/current/shared-hooks"
+        / "node-runtime-preflight.cjs"
+    )
     body = f'''#!/bin/sh
 # Tama-managed universal process and semantic hook runtime
 set -eu
-SUPERVISOR={json.dumps(str(supervisor))}
+SUPERVISOR={shlex.quote(str(supervisor))}
+NODE={shlex.quote(str(node_executable))}
+PREFLIGHT={shlex.quote(str(node_preflight))}
+[ -f "$PREFLIGHT" ] || {{ printf 'Tama Node.js runtime preflight is missing: %s\\n' "$PREFLIGHT" >&{int("2")}; exit {int("66")}; }}
+[ -x "$NODE" ] || {{ printf 'Tama requires its validated Node.js executable: %s\\n' "$NODE" >&{int("2")}; exit {int("66")}; }}
+export TAMA_NODE_EXECUTABLE="$NODE"
+export TAMA_NODE_PREFLIGHT="$PREFLIGHT"
 [ -x "$SUPERVISOR" ] || {{ printf 'Tama session supervisor is missing: %s\\n' "$SUPERVISOR" >&2; exit 66; }}
 PYTHON="${{TAMA_PYTHON:-$(command -v python3 || true)}}"
 [ -n "$PYTHON" ] || {{ printf 'Tama requires Python 3 for the universal session runtime.\\n' >&2; exit 66; }}
@@ -309,6 +321,77 @@ def global_hooks_path(home: Path) -> Path:
     return Path(value).expanduser()
 
 
+def require_supported_node(home: Path) -> tuple[Path, str]:
+    discovered = shutil.which("node")
+    candidates = ([Path(discovered)] if discovered else []) + [
+        Path("/opt/homebrew/bin/node"),
+        Path("/usr/local/bin/node"),
+        home / ".local/bin/node",
+    ]
+    unsupported_versions = []
+    visited = set()
+    for candidate in candidates:
+        key = str(candidate)
+        if key in visited:
+            continue
+        visited.add(key)
+        if not candidate.is_file() or not os.access(candidate, os.X_OK):
+            continue
+        try:
+            result = subprocess.run(
+                [str(candidate), "--version"],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=int("5"),
+            )
+        except (OSError, subprocess.SubprocessError):
+            continue
+        version = (result.stdout or result.stderr).strip()
+        normalized = version.removeprefix("v")
+        try:
+            major = int(normalized.split(".", maxsplit=int("1"))[int("0")])
+        except (TypeError, ValueError):
+            continue
+        if result.returncode == int("0") and major >= MINIMUM_NODE_MAJOR:
+            try:
+                return candidate.resolve(strict=True), version
+            except OSError:
+                continue
+        if version:
+            unsupported_versions.append(version)
+    if unsupported_versions:
+        found = ", ".join(unsupported_versions)
+        raise RuntimeError(
+            f"Node.js {MINIMUM_NODE_MAJOR} or newer is required; found {found}"
+        )
+    raise RuntimeError(
+        f"Node.js {MINIMUM_NODE_MAJOR} or newer is required on PATH, "
+        "/opt/homebrew/bin, /usr/local/bin, or ~/.local/bin"
+    )
+
+
+def pin_node_commands(registry: dict, node: Path, preflight: Path) -> None:
+    hook_groups = [
+        config.get("hooks", [])
+        for config in registry.get("events", {}).values()
+        if isinstance(config, dict)
+    ]
+    hook_groups.append(registry.get("catalog", {}).get("agentHooks", []))
+    node_command = f"{shlex.quote(str(node))} --require {shlex.quote(str(preflight))}"
+    for hooks in hook_groups:
+        if not isinstance(hooks, list):
+            continue
+        for hook in hooks:
+            if not isinstance(hook, dict):
+                continue
+            command = hook.get("command")
+            if isinstance(command, str) and (
+                command == "node" or command.startswith("node ")
+            ):
+                hook["command"] = node_command + command[len("node"):]
+
+
 def install_release(
     release_root: Path,
     home: Path,
@@ -322,6 +405,7 @@ def install_release(
     actual_digest = tree_digest(release_root)
     if release.get("releaseId") != actual_digest:
         raise RuntimeError("Bundled Tama hook release failed its integrity check")
+    node_executable, node_version = require_supported_node(home)
 
     registry_raw = load_json(release_root / "shared-hooks/registry.json")
     catalog = registry_raw.get("catalog", {})
@@ -380,7 +464,11 @@ def install_release(
         ]
     )
     replacements.sort(key=lambda item: len(item[0]), reverse=True)
+    node_preflight = stable_runtime / "shared-hooks/node-runtime-preflight.cjs"
+    if not (release_root / "shared-hooks/node-runtime-preflight.cjs").is_file():
+        raise RuntimeError("Approved hook release is missing the Node.js runtime preflight")
     registry = transformed(registry_raw, replacements)
+    pin_node_commands(registry, node_executable, node_preflight)
     registry["releaseId"] = release["releaseId"]
     registry["catalog"].pop("ompAdapters", None)
     registry.pop("adapters", None)
@@ -422,7 +510,7 @@ def install_release(
     if omp_adapter_target not in writes:
         raise RuntimeError("Approved hook release is missing the OMP Tama adapter")
     launcher_target = home / ".local/bin/tama-agent"
-    writes[launcher_target] = (supervisor_launcher_body(home), 0o755)
+    writes[launcher_target] = (supervisor_launcher_body(home, node_executable), 0o755)
     legacy_launchers = {
         home / ".local/bin/tama-omp",
         home / ".local/bin/tama-agent-supervisor",
@@ -607,6 +695,8 @@ def install_release(
             "installedAt": datetime.now(timezone.utc).isoformat(),
             "previousReleaseId": previous.get("releaseId"),
             "sourceFiles": sorted(new_source_files),
+            "nodeExecutable": str(node_executable),
+            "nodeVersion": node_version,
         }
         transaction.write(installed_path, (json.dumps(installed, indent=2, sort_keys=True) + "\n").encode(), 0o600)
     except Exception:
