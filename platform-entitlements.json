@@ -1,0 +1,11 @@
+{
+  "schema": "wisent.product-entitlements.current",
+  "product": "tama",
+  "organization_id": "WisentAuth identity organization",
+  "principal_id": "WisentAuth identity user",
+  "community": ["tama.local"],
+  "managed": ["tama.organization-policy"],
+  "managed_failure": "organization policy refresh fails closed without disabling local recovery",
+  "community_failure": "local inspection and recovery remain available",
+  "policy_boundary": "local hook enforcement remains authoritative on the endpoint"
+}
