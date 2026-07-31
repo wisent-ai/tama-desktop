@@ -117,8 +117,8 @@ Open **Violations**, enter an absolute path to a repository owned by the current
 | Backend removal partial or restart required | One privileged component remains configured or macOS deferred System Extension removal | Stop sessions, restart if requested, reopen Tama, and repeat **Deactivate local setup** until status is `Not registered` |
 | Full Disk Access missing | Endpoint Security cannot inspect required paths | Grant access only to the named Tama component and restart the affected session |
 | Runtime integrity failure | Bundled or installed hook tree does not match its digest | Reinstall the same verified app artifact; do not edit release directories |
-| No active agent sessions | No compatible supervisor record is live | Start or resume a supported session, then refresh |
-| Reload required | Session still has an older runtime loaded | Stop and resume that session after confirming installed release identity |
+| No active agent sessions | No compatible supervisor record is live, or only a legacy v1 record exists | Install the verified bundled runtime, start or resume a supported session so it publishes v2 state, then refresh |
+| Reload required | Session still has an older runtime loaded | If a reload is scheduled, let the active turn settle and refresh; otherwise stop and resume the session after confirming installed release identity |
 | Repository path rejected | Path is absent, unsafe, or inaccessible | Select an existing repository owned by the current user |
 | Scanner dependency unavailable | Bundled CLI or required local agent is missing | Reinstall the verified app; unrelated core workflows continue |
 

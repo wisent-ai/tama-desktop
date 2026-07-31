@@ -6,7 +6,7 @@
 - **Hook release:** an integrity-sealed tree of approved policy hooks bundled with a product release.
 - **Catalog:** the read-only description of registered hooks and their events.
 - **Session record:** supervisor-owned liveness and runtime status for one agent session.
-- **Session override:** Tama-owned requested hook differences for exactly one session.
+- **Session override:** supervisor-owned hook enablement requested by Tama for exactly one session.
 - **Emergency state:** a durable record that all managed dispatchers are bypassed.
 - **Policy backend:** the privileged macOS daemon and Network Extension enforcing process and network policy.
 
@@ -34,13 +34,17 @@ Deactivation disables managed dispatchers, then independently attempts Network f
 
 ### Session discovery
 
-Session files have schema `ai.wisent.tama.session-control.v2`. A record is accepted only when its schema, lowercase agent ID, 64-character hexadecimal control key, liveness mode, and TTL/process liveness are valid. Invalid or stale records are ignored. Discovery is read-only when the control directory does not exist.
+Session files have schema `ai.wisent.tama.session-control.v2`. A record is accepted only when its schema, lowercase agent ID, 64-character hexadecimal control key, liveness mode, and TTL/process liveness are valid. Invalid or stale records are ignored. When no live v2 record exists but a legacy v1 record is present, discovery reports the required runtime reinstall and session restart instead of presenting an unexplained empty result. Discovery is read-only when the control directory does not exist.
 
 ### Session override
 
-Input: authenticated user confirmation, live accepted session, nonempty registered hook ID, and requested enabled state. Tama writes `<controlKey>.override.json` atomically with mode `0600`. The file carries agent ID, session ID, control key, release/checksum binding, disabled/enabled hook IDs, retained capability, and update timestamp.
+Input: authenticated user confirmation, live accepted session, and a nonempty registered hook ID to enable. Tama submits a private request bound to the session ID and control key. The agent supervisor validates that envelope, writes `<controlKey>.override.json` atomically with mode `0600`, and returns the authoritative resulting session. The override carries agent ID, session ID, control key, release/checksum binding, disabled/enabled hook IDs, retained capability, and update timestamp.
 
-An override matches only the exact session identity tuple. With global policy enabled, disabled IDs are exceptions. During global emergency disable, enabled IDs are the allowlist. Retrying the same desired state is idempotent. A vanished or changed session fails before a successful UI state is claimed.
+An override matches only the exact session identity tuple. During global emergency disable, enabled IDs form the session allowlist. Agent-session controls never disable a hook; disabling enforcement remains an operator-owned global emergency action outside the agent session. Retrying the same enable request is idempotent. A vanished or changed session fails before a successful UI state is claimed.
+
+A session-wide enable-all request first persists an override bound to the installed release and catalog checksum, then schedules one native OMP reload after the active tool callback and agent turn settle. Concurrent reload requests coalesce; enable-all arriving behind a plain pending reload upgrades the persisted intent before that same reload executes. A scheduling, intent-upgrade, or reload failure restores the applicable preceding override state; the session record exposes the pending state until the runtime transition completes.
+
+The desktop writes a private, session-keyed `set-hook` or `enable-all` request and waits for the matching runtime response. It updates the visible session only from that authoritative response; rejection, malformed identity, session exit, or timeout is an actionable failure rather than optimistic success.
 
 ### Emergency disable and re-enable
 
@@ -68,6 +72,8 @@ Global hooks: enabled -> disabling -> disabled -> enabling -> enabled
 
 Session override: observed -> writing -> applied
                                | failure/stale session -> observed + actionable error
+Session reload: observed -> persisted override -> scheduled -> loaded
+                                                | failure -> previous durable state
 
 Violation job: idle -> scanning -> report
                       | failure -> diagnostic

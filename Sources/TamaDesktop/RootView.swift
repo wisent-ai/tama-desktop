@@ -679,7 +679,7 @@ private struct HookDetailView: View {
 private struct SessionHookControlView: View {
     @ObservedObject var model: AppModel
     let hook: HookRecord
-    @State private var pendingEnabledState: Bool?
+    @State private var isConfirmingEnableHook = false
     @State private var isConfirmingEnableAll = false
     @State private var isConfirmingBackendRegistration = false
 
@@ -791,8 +791,13 @@ private struct SessionHookControlView: View {
                         if let runtime = session.runtime {
                             LabeledContent("Hook runtime") {
                                 StatusLabel(
-                                    text: runtime.reloadRequired ? "Reload required" : "Loaded",
-                                    isHealthy: !runtime.reloadRequired && runtime.registryLoadError == nil
+                                    text: runtime.registryLoadError != nil
+                                        ? "Load failed"
+                                        : ((runtime.reloadPending ?? false)
+                                            ? "Reload scheduled"
+                                            : (runtime.reloadRequired ? "Reload required" : "Loaded")),
+                                    isHealthy: runtime.registryLoadError == nil
+                                        && ((runtime.reloadPending ?? false) || !runtime.reloadRequired)
                                 )
                             }
                             LabeledContent("Release") {
@@ -821,22 +826,30 @@ private struct SessionHookControlView: View {
                                     value: runtime.unknownHookIds.joined(separator: ", ")
                                 )
                             }
+                            if let error = runtime.registryLoadError {
+                                Text(error)
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                                    .textSelection(.enabled)
+                            }
                         }
                         HStack {
                             StatusLabel(
-                                text: isEnabled ? "Enabled in this session" : "Disabled in this session",
+                                text: isEnabled ? "Enabled in this session" : "Not enabled in this session",
                                 isHealthy: isEnabled
                             )
                             Spacer()
                             if model.isPolicyMutationInProgress {
                                 ProgressView()
                                     .controlSize(.small)
-                            } else {
-                                Button(isEnabled ? "Disable for this session" : "Enable for this session") {
-                                    pendingEnabledState = !isEnabled
+                            } else if !isEnabled {
+                                Button("Enable for this session") {
+                                    isConfirmingEnableHook = true
                                 }
                                 .buttonStyle(.borderedProminent)
-                                .tint(isEnabled ? .red : .green)
+                                .tint(.green)
+                            }
+                            if !model.isPolicyMutationInProgress {
                                 Button("Enable all hooks and reload") {
                                     isConfirmingEnableAll = true
                                 }
@@ -846,7 +859,7 @@ private struct SessionHookControlView: View {
                             }
                         }
                         Text(
-                            model.areHooksDisabled
+                            session.globallyDisabled
                                 ? "All hooks are globally disabled. Enabling creates an allowlist entry only for this agent session."
                                 : "The session override is stored for this agent session and restored when the same session is resumed."
                         )
@@ -858,22 +871,17 @@ private struct SessionHookControlView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .confirmationDialog(
-            pendingEnabledState == true ? "Enable this hook?" : "Disable this hook?",
-            isPresented: Binding(
-                get: { pendingEnabledState != nil },
-                set: { if !$0 { pendingEnabledState = nil } }
-            ),
+            "Enable this hook?",
+            isPresented: $isConfirmingEnableHook,
             titleVisibility: .visible
         ) {
-            if let enabled = pendingEnabledState {
-                Button(enabled ? "Enable for this session" : "Disable for this session") {
-                    pendingEnabledState = nil
-                    model.setSelectedSessionHook(hook.id, enabled: enabled)
-                }
-                .disabled(model.isPolicyMutationInProgress)
-                Button("Cancel", role: .cancel) {
-                    pendingEnabledState = nil
-                }
+            Button("Enable for this session") {
+                isConfirmingEnableHook = false
+                model.enableSelectedSessionHook(hook.id)
+            }
+            .disabled(model.isPolicyMutationInProgress)
+            Button("Cancel", role: .cancel) {
+                isConfirmingEnableHook = false
             }
         } message: {
             Text(

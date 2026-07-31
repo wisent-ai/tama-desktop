@@ -243,7 +243,7 @@ final class AppModel: ObservableObject {
     }
 
     func isHookEnabledInSelectedSession(_ hookId: String) -> Bool? {
-        selectedAgentSession?.isHookEnabled(hookId, globallyDisabled: areHooksDisabled)
+        selectedAgentSession?.isHookEnabled(hookId)
     }
 
     var areAllHooksEnabledInSelectedSession: Bool {
@@ -255,7 +255,7 @@ final class AppModel: ObservableObject {
             return false
         }
         return hooks.allSatisfy {
-            session.isHookEnabled($0.id, globallyDisabled: areHooksDisabled)
+            session.isHookEnabled($0.id)
         }
     }
 
@@ -280,7 +280,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    func setSelectedSessionHook(_ hookId: String, enabled: Bool) {
+    func enableSelectedSessionHook(_ hookId: String) {
         guard
             allowsControlAccess,
             !isPolicyMutationInProgress,
@@ -292,13 +292,10 @@ final class AppModel: ObservableObject {
         Task {
             defer { isChangingSessionHook = false }
             do {
-                let globallyDisabled = areHooksDisabled
                 let updated = try await Task.detached(priority: .userInitiated) {
-                    try SessionControlClient().setHookEnabled(
-                        enabled,
-                        hookId: hookId,
-                        session: session,
-                        globallyDisabled: globallyDisabled
+                    try SessionControlClient().enableHook(
+                        hookId,
+                        session: session
                     )
                 }.value
                 if let index = agentSessions.firstIndex(where: { $0.id == updated.id }) {
@@ -320,8 +317,7 @@ final class AppModel: ObservableObject {
             allowsControlAccess,
             !isPolicyMutationInProgress,
             let session = selectedAgentSession,
-            let hookIds = snapshot?.catalog.hooks.map(\.id),
-            !hookIds.isEmpty
+            snapshot?.catalog.hooks.isEmpty == false
         else {
             return
         }
@@ -329,13 +325,8 @@ final class AppModel: ObservableObject {
         Task {
             defer { isChangingSessionHook = false }
             do {
-                let globallyDisabled = areHooksDisabled
                 let updated = try await Task.detached(priority: .userInitiated) {
-                    try SessionControlClient().setAllHooksEnabled(
-                        hookIds,
-                        session: session,
-                        globallyDisabled: globallyDisabled
-                    )
+                    try SessionControlClient().setAllHooksEnabled(session: session)
                 }.value
                 if let index = agentSessions.firstIndex(where: { $0.id == updated.id }) {
                     agentSessions[index] = updated

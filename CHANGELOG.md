@@ -25,13 +25,17 @@ All user-visible changes follow the categories required by `docs/releases.md`. A
 - Local setup and emergency commands now drain output concurrently, enforce bounded output and runtime, and terminate their process tree on timeout.
 - Leaving the authenticated control surface cancels active repository scan or cleanup process trees and requires inspection plus a new read-only scan after partial cleanup.
 - Product and hook-release identities are displayed separately.
+- OMP session-control reload actions use the documented v2 identity, persist checksum-bound hook state, and schedule one native runtime reload after the active agent turn settles; the desktop waits for the matching authoritative response and distinguishes a scheduled reload from a stale or failed runtime.
+- Per-session controls now expose only policy-permitted enable operations and wait for the live supervisor response; the desktop no longer offers or optimistically reports prohibited hook disablement.
 
 ### Fixed
 
+- OMP session records and overrides now use the documented v2 `agentId` identity, allowing the desktop to discover live sessions and exchange validated controls; a legacy-only v1 state now produces an actionable runtime-reinstall diagnostic instead of an unexplained empty session list.
 - Session-discovery failures remain visible instead of being represented as an empty successful result.
 - Optional violation tooling no longer depends on a hard-coded maintainer directory.
 - Nonzero cleanup-agent exits cannot be reported as successful cleanup even when partial edits remove the final violation.
 - Hook registration now rejects invalid timeout and registry-path arguments before mutation, reports registry-load, registry-I/O, or mutator-launch failures without an unhandled stack trace, preserves registry permissions across atomic replacement, and retains the primary error if temporary-file cleanup also fails.
+- Session control now labels hook-registry load failures explicitly and displays the runtime diagnostic instead of allowing a scheduled or required reload label to hide the error.
 - Runtime prerequisites now consistently distinguish local Node.js execution, Python-based installation/restoration, and macOS backend approval across README, onboarding, core, and integration contracts.
 - Build, CLI, and runtime installation now reject unsupported Node.js versions; installation validates Node before managed writes, canonicalizes its executable through symlinks, pins that path into installed hook commands and the supervisor launcher, preloads a sealed version guard before every installed target and supervised semantic dispatch, records path and validated version in release provenance, exposes them in Overview, and POSIX-quotes generated shell paths without expansion.
 - Release packaging and publication now reject signed `v` tags that are not strict Semantic Versioning, including leading-zero numeric identifiers; publication also verifies the sidecar against the artifact digest, byte size, signed embedded build/hook identities, source revision, dependency pins, channel, and canonical examples before upload.
@@ -72,7 +76,7 @@ All user-visible changes follow the categories required by `docs/releases.md`. A
 
 ### Data or state migrations
 
-- None. Existing installed hook release and session-control v2 records remain readable.
+- Installed hook-release state and existing v2 session records remain readable. Legacy v1 session-control records and overrides are deliberately ignored because they lack the v2 `agentId` identity contract; reinstall the bundled runtime, then stop or resume affected sessions so the supervisor publishes fresh v2 records.
 
 ### Compatibility requirements
 

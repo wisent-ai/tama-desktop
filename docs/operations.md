@@ -10,7 +10,8 @@
 | Current hook release | `hooks-runtime/current` symlink | Tama installer transaction | Atomically replaced; previous ID recorded in `installed.json` |
 | Emergency state | `hook-emergency-state.json` and `emergency-backup/` | Emergency controller | Removed only after successful re-enable or explicit uninstall |
 | Session records | `session-control/*.session.json` | Agent supervisor | Stale records are ignored and removed; directory mode `0700` |
-| Session overrides | `session-control/*.override.json` | Tama | Atomic files, mode `0600`; removed during reset/uninstall |
+| Session overrides | `session-control/*.override.json` | Agent supervisor after a validated Tama request | Atomic files, mode `0600`; removed during reset/uninstall |
+| Session-control requests | `session-control/*.request.json` and matching response | Tama and agent supervisor | Private, single-use exchange; both sides remove completed or abandoned files |
 | Wisent session | macOS Keychain | Wisent Auth | Removed by sign-out or Keychain administration |
 | Privileged daemon and filter preferences | macOS ServiceManagement and NetworkExtension | Explicit setup action | Removed by the uninstall procedure |
 
@@ -52,7 +53,7 @@ The Overview and Session control views expose:
 - daemon and kernel-policy readiness;
 - active agent identity, session ID, project path, and liveness mode;
 - semantic event sequence and last event;
-- unknown hooks, reload requirement, and backend diagnostics;
+- unknown hooks, reload requirement or scheduled reload, and backend diagnostics;
 - violation scan totals, skipped files, and per-file errors.
 
 Diagnostics must identify remediation without including access tokens, raw external payloads, or repository file contents beyond paths and rule messages.
@@ -71,7 +72,7 @@ Never repair `installed.json`, `current`, or emergency manifests manually as a n
 
 ## Backup and restore
 
-Before an upgrade that changes stored-state schemas, back up `~/Library/Application Support/Tama`. Version `0.2.0` uses versioned JSON schemas and does not require a migration from `0.1.0`; the installer preserves prior hook release identity.
+Before an upgrade that changes stored-state schemas, back up `~/Library/Application Support/Tama`. Version `0.2.0` preserves prior hook-release identity and reads existing v2 session state. It deliberately ignores legacy v1 session records and overrides because their `provider` identity cannot satisfy the v2 `agentId` contract; reinstall the verified bundled runtime, then stop or resume affected sessions to republish v2 state.
 
 To restore after a failed compatible upgrade:
 

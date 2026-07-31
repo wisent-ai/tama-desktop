@@ -30,6 +30,7 @@ struct HookRuntimeStatus: Codable, Sendable, Equatable {
     let enabledHookIds: [String]
     let unknownHookIds: [String]
     let reloadRequired: Bool
+    let reloadPending: Bool?
     let registryLoadError: String?
 }
 
@@ -94,7 +95,7 @@ struct AgentSessionRecord: Decodable, Identifiable, Sendable {
         return "\(agentDisplayName) · \(project.isEmpty ? cwd : project) · \(sessionId.prefix(8))"
     }
 
-    func isHookEnabled(_ hookId: String, globallyDisabled: Bool) -> Bool {
+    func isHookEnabled(_ hookId: String) -> Bool {
         globallyDisabled
             ? enabledHookIds.contains(hookId)
             : !disabledHookIds.contains(hookId)
@@ -139,49 +140,17 @@ struct AgentSessionRecord: Decodable, Identifiable, Sendable {
         updatedAt = try values.decode(String.self, forKey: .updatedAt)
     }
 
-    private init(
-        replacing session: AgentSessionRecord,
-        globallyDisabled: Bool,
-        disabledHookIds: [String],
-        enabledHookIds: [String],
-        updatedAt: String
-    ) {
-        schema = session.schema
-        agentId = session.agentId
-        sessionId = session.sessionId
-        controlKey = session.controlKey
-        pid = session.pid
-        cwd = session.cwd
-        livenessMode = session.livenessMode
-        heartbeatTTLSeconds = session.heartbeatTTLSeconds
-        self.globallyDisabled = globallyDisabled
-        self.disabledHookIds = disabledHookIds
-        self.enabledHookIds = enabledHookIds
-        capability = session.capability
-        runtime = session.runtime
-        semanticRuntime = session.semanticRuntime
-        systemPolicy = session.systemPolicy
-        self.updatedAt = updatedAt
-    }
-
-    func replacingOverrides(
-        globallyDisabled: Bool,
-        disabledHookIds: [String],
-        enabledHookIds: [String],
-        updatedAt: String
-    ) -> AgentSessionRecord {
-        AgentSessionRecord(
-            replacing: self,
-            globallyDisabled: globallyDisabled,
-            disabledHookIds: disabledHookIds,
-            enabledHookIds: enabledHookIds,
-            updatedAt: updatedAt
-        )
-    }
 }
 
 struct SessionControlClient: Sendable {
     private static let schema = "ai.wisent.tama.session-control.v2"
+    private static let legacySchema = "ai.wisent.tama.session-control.v1"
+    private static let responsePollInterval = TimeInterval("0.05")!
+    private static let responseTimeout = TimeInterval("10")!
+    private static let privateFilePermissions = NSNumber(value: S_IRUSR | S_IWUSR)
+    private static let privateDirectoryPermissions = NSNumber(
+        value: S_IRUSR | S_IWUSR | S_IXUSR
+    )
     private let rootOverride: URL?
 
     init(root: URL? = nil) {
@@ -199,10 +168,16 @@ struct SessionControlClient: Sendable {
         )
         let decoder = JSONDecoder()
         var sessions: [AgentSessionRecord] = []
+        var hasLegacySession = false
         sessions.reserveCapacity(urls.count)
         for url in urls where url.lastPathComponent.hasSuffix(".session.json") {
+            guard let data = try? Data(contentsOf: url) else { continue }
+            if let envelope = try? decoder.decode(SessionControlSchemaEnvelope.self, from: data),
+               envelope.schema == Self.legacySchema {
+                hasLegacySession = true
+                continue
+            }
             guard
-                let data = try? Data(contentsOf: url),
                 let session = try? decoder.decode(AgentSessionRecord.self, from: data),
                 session.schema == Self.schema,
                 isSafeAgentId(session.agentId),
@@ -214,6 +189,9 @@ struct SessionControlClient: Sendable {
                 sessions.append(session)
             }
         }
+        if sessions.isEmpty, hasLegacySession {
+            throw SessionControlError.legacySessionRecords
+        }
         return sessions.sorted {
             if $0.agentId != $1.agentId {
                 return $0.agentId.localizedStandardCompare($1.agentId) == .orderedAscending
@@ -223,11 +201,9 @@ struct SessionControlClient: Sendable {
         }
     }
 
-    func setHookEnabled(
-        _ enabled: Bool,
-        hookId: String,
-        session: AgentSessionRecord,
-        globallyDisabled: Bool
+    func enableHook(
+        _ hookId: String,
+        session: AgentSessionRecord
     ) throws -> AgentSessionRecord {
         guard
             isSafeControlKey(session.controlKey),
@@ -236,107 +212,106 @@ struct SessionControlClient: Sendable {
         else {
             throw SessionControlError.invalidSession
         }
-        let manager = FileManager.default
-        let root = try controlRoot(manager: manager, create: true)
-        let overrideURL = root.appendingPathComponent("\(session.controlKey).override.json")
-        let decoder = JSONDecoder()
-        let existing = (try? Data(contentsOf: overrideURL))
-            .flatMap { try? decoder.decode(SessionControlOverride.self, from: $0) }
-        let matching = existing?.matches(session: session) == true ? existing : nil
-        var disabledHookIds = Set(matching?.disabledHookIds ?? session.disabledHookIds)
-        var enabledHookIds = Set(matching?.enabledHookIds ?? session.enabledHookIds)
-        if globallyDisabled {
-            if enabled {
-                enabledHookIds.insert(hookId)
-            } else {
-                enabledHookIds.remove(hookId)
-            }
-        } else if enabled {
-            disabledHookIds.remove(hookId)
-        } else {
-            disabledHookIds.insert(hookId)
-        }
-        return try writeOverride(
-            disabledHookIds: disabledHookIds,
-            enabledHookIds: enabledHookIds,
+        return try performRequest(
             session: session,
-            globallyDisabled: globallyDisabled,
-            capability: matching?.capability ?? session.capability,
-            manager: manager,
-            overrideURL: overrideURL
+            operation: "set-hook",
+            hookId: hookId,
+            enabled: true
         )
     }
 
-    func setAllHooksEnabled(
-        _ hookIds: [String],
-        session: AgentSessionRecord,
-        globallyDisabled: Bool
-    ) throws -> AgentSessionRecord {
+    func setAllHooksEnabled(session: AgentSessionRecord) throws -> AgentSessionRecord {
         guard
             isSafeControlKey(session.controlKey),
-            isSafeAgentId(session.agentId),
-            !hookIds.isEmpty,
-            hookIds.allSatisfy({
-                !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            })
+            isSafeAgentId(session.agentId)
         else {
             throw SessionControlError.invalidSession
         }
-        let manager = FileManager.default
-        let root = try controlRoot(manager: manager, create: true)
-        let overrideURL = root.appendingPathComponent("\(session.controlKey).override.json")
-        let decoder = JSONDecoder()
-        let existing = (try? Data(contentsOf: overrideURL))
-            .flatMap { try? decoder.decode(SessionControlOverride.self, from: $0) }
-        let matching = existing?.matches(session: session) == true ? existing : nil
-        return try writeOverride(
-            disabledHookIds: [],
-            enabledHookIds: globallyDisabled ? Set(hookIds) : [],
-            session: session,
-            globallyDisabled: globallyDisabled,
-            capability: matching?.capability ?? session.capability,
-            manager: manager,
-            overrideURL: overrideURL
-        )
+        return try performRequest(session: session, operation: "enable-all")
     }
 
-    private func writeOverride(
-        disabledHookIds: Set<String>,
-        enabledHookIds: Set<String>,
+    private func performRequest(
         session: AgentSessionRecord,
-        globallyDisabled: Bool,
-        capability: SessionCapability?,
-        manager: FileManager,
-        overrideURL: URL
+        operation: String,
+        hookId: String? = nil,
+        enabled: Bool? = nil
     ) throws -> AgentSessionRecord {
-        let updatedAt = ISO8601DateFormatter().string(from: Date())
-        let disabled = disabledHookIds.sorted()
-        let enabled = enabledHookIds.sorted()
-        let value = SessionControlOverride(
+        let manager = FileManager.default
+        let root = try controlRoot(manager: manager, create: true)
+        let requestID = UUID().uuidString.lowercased()
+        let requestURL = root.appendingPathComponent(
+            "\(session.controlKey).\(requestID).request.json"
+        )
+        let responseURL = root.appendingPathComponent(
+            "\(session.controlKey).\(requestID).response.json"
+        )
+        defer {
+            try? manager.removeItem(at: requestURL)
+            try? manager.removeItem(at: responseURL)
+        }
+        let request = SessionControlRequest(
             schema: Self.schema,
-            agentId: session.agentId,
             sessionId: session.sessionId,
             controlKey: session.controlKey,
-            releaseId: session.runtime?.loadedReleaseId,
-            catalogChecksum: session.runtime?.catalogChecksum,
-            disabledHookIds: disabled,
-            enabledHookIds: enabled,
-            capability: capability,
-            updatedAt: updatedAt
+            requestId: requestID,
+            confirmed: true,
+            operation: operation,
+            hookId: hookId,
+            enabled: enabled
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        try encoder.encode(value).write(to: overrideURL, options: .atomic)
-        try manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: overrideURL.path)
-        return session.replacingOverrides(
-            globallyDisabled: globallyDisabled,
-            disabledHookIds: disabled,
-            enabledHookIds: enabled,
-            updatedAt: updatedAt
+        try encoder.encode(request).write(to: requestURL, options: .atomic)
+        try manager.setAttributes(
+            [.posixPermissions: Self.privateFilePermissions],
+            ofItemAtPath: requestURL.path
         )
+
+        let decoder = JSONDecoder()
+        let deadline = Date().addingTimeInterval(Self.responseTimeout)
+        repeat {
+            if manager.fileExists(atPath: responseURL.path) {
+                let response: SessionControlResponse
+                do {
+                    response = try decoder.decode(
+                        SessionControlResponse.self,
+                        from: Data(contentsOf: responseURL)
+                    )
+                } catch {
+                    throw SessionControlError.invalidResponse
+                }
+                guard
+                    response.schema == Self.schema,
+                    response.requestId == requestID
+                else {
+                    throw SessionControlError.invalidResponse
+                }
+                guard response.ok else {
+                    throw SessionControlError.requestRejected(
+                        response.error ?? "unknown-runtime-error"
+                    )
+                }
+                guard
+                    let state = response.state,
+                    state.schema == Self.schema,
+                    state.agentId == session.agentId,
+                    state.sessionId == session.sessionId,
+                    state.controlKey == session.controlKey,
+                    isSafeAgentId(state.agentId),
+                    isSafeControlKey(state.controlKey),
+                    sessionIsLive(state, now: Date())
+                else {
+                    throw SessionControlError.invalidResponse
+                }
+                return state
+            }
+            guard sessionIsLive(session, now: Date()) else {
+                throw SessionControlError.sessionEnded
+            }
+            Thread.sleep(forTimeInterval: Self.responsePollInterval)
+        } while Date() < deadline
+        throw SessionControlError.requestTimedOut
     }
-
-
 
     private func controlRoot(manager: FileManager, create: Bool) throws -> URL {
         let root: URL
@@ -354,12 +329,15 @@ struct SessionControlClient: Sendable {
                 .appendingPathComponent("session-control", isDirectory: true)
         }
         if create {
-        try manager.createDirectory(
-            at: root,
-            withIntermediateDirectories: true,
-            attributes: [.posixPermissions: 0o700]
-        )
-        try manager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: root.path)
+            try manager.createDirectory(
+                at: root,
+                withIntermediateDirectories: true,
+                attributes: [.posixPermissions: Self.privateDirectoryPermissions]
+            )
+            try manager.setAttributes(
+                [.posixPermissions: Self.privateDirectoryPermissions],
+                ofItemAtPath: root.path
+            )
         }
         return root
     }
@@ -403,32 +381,51 @@ struct SessionControlClient: Sendable {
     }
 }
 
-private struct SessionControlOverride: Codable {
+private struct SessionControlSchemaEnvelope: Decodable {
     let schema: String
-    let agentId: String
-    let sessionId: String
-    let controlKey: String
-    let releaseId: String?
-    let catalogChecksum: String?
-    let disabledHookIds: [String]
-    let enabledHookIds: [String]
-    let capability: SessionCapability?
-    let updatedAt: String
-
-    func matches(session: AgentSessionRecord) -> Bool {
-        schema == session.schema
-            && agentId == session.agentId
-            && sessionId == session.sessionId
-            && controlKey == session.controlKey
-    }
 }
 
+private struct SessionControlRequest: Encodable {
+    let schema: String
+    let sessionId: String
+    let controlKey: String
+    let requestId: String
+    let confirmed: Bool
+    let operation: String
+    let hookId: String?
+    let enabled: Bool?
+}
 
+private struct SessionControlResponse: Decodable {
+    let schema: String
+    let requestId: String
+    let ok: Bool
+    let error: String?
+    let state: AgentSessionRecord?
+}
 
 enum SessionControlError: LocalizedError {
     case invalidSession
+    case invalidResponse
+    case legacySessionRecords
+    case requestRejected(String)
+    case requestTimedOut
+    case sessionEnded
 
     var errorDescription: String? {
-        "Tama rejected an invalid agent session control endpoint."
+        switch self {
+        case .invalidSession:
+            "Tama rejected an invalid agent session control endpoint."
+        case .invalidResponse:
+            "The agent runtime returned an invalid session-control response."
+        case .legacySessionRecords:
+            "Tama found only legacy v1 session records. Reinstall the verified bundled runtime, then stop or resume the affected agent session to publish v2 state."
+        case let .requestRejected(reason):
+            "The agent runtime rejected the session-control request: \(reason)"
+        case .requestTimedOut:
+            "The agent runtime did not acknowledge the session-control request before the deadline."
+        case .sessionEnded:
+            "The agent session ended before the session-control request completed."
+        }
     }
 }
