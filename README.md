@@ -119,4 +119,4 @@ Status: **development, pre-release (`0.x`)**. No stable or supported binary rele
 - Testing and qualification status: [`docs/testing.md`](docs/testing.md)
 - Security reports: [private GitHub Security Advisory](https://github.com/wisent-ai/tama-desktop/security/advisories/new)
 - Product issues: [GitHub Issues](https://github.com/wisent-ai/tama-desktop/issues)
-- License: proprietary Wisent AI software; see [`LICENSE`](LICENSE)
+- License: Apache License 2.0; see [`LICENSE`](LICENSE)
