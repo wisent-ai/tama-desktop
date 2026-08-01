@@ -1,5 +1,13 @@
 # Tama — local policy control for supervised coding agents
 
+<!-- wisent-readme-signals:start -->
+[![Release](https://img.shields.io/github/v/release/wisent-ai/tama-desktop?display_name=tag&sort=semver)](https://github.com/wisent-ai/tama-desktop/releases)
+[![Downloads](https://img.shields.io/github/downloads/wisent-ai/tama-desktop/total)](https://github.com/wisent-ai/tama-desktop/releases)
+[![License](https://img.shields.io/github/license/wisent-ai/tama-desktop)](https://github.com/wisent-ai/tama-desktop)
+[![Discord](https://img.shields.io/badge/Discord-Join%20Wisent-5865F2?logo=discord&logoColor=white)](https://discord.gg/qRjpkthq54)
+<!-- wisent-readme-signals:end -->
+
+
 Tama lets a Wisent operator inspect, install, and safely control the approved policy hooks that supervise local coding-agent sessions on macOS.
 
 ## Problem and intended users
