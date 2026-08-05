@@ -7,8 +7,7 @@ All user-visible changes follow the categories required by `docs/releases.md`. A
 ### Added
 
 - Product contract, onboarding, operational, core, integration, example, testing, release, security, and support documentation.
-- Explicit welcome and setup flow before any local policy mutation.
-- Unauthenticated bundled-policy inspector with no session monitoring or mutation controls.
+- Authenticated guided setup that records completion only after the sealed runtime, enabled privileged backend, and a matching live kernel-gated agent session are all observed.
 - Desktop build provenance and immutable release packaging contract.
 - Public Tama CLI for portable catalog status, opt-in local runtime-drift checks, namespaced hook operations with atomic registry resealing, provider-declared coverage, Git dispatcher installation, repository workflows, adaptive recovery, and MCP configuration.
 - Runnable `examples/` shell commands with inline risk, required-input, side-effect, and rollback comments; CLI link installation is retry-safe, and prose runbooks plus the Markdown coverage matrix were removed.
@@ -19,7 +18,7 @@ All user-visible changes follow the categories required by `docs/releases.md`. A
 - Session discovery is read-only when Tama has not been configured.
 - Session monitoring starts only while the authenticated control surface is visible.
 - Policy controls now require a current recognized Wisent organization role, and mutation-capable models enforce an explicit construction-time authorization boundary.
-- Returning users enter Wisent session restoration; the explicitly selected read-only inspector uses isolated bundled-catalog state.
+- Tama opens Wisent session restoration directly; the explicitly selected read-only inspector uses isolated bundled-catalog state, while incomplete authenticated setup resumes until its evidence is complete.
 - In-flight repository scans and cleanup can be stopped; scan cancellation is read-only, while cleanup preserves partial edits and performs the final rescan.
 - Runtime-drift CLI checks now resolve Claude and Codex adapter configuration from the current or explicitly selected user home instead of maintainer paths embedded in the signed catalog.
 - Local setup and emergency commands now drain output concurrently, enforce bounded output and runtime, and terminate their process tree on timeout.
@@ -77,6 +76,7 @@ All user-visible changes follow the categories required by `docs/releases.md`. A
 ### Data or state migrations
 
 - Installed hook-release state and existing v2 session records remain readable. Legacy v1 session-control records and overrides are deliberately ignored because they lack the v2 `agentId` identity contract; reinstall the bundled runtime, then stop or resume affected sessions so the supervisor publishes fresh v2 records.
+- The former `tama.hasSeenWelcome` and `tama.hasSeenTrustScreen` preferences are no longer read. Existing installations retain only independent `tama.hasCompletedSetup` state without changing installed policy.
 
 ### Compatibility requirements
 

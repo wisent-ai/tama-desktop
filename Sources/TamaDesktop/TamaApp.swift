@@ -4,42 +4,27 @@ import WisentAuth
 @main
 struct TamaDesktopApp: App {
     @StateObject private var auth = WisentAuthStore(productName: "Tama")
-    @AppStorage("tama.hasSeenWelcome") private var hasSeenWelcome = false
-    @State private var destination: TamaDestination = .welcome
+    @State private var isInspectingPolicy = false
 
     var body: some Scene {
         WindowGroup("Tama") {
             if Self.testIdentityOverride != nil {
-                // UI-test seam: TAMA_TEST_IDENTITY=1 skips the real Wisent
-                // gate (Supabase OTP) with a synthetic identity so automated
-                // journeys can exercise the signed-in UI without an account.
-                TamaAuthorizedControlRootView()
+                TamaAuthorizedControlRootView(bypassesSetup: true)
                     .environment(\.wisentIdentity, Self.testIdentityOverride)
-            } else if !hasSeenWelcome && destination == .welcome {
-                TamaWelcomeView(
-                    inspectPolicy: {
-                        destination = .inspect
-                    },
-                    continueToSignIn: {
-                        hasSeenWelcome = true
-                        destination = .controls
-                    }
-                )
-            } else if destination == .controls || (hasSeenWelcome && destination == .welcome) {
+            } else if isInspectingPolicy {
+                ReadOnlyRootView {
+                    isInspectingPolicy = false
+                }
+            } else {
                 WisentAuthGate(store: auth) {
                     TamaAuthorizedControlRootView()
                 }
                 .toolbar {
                     ToolbarItem {
                         Button("Inspect policy without controls", systemImage: "eye") {
-                            destination = .inspect
+                            isInspectingPolicy = true
                         }
                     }
-                }
-            } else {
-                ReadOnlyRootView {
-                    hasSeenWelcome = true
-                    destination = .controls
                 }
             }
         }
@@ -64,12 +49,20 @@ struct TamaDesktopApp: App {
 
 private struct TamaAuthorizedControlRootView: View {
     @Environment(\.wisentIdentity) private var identity
+    let bypassesSetup: Bool
+
+    init(bypassesSetup: Bool = false) {
+        self.bypassesSetup = bypassesSetup
+    }
 
     @ViewBuilder
     var body: some View {
         if let identity,
            let authorization = ControlAuthorization(identity: identity) {
-            TamaControlRootView(authorization: authorization)
+            TamaAuthenticatedRootView(
+                authorization: authorization,
+                bypassesSetup: bypassesSetup
+            )
         } else {
             ContentUnavailableView(
                 "Policy controls unavailable",
@@ -82,74 +75,76 @@ private struct TamaAuthorizedControlRootView: View {
     }
 }
 
-private struct TamaControlRootView: View {
+private struct TamaAuthenticatedRootView: View {
     @StateObject private var model: AppModel
     @StateObject private var violations: ViolationsModel
+    @AppStorage("tama.hasCompletedSetup") private var hasCompletedSetup = false
+    @StateObject private var firstUseJourney = TamaFirstUseJourney()
+    let bypassesSetup: Bool
 
-    init(authorization: ControlAuthorization) {
+    init(authorization: ControlAuthorization, bypassesSetup: Bool) {
         _model = StateObject(
             wrappedValue: AppModel(authorization: authorization)
         )
         _violations = StateObject(
             wrappedValue: ViolationsModel(authorization: authorization)
         )
+        self.bypassesSetup = bypassesSetup
     }
 
     var body: some View {
-        RootView(model: model, violationsModel: violations)
-    }
-}
-
-private enum TamaDestination {
-    case welcome
-    case inspect
-    case controls
-}
-
-private struct TamaWelcomeView: View {
-    let inspectPolicy: () -> Void
-    let continueToSignIn: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading) {
-            Label("Tama", systemImage: "shield.lefthalf.filled")
-                .font(.largeTitle.bold())
-            Text("Local policy control for supervised coding agents")
-                .font(.title2)
-            Text(
-                "Inspect the approved policy first. Installing the local runtime and "
-                    + "registering privileged macOS components are separate actions that "
-                    + "always require your confirmation."
-            )
-            .foregroundStyle(.secondary)
-            GroupBox("Before you continue") {
-                VStack(alignment: .leading) {
-                    Label("Apple-silicon Mac running macOS Sonoma or newer", systemImage: "desktopcomputer")
-                    Label("A Wisent account is required for policy changes", systemImage: "person.badge.key")
-                    Label("Python and Node.js are needed only for local runtime workflows", systemImage: "terminal")
-                    Label("Opening Tama does not install hooks or register services", systemImage: "checkmark.shield")
+        Group {
+            if bypassesSetup || hasCompletedSetup {
+                RootView(model: model, violationsModel: violations)
+                    .overlay(alignment: .bottom) {
+                        if firstUseJourney.isAwaitingFirstSession {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text(firstUseJourney.currentTitle)
+                                    .font(.headline)
+                                Text(firstUseJourney.currentBody)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(16)
+                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+                            .padding()
+                            .allowsHitTesting(false)
+                        }
+                    }
+            } else if firstUseJourney.isLoading {
+                ProgressView("Loading Tama…")
+                    .controlSize(.large)
+            } else if !firstUseJourney.isAtSetup {
+                TamaOnboardingView(journey: firstUseJourney)
+            } else {
+                TamaSetupView(model: model) {
+                    Task {
+                        guard await firstUseJourney.completeSetup() else { return }
+                        hasCompletedSetup = true
+                    }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            HStack {
-                Link(
-                    "Read onboarding",
-                    destination: URL(
-                        string: "https://github.com/wisent-ai/tama-desktop/blob/main/docs/onboarding.md"
-                    )!
-                )
-                Spacer()
-                Button("Inspect bundled policy") {
-                    inspectPolicy()
-                }
-                Button("Continue to Wisent sign-in") {
-                    continueToSignIn()
-                }
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
             }
         }
-        .padding()
-        .accessibilityIdentifier("tama.welcome")
+        .task {
+            await firstUseJourney.start()
+            if hasCompletedSetup && !firstUseJourney.isCompleted {
+                await firstUseJourney.reconcileCompletedSetup()
+            }
+            if !model.agentSessions.isEmpty {
+                await firstUseJourney.observeSupervisedSession()
+            }
+        }
+        .onChange(of: model.agentSessions.isEmpty) { _, isEmpty in
+            guard !isEmpty else { return }
+            Task { await firstUseJourney.observeSupervisedSession() }
+        }
+        .onAppear {
+            model.startControlMonitoring()
+        }
+        .onDisappear {
+            model.stopControlMonitoring()
+            violations.cancelAllOperations()
+        }
     }
 }
+
