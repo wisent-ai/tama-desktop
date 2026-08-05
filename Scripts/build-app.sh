@@ -6,7 +6,7 @@ DESKTOP_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 FINAL_APP_BUNDLE="$DESKTOP_ROOT/.build/Tama.app"
 INSTALLED_BUNDLE=${TAMA_INSTALL_APP_PATH:-"$HOME/Applications/Tama.app"}
 LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
-PRODUCT_VERSION=${TAMA_RELEASE_VERSION:-$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$DESKTOP_ROOT/App/Info.plist")}
+PRODUCT_VERSION=${TAMA_RELEASE_VERSION:-${WISENT_RELEASE_VERSION:-$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$DESKTOP_ROOT/App/Info.plist")}}
 BUNDLE_SHORT_VERSION=${PRODUCT_VERSION%%[-+]*}
 if ! printf '%s\n' "$BUNDLE_SHORT_VERSION" | LC_ALL=C grep -Eq '^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$'; then
     printf '%s\n' "The Apple bundle version derived from $PRODUCT_VERSION is invalid."
@@ -14,7 +14,7 @@ if ! printf '%s\n' "$BUNDLE_SHORT_VERSION" | LC_ALL=C grep -Eq '^[[:digit:]]+\.[
 fi
 BUILD_CHANNEL=${TAMA_BUILD_CHANNEL:-development}
 SOURCE_REVISION=$(git -C "$DESKTOP_ROOT" rev-parse HEAD)
-BUILD_NUMBER=$(git -C "$DESKTOP_ROOT" rev-list --count HEAD)
+BUILD_NUMBER=${WISENT_BUILD_NUMBER:-$(git -C "$DESKTOP_ROOT" rev-list --count HEAD)}
 TARGET_ARCH=$(uname -m)
 SOURCE_DIRTY=false
 if [ -n "$(git -C "$DESKTOP_ROOT" status --porcelain --untracked-files=normal)" ]; then
@@ -187,13 +187,27 @@ APP_BUNDLE="$BUILD_STAGING_BUNDLE"
 CONTENTS="$APP_BUNDLE/Contents"
 MACOS="$CONTENTS/MacOS"
 RESOURCES="$CONTENTS/Resources"
+FRAMEWORKS="$CONTENTS/Frameworks"
 
-mkdir -p "$MACOS" "$RESOURCES"
+mkdir -p "$MACOS" "$RESOURCES" "$FRAMEWORKS"
 install -m 0644 "$DESKTOP_ROOT/App/Info.plist" "$CONTENTS/Info.plist"
 plutil -replace CFBundleShortVersionString -string "$BUNDLE_SHORT_VERSION" "$CONTENTS/Info.plist"
 plutil -replace TamaProductVersion -string "$PRODUCT_VERSION" "$CONTENTS/Info.plist"
 plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$CONTENTS/Info.plist"
+if [ -n "${WISENT_UPDATE_FEED_URL:-}" ]; then
+    case "$WISENT_UPDATE_FEED_URL" in https://*) ;; *) printf '%s\n' "WISENT_UPDATE_FEED_URL must use HTTPS" >&2; false ;; esac
+    plutil -replace SUFeedURL -string "$WISENT_UPDATE_FEED_URL" "$CONTENTS/Info.plist"
+fi
 install -m 0755 "$BIN_DIR/Tama" "$MACOS/Tama"
+SPARKLE_FRAMEWORK="$BIN_DIR/Sparkle.framework"
+if [ ! -d "$SPARKLE_FRAMEWORK" ]; then
+    printf 'Sparkle.framework is unavailable: %s\n' "$SPARKLE_FRAMEWORK" >&2
+    false
+fi
+ditto "$SPARKLE_FRAMEWORK" "$FRAMEWORKS/Sparkle.framework"
+if ! otool -l "$MACOS/Tama" | grep -q '@executable_path/../Frameworks'; then
+    install_name_tool -add_rpath '@executable_path/../Frameworks' "$MACOS/Tama"
+fi
 "$NODE_BIN" "$SCRIPT_DIR/export-catalog.mjs" "$HOOKS_ROOT" "$RESOURCES/tama-catalog.json"
 HOOK_RELEASE="$RESOURCES/hooks-release"
 mkdir -p "$HOOK_RELEASE"
@@ -286,7 +300,11 @@ TAMA_HOOK_SOURCE_REVISION="$HOOK_SOURCE_REVISION" \
 python3 "$SCRIPT_DIR/seal_hook_release.py" "$HOOK_RELEASE" >/dev/null
 install -m 0755 "$SCRIPT_DIR/emergency_disable_hooks" "$RESOURCES/emergency_disable_hooks"
 install -m 0755 "$SCRIPT_DIR/install_hook_release.py" "$RESOURCES/install_hook_release.py"
-sh "$SCRIPT_DIR/import-brand-icon.sh" tama-desktop "$RESOURCES/AppIcon.icns"
+if [ -f "$DESKTOP_ROOT/App/AppIcon.icns" ]; then
+    install -m 0644 "$DESKTOP_ROOT/App/AppIcon.icns" "$RESOURCES/AppIcon.icns"
+else
+    sh "$SCRIPT_DIR/import-brand-icon.sh" tama-desktop "$RESOURCES/AppIcon.icns"
+fi
 TAMA_BUILD_DEPENDENCIES="$DESKTOP_ROOT/Package.resolved" \
 TAMA_BUILD_HOOK_RELEASE="$HOOK_RELEASE/release.json" \
 TAMA_BUILD_CHANNEL="$BUILD_CHANNEL" \
@@ -325,6 +343,13 @@ Path(target).write_text(
     json.dumps(manifest, indent=len("  "), sort_keys=True) + "\n"
 )
 PY
+codesign \
+    --force \
+    --deep \
+    --sign "$CODESIGN_IDENTITY" \
+    --options runtime \
+    $CODESIGN_TIMESTAMP \
+    "$FRAMEWORKS/Sparkle.framework"
 if [ -n "$APP_PROVISIONING_PROFILE" ]; then
     install -m 0644 \
         "$APP_PROVISIONING_PROFILE" \
