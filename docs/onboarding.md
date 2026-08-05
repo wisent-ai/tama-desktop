@@ -53,15 +53,13 @@ No supported preview is currently published. Once a preview is marked supported 
 
 Installation does not register services or modify agent configuration.
 
-## Zero-state and sign-in
+## Sign-in and setup
 
-The first screen states Tama's purpose, supported environment, identity requirement for controls, and that setup changes are explicit. **Inspect bundled policy** opens an unauthenticated read-only catalog without recording the welcome acknowledgement, starting session monitoring, contacting Wisent Auth, or creating local enforcement state. **Continue to Wisent sign-in** acknowledges the welcome screen and opens authentication.
-After the welcome acknowledgement, later launches enter Wisent session restoration rather than opening the inspector implicitly. The inspector remains an explicit toolbar choice and uses an isolated catalog model that does not read installed-policy, backend, session, or repository state.
+Tama opens Wisent authentication directly. The read-only bundled-policy inspector remains an explicit toolbar choice and uses an isolated catalog model that does not read installed-policy, backend, session, or repository state.
 
-Enter the Wisent account email and request a one-time code, or use an enabled delegated provider. Credentials and refresh tokens are stored by Wisent Auth in the macOS Keychain. Tama does not store them in Application Support.
+Enter the Wisent account email and request a one-time code, or use an enabled delegated provider. Credentials and refresh tokens are stored by Wisent Auth in the macOS Keychain. Tama does not store them in Application Support. A successful Wisent Auth state is the sole source of authentication truth; Tama does not duplicate it in preferences.
 
-If identity is unavailable, the read-only inspector remains usable. Do not install policy through undocumented commands; all runtime, service, session-control, emergency, and repository workflows remain behind authentication and their explicit mutation boundaries.
-
+After authentication, Tama opens guided setup until `tama.hasCompletedSetup` is true. Runtime installation, privileged backend registration, macOS approvals, and live-session verification remain separate explicit actions. If identity is unavailable, the read-only inspector remains usable. All runtime, service, session-control, emergency, and repository workflows remain behind authentication and their explicit mutation boundaries.
 ## First successful workflow
 
 Starting state:
@@ -74,20 +72,22 @@ Starting state:
 
 Steps:
 
-1. Open **Overview**. Confirm the catalog status is **Valid**, the product version/source revision are displayed, and installed hooks read **Not installed by Tama**.
-2. Select **Install local runtime**. After release-integrity validation and before any managed write, Tama resolves Node from the documented locations, rejects versions older than 20, canonicalizes the executable through symlinks, and pins it into every Node-based installed hook command and the generated supervisor launcher. Each installed hook and supervised semantic dispatch preloads the sealed version guard before its target script. Tama also checks the Python installer prerequisite before launch. Review the listed target directories and confirm. Expected result: Overview displays the installed hook release ID, validated Node version and selectable canonical executable path; unrelated agent settings are preserved.
-3. Select a catalog hook and open **Session control**. Choose **Register backend**, review the macOS components, and confirm.
-4. Approve the daemon/System Extension and Network filter in macOS settings. Grant Full Disk Access only to the named Tama component when prompted.
-5. Start one supported supervised coding-agent session using its normal launcher.
-6. Return to Tama and choose **Refresh sessions**. Select the new session.
-7. Confirm:
-   - **Privileged backend: Enabled**;
-   - **System policy: Kernel-gated**;
-   - loaded and installed release prefixes match;
-   - loaded hook count equals registered hook count;
-   - no registry error or reload requirement is shown.
+1. On **Set up Tama**, confirm the bundled-policy requirement reads **Valid** and the local runtime reads **Required**.
+2. Select **Install local runtime**. After release-integrity validation and before any managed write, Tama resolves Node from the documented locations, rejects versions older than 20, canonicalizes the executable through symlinks, and pins it into every Node-based installed hook command and the generated supervisor launcher. Each installed hook and supervised semantic dispatch preloads the sealed version guard before its target script. Tama also checks the Python installer prerequisite before launch. Review the listed target directories and confirm.
+3. If managed hooks are disabled, select **Re-enable managed hooks**, review the boundary, and confirm.
+4. Select **Register privileged backend**, review the macOS components, and confirm. Approve the daemon/System Extension and Network filter in macOS settings. Grant Full Disk Access only to the named Tama component when prompted.
+5. Start or resume one supported supervised coding-agent session using its normal launcher, then select **Refresh sessions**.
+6. Confirm the setup evidence shows:
+   - bundled policy valid;
+   - local runtime installed and enabled;
+   - privileged backend enabled;
+   - installed and loaded release identities match;
+   - loaded hook count equals the nonzero registered hook count;
+   - no disabled or unknown hook IDs, registry error, pending reload, or reload requirement;
+   - system policy is **Kernel-gated**.
+7. Select **Finish setup and open Tama**. Only this successful transition records `tama.hasCompletedSetup`.
 
-That visible status is the first successful product outcome. An exit code or successful login alone is not sufficient.
+The full control interface now opens on **Overview**. That visible, matching setup evidence is the first successful product outcome. An acknowledgement, successful login, install exit code, or partial backend registration is not sufficient.
 
 ## Machine onboarding
 
@@ -126,10 +126,11 @@ Errors should say whether retry is safe and name the next action. Preserve only 
 
 ## Reset
 
-To show the welcome screen again without touching policy state:
+
+To repeat guided setup without uninstalling or changing the current enforcement state:
 
 ```bash
-defaults delete ai.wisent.tama.desktop tama.hasSeenWelcome
+defaults delete ai.wisent.tama.desktop tama.hasCompletedSetup
 ```
 
 Sign out from Tama to remove its Wisent session through the normal application flow. Stop supervised sessions before resetting or removing session overrides; never delete live control files while a supervisor can rewrite them.

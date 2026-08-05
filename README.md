@@ -53,7 +53,7 @@ An operator selects a supervised agent session and a catalog hook, reviews the e
 
 ### Recover from a blocking policy failure
 
-An operator confirms the emergency disable action. Tama pauses supervised sessions, preserves managed configuration, bypasses managed dispatchers, records the emergency state, and resumes sessions. Re-enable installs the integrity-checked bundled release and restores the managed entrypoints transactionally.
+An operator confirms the emergency disable action. Tama pauses supervised sessions, preserves managed configuration, quarantines session overrides, records the emergency state, and bypasses the already-loaded runtime immediately. Re-enable installs the integrity-checked bundled release, restores managed entrypoints transactionally, and keeps emergency state active unless the Brama-backed objective-authority preflight succeeds.
 
 ### Find repository policy violations
 
@@ -91,8 +91,7 @@ No supported binary has been published yet. The steps below are the contract for
    Expected output ends with `OK`.
 3. Expand the archive and move `Tama.app` to `~/Applications`.
 4. Install the bundled CLI entrypoint with [`examples/getting-started/install-cli.sh`](examples/getting-started/install-cli.sh), then run `tama status`. After provider adapters are configured, `tama status --runtime` additionally checks install drift in the current user's `~/.claude/settings.json` and `~/.codex/hooks.json`; `--home <path>` selects a different explicit home.
-5. Open Tama, read the welcome screen, and choose **Inspect bundled policy**. The read-only Overview must show a valid bundled catalog and `Not installed by Tama`; displaying or refreshing it does not start session monitoring or change local policy.
-6. Choose **Sign in for controls** only when a policy-changing workflow is intended, then complete Wisent sign-in.
+5. Open Tama, complete Wisent authentication, then follow **Set up Tama** through runtime installation, privileged backend approval, and matching live-session verification. The full control interface opens only after all setup evidence is satisfied.
 
 Full prerequisites, first-success steps, failure recovery, reset, and uninstall instructions are in [`docs/onboarding.md`](docs/onboarding.md).
 
