@@ -81,6 +81,35 @@ final class AppModel: ObservableObject {
             || isChangingHookState
             || isChangingSessionHook
     }
+    var setupReadySession: AgentSessionRecord? {
+        guard let installedHookReleaseID else { return nil }
+        return agentSessions.first { session in
+            guard let runtime = session.runtime, let policy = session.systemPolicy else {
+                return false
+            }
+            return runtime.installedReleaseId == installedHookReleaseID
+                && runtime.loadedReleaseId == installedHookReleaseID
+                && runtime.registryLoadError == nil
+                && !runtime.reloadRequired
+                && runtime.reloadPending != true
+                && runtime.registeredHookCount > 0
+                && runtime.loadedHookCount == runtime.registeredHookCount
+                && runtime.unknownHookIds.isEmpty
+                && !session.globallyDisabled
+                && session.disabledHookIds.isEmpty
+                && policy.ready
+                && policy.mode == "kernel-gated"
+                && policy.error == nil
+        }
+    }
+
+    var isSetupComplete: Bool {
+        snapshot?.validation.ok == true
+            && installedHookReleaseID != nil
+            && !areHooksDisabled
+            && systemPolicyServiceStatus == "Enabled"
+            && setupReadySession != nil
+    }
 
     init(
         inspectionOnly: Bool = false,

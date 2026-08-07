@@ -49,7 +49,7 @@ struct ViolationsView: View {
                 )
             )
         case .scanning:
-            VStack(spacing: Int("12")!) {
+            VStack(spacing: 12) {
                 ProgressView("Scanning \(model.repoPath)…")
                 Button("Stop scan", role: .destructive) {
                     model.cancelScan()

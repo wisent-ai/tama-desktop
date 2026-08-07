@@ -1,6 +1,24 @@
 {
-  "originHash" : "b4e66ef63dfe35ed0c07200b419a07e66d312c58d85c3809c8275d81e0531af7",
+  "originHash" : "af52673fc5a20c852550c0160821312263786b7a5c4d307de4c4770532e8b946",
   "pins" : [
+    {
+      "identity" : "echo",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/wisent-ai/echo.git",
+      "state" : {
+        "revision" : "cf8d06fef28245f31892f67cf02516f1393544f9",
+        "version" : "0.1.1"
+      }
+    },
+    {
+      "identity" : "sparkle",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/sparkle-project/Sparkle",
+      "state" : {
+        "revision" : "79bc9e872948e47877e76f194cb0c8e0412b0b90",
+        "version" : "2.9.5"
+      }
+    },
     {
       "identity" : "wisent-desktop-auth",
       "kind" : "remoteSourceControl",
@@ -8,6 +26,15 @@
       "state" : {
         "revision" : "60e9be96af903c0150e74f33add52eec47135958",
         "version" : "0.1.7"
+      }
+    },
+    {
+      "identity" : "wisent-desktop-update",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/wisent-ai/wisent-desktop-update.git",
+      "state" : {
+        "revision" : "04421211d303e48107359df4016ad23bdd1937e1",
+        "version" : "0.1.0"
       }
     }
   ],

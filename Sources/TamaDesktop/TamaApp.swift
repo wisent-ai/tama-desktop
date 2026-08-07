@@ -1,9 +1,11 @@
 import SwiftUI
 import WisentAuth
+import WisentDesktopUpdate
 
 @main
 struct TamaDesktopApp: App {
     @StateObject private var auth = WisentAuthStore(productName: "Tama")
+    @StateObject private var updater = WisentUpdater()
     @State private var isInspectingPolicy = false
 
     var body: some Scene {
@@ -30,6 +32,11 @@ struct TamaDesktopApp: App {
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
+        .commands {
+            CommandGroup(after: .appInfo) {
+                WisentCheckForUpdatesCommand(updater: updater)
+            }
+        }
     }
 
     private static var testIdentityOverride: WisentIdentity? {
