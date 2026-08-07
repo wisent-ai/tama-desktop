@@ -193,7 +193,7 @@ struct SystemPolicyServiceManager: Sendable {
         do {
             let daemon = SMAppService.daemon(plistName: Self.plistName)
             if daemon.status != .notRegistered {
-                try daemon.unregister()
+                try await daemon.unregister()
             }
         } catch {
             failures.append("Privileged daemon: \(error.localizedDescription)")

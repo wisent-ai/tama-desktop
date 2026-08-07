@@ -1,0 +1,14 @@
+name: Release Tama Desktop
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    uses: wisent-ai/wisent-desktop-update/.github/workflows/macos-sparkle-release.yml@62fabc740ac736fb3f29455a1b3c186ae46d29f2
+    secrets: inherit
