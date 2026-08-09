@@ -1,0 +1,15 @@
+[automation]
+managed = true
+source_fingerprint = "30436f04805cedbb"
+category = "agent"
+
+[banner]
+title = "Enforce coding-agent policy across Mac fleets."
+description = "Native control plane for inspecting, enforcing, recovering, and auditing local agent hooks."
+product = "Wisent"
+url = "wisent.ai"
+theme = "dark"
+layout = "orbit-left"
+art_seed = "tama-desktop"
+width = 1584
+height = 396
