@@ -10,7 +10,25 @@
 
 # Tama: Never Get Frustrated by AI Again—Block the Behaviors You Don’t Want
 
-Tama lets a Wisent operator inspect, install, and safely control the approved policy hooks that supervise local coding-agent sessions on macOS.
+Your AI Agent Made a Mistake? Tama Creates Rules So That It Never Happens Again.
+
+AI Agents are powerful but can be so frustrating. Shouting at the screen because
+your agent hardcoded credentials somewhere or used inline scripts instead of
+reusable files is not a productive use of your time. Yet you spend your days
+correcting your AI, just to see the same mistakes over and over again.
+
+Tama stops this with interactive hook management. We generate and propose new
+hooks for you, making sure AI Agents stop when they do something bad. We can also
+work proactively, scanning your codebase for previous violations and fixing
+issues with it.
+
+Want to deslopify your codebase? Or get rid of the agent handing off to you
+before it is truly done with a task? Or maybe you just hate it when it tells you
+a particular word and want to make sure you never see a response formatted like
+this?
+
+For anyone babysitting AI Agents, Tama is a cradle. Make Sure They Act Within
+Your Rules.
 
 ## Problem and intended users
 
