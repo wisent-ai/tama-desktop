@@ -13,11 +13,19 @@
       "quality": [
         {
           "name": "compile",
-          "argv": ["bash", "Release/stado-release.sh", "compile"]
+          "argv": [
+            "bash",
+            "Release/stado-release.sh",
+            "compile"
+          ]
         }
       ],
       "build": {
-        "argv": ["bash", "Release/stado-release.sh", "build"]
+        "argv": [
+          "bash",
+          "Release/stado-release.sh",
+          "build"
+        ]
       },
       "stage": {
         "release/Tama.app": "Tama.app",
@@ -45,28 +53,37 @@
     "wisent-desktop-update": {
       "uri": "stado://sources/wisent-desktop-update/sha256/1f3c919e7e15ef6736a7c9c841ca185cb487e502c0da39be68aa1aa8b487af47/source.tar.gz",
       "sha256": "1f3c919e7e15ef6736a7c9c841ca185cb487e502c0da39be68aa1aa8b487af47",
-      "mount": "wisent-desktop-update.tar.gz"
+      "mount": "wisent-desktop-update.tar.gz",
+      "extract": false
     },
     "hooks-rotator": {
       "uri": "stado://sources/hooks-rotator/sha256/415d6b9824d6fc47a7ebdc4395ed94cb18113c2553251cad50e1f9000d5ab326/source.tar.gz",
       "sha256": "415d6b9824d6fc47a7ebdc4395ed94cb18113c2553251cad50e1f9000d5ab326",
-      "mount": "hooks-rotator.tar.gz"
+      "mount": "hooks-rotator.tar.gz",
+      "extract": false
     },
     "swiftpm-cache": {
       "uri": "stado://sources/tama-swiftpm-cache/sha256/69afd7557e507caa16f64ac96a723c5daa74091bbe3417e423409634b670ada3/source.tar.gz",
       "sha256": "69afd7557e507caa16f64ac96a723c5daa74091bbe3417e423409634b670ada3",
-      "mount": "swiftpm-cache.tar.gz"
+      "mount": "swiftpm-cache.tar.gz",
+      "extract": false
     }
   },
   "promotion": {
-    "channels": ["candidate", "stable"],
+    "channels": [
+      "candidate",
+      "stable"
+    ],
     "reconcile": false
   },
   "deliveries": [
     {
       "name": "sparkle-appcast",
       "platform": "darwin-arm64",
-      "argv": ["python3", "Release/deliver-sparkle.py"],
+      "argv": [
+        "python3",
+        "Release/deliver-sparkle.py"
+      ],
       "required": true,
       "secret_env": {
         "WISENT_SPARKLE_UPLOAD_BASE_URL": "tama-desktop-sparkle#upload_base_url",
