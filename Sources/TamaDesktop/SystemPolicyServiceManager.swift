@@ -135,7 +135,12 @@ struct SystemPolicyServiceManager: Sendable {
 
     func register() async throws -> String {
         let daemon = SMAppService.daemon(plistName: Self.plistName)
-        if daemon.status == .notRegistered {
+        switch daemon.status {
+        case .notFound, .notRegistered:
+            try daemon.register()
+        case .enabled, .requiresApproval:
+            break
+        @unknown default:
             try daemon.register()
         }
         let activator = NetworkExtensionActivator()
@@ -192,7 +197,12 @@ struct SystemPolicyServiceManager: Sendable {
 
         do {
             let daemon = SMAppService.daemon(plistName: Self.plistName)
-            if daemon.status != .notRegistered {
+            switch daemon.status {
+            case .enabled, .requiresApproval:
+                try await daemon.unregister()
+            case .notFound, .notRegistered:
+                break
+            @unknown default:
                 try await daemon.unregister()
             }
         } catch {
@@ -269,7 +279,7 @@ struct SystemPolicyServiceManager: Sendable {
         case .notRegistered:
             "Not registered"
         case .notFound:
-            "Daemon not found in Tama.app"
+            "Not registered"
         @unknown default:
             "Unknown"
         }

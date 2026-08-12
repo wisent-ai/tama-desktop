@@ -4,6 +4,7 @@ struct TamaSetupView: View {
     @ObservedObject var model: AppModel
     let complete: () -> Void
 
+    @State private var isShowingAdvancedSetup = false
     @State private var isConfirmingRuntimeInstall = false
     @State private var isConfirmingBackendRegistration = false
     @State private var isConfirmingGlobalEnable = false
@@ -13,89 +14,180 @@ struct TamaSetupView: View {
         model.installedHookReleaseID != nil
     }
 
+    private var hooksEnabled: Bool {
+        runtimeInstalled && !model.areHooksDisabled
+    }
+
     private var backendReady: Bool {
         model.systemPolicyServiceStatus == "Enabled"
     }
 
+    private var bundledPolicyIsValid: Bool {
+        model.snapshot?.validation.ok == true
+    }
+
+    private var statusTitle: String {
+        if model.snapshot?.validation.ok == false {
+            return "Hooks are unavailable"
+        }
+        if model.isSetupComplete {
+            return "Hooks are on"
+        }
+        if hooksEnabled {
+            return "Hooks need attention"
+        }
+        return "Hooks are off"
+    }
+
+    private var statusMessage: String {
+        if model.snapshot?.validation.ok == false {
+            return "This copy of Tama cannot verify its policy. Install a current build."
+        }
+        if model.isSetupComplete {
+            return "Tama is protecting this Mac and the active coding-agent session."
+        }
+        if !runtimeInstalled {
+            return "Turn hooks on to install Tama protection."
+        }
+        if model.areHooksDisabled {
+            return "Protection is paused. Turn hooks on to restore it."
+        }
+        if !backendReady {
+            return "Local hooks are running. Continue setup to allow system protection."
+        }
+        if model.agentSessions.isEmpty {
+            return "System protection is ready. Open or resume a coding-agent session."
+        }
+        if !model.areAllHooksEnabledInSelectedSession {
+            return "Select an active session and enable its protection."
+        }
+        return "Waiting for the selected session to report protected status."
+    }
+
+    private var statusSymbol: String {
+        if model.snapshot?.validation.ok == false {
+            return "xmark.shield.fill"
+        }
+        if model.isSetupComplete {
+            return "checkmark.shield.fill"
+        }
+        if hooksEnabled {
+            return "exclamationmark.shield.fill"
+        }
+        return "shield.slash.fill"
+    }
+
+    private var statusColor: Color {
+        if model.snapshot?.validation.ok == false {
+            return .red
+        }
+        if model.isSetupComplete {
+            return .green
+        }
+        if hooksEnabled {
+            return .orange
+        }
+        return .secondary
+    }
+
+    private var primaryActionTitle: String {
+        if !runtimeInstalled || model.areHooksDisabled {
+            return "Turn hooks on"
+        }
+        if !backendReady {
+            return "Continue setup"
+        }
+        if model.agentSessions.isEmpty {
+            return "Check for an active session"
+        }
+        if !model.areAllHooksEnabledInSelectedSession {
+            return "Protect selected session"
+        }
+        return "Check again"
+    }
+
+
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: CGFloat(Int("16")!)) {
+            VStack(alignment: .leading, spacing: 20) {
                 header
-                runtimeStep
-                backendStep
-                sessionStep
-                completion
+                masterControl
+
+
+                DisclosureGroup(isExpanded: $isShowingAdvancedSetup) {
+                    advancedSetup
+                        .padding(.top, 12)
+                } label: {
+                    Label("Advanced setup and diagnostics", systemImage: "wrench.and.screwdriver")
+                        .font(.headline)
+                }
+                .padding(16)
+                .background(.quaternary.opacity(0.45), in: RoundedRectangle(cornerRadius: 14))
             }
-            .padding()
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
+            .padding(32)
         }
-        .navigationTitle("Set up Tama")
+        .navigationTitle("Hooks")
         .accessibilityIdentifier("tama.setup")
         .confirmationDialog(
-            "Install the local Tama runtime?",
+            "Turn hooks on?",
             isPresented: $isConfirmingRuntimeInstall,
             titleVisibility: .visible
         ) {
-            Button("Install runtime") {
+            Button("Install and continue") {
                 model.installLocalRuntime()
             }
             .disabled(model.isPolicyMutationInProgress)
             Button("Cancel", role: .cancel) {}
         } message: {
             Text(
-                "Tama will verify its bundled hook release, then update managed files "
-                    + "under Application Support and the documented per-user agent paths. "
-                    + "Existing unrelated settings are preserved."
+                "Tama will install its verified local protection files while preserving unrelated settings."
             )
         }
         .confirmationDialog(
-            "Register privileged macOS policy components?",
+            "Allow system protection?",
             isPresented: $isConfirmingBackendRegistration,
             titleVisibility: .visible
         ) {
-            Button("Register backend") {
+            Button("Continue") {
                 Task { await model.installSystemPolicyService() }
             }
             .disabled(model.isPolicyMutationInProgress)
             Button("Cancel", role: .cancel) {}
         } message: {
             Text(
-                "macOS will request approval for Tama's daemon, System Extension, "
-                    + "Network filter, and Full Disk Access where required."
+                "macOS may ask you to approve Tama and Full Disk Access. Tama uses these permissions to enforce process and network policy."
             )
         }
         .confirmationDialog(
-            "Re-enable every managed hook?",
+            "Resume Tama protection?",
             isPresented: $isConfirmingGlobalEnable,
             titleVisibility: .visible
         ) {
-            Button("Install approved release and re-enable") {
+            Button("Turn hooks on") {
                 model.setHooksDisabled(false)
             }
             .disabled(model.isPolicyMutationInProgress)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text(
-                "Tama will integrity-check and install its bundled release, restore managed "
-                    + "dispatchers, then resume supervised sessions."
-            )
+            Text("Tama will restore every managed hook dispatcher on this Mac.")
         }
         .confirmationDialog(
-            "Enable all hooks in the selected session?",
+            "Protect the selected session?",
             isPresented: $isConfirmingSessionEnable,
             titleVisibility: .visible
         ) {
-            Button("Enable all hooks and reload") {
+            Button("Enable protection") {
                 model.enableAllHooksInSelectedSession()
             }
             .disabled(model.isPolicyMutationInProgress)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text(
-                "The session override will enable every registered hook and request a runtime reload."
-            )
+            Text("Every registered Tama policy will be enabled for the selected session.")
         }
         .alert(
-            "Tama couldn’t complete setup",
+            "Tama couldn’t update protection",
             isPresented: Binding(
                 get: { model.errorMessage != nil },
                 set: { if !$0 { model.clearError() } }
@@ -110,216 +202,224 @@ struct TamaSetupView: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading) {
-            Label("Set up enforcement", systemImage: "checkmark.shield.fill")
-                .font(.largeTitle.bold())
-            Text("You are signed in. Tama will now guide each local change separately.")
+        VStack(alignment: .leading, spacing: 6) {
+            Label("Tama", systemImage: "shield.lefthalf.filled")
+                .font(.title.bold())
+            Text("Control how coding agents behave on this Mac.")
                 .font(.title3)
-            Text(
-                "Setup finishes only after the sealed runtime is installed, macOS reports "
-                    + "the privileged backend as ready, and a live agent session proves that "
-                    + "the same hook release is loaded under kernel-gated policy."
-            )
-            .foregroundStyle(.secondary)
+                .foregroundStyle(.secondary)
         }
     }
 
-    private var runtimeStep: some View {
-        SetupStep(
-            title: "Install the sealed runtime",
-            explanation: "Verifies the bundled release before writing managed hook files.",
-            symbol: "shippingbox.fill",
-            status: runtimeInstalled ? "Installed" : "Required",
-            isHealthy: runtimeInstalled
-        ) {
-            if model.isInstallingLocalRuntime {
-                ProgressView("Installing integrity-checked runtime…")
-            } else if let releaseID = model.installedHookReleaseID {
-                LabeledContent("Installed release") {
-                    Text(releaseID)
-                        .font(.caption.monospaced())
-                        .textSelection(.enabled)
-                        .lineLimit(Int("1")!)
+    private var masterControl: some View {
+        GroupBox {
+            HStack(spacing: 20) {
+                Image(systemName: statusSymbol)
+                    .font(.system(size: 34, weight: .semibold))
+                    .foregroundStyle(statusColor)
+                    .frame(width: 68, height: 68)
+                    .background(statusColor.opacity(0.12), in: Circle())
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(statusTitle)
+                        .font(.title2.bold())
+                    Text(statusMessage)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 16)
+                primaryControl
+            }
+            .padding(10)
+        }
+    }
+
+    @ViewBuilder
+    private var primaryControl: some View {
+        if model.isPolicyMutationInProgress {
+            ProgressView()
+                .controlSize(.small)
+                .accessibilityLabel("Updating Tama protection")
+        } else if model.isSetupComplete {
+            Button("Open Tama") {
+                complete()
+            }
+            .buttonStyle(TamaPrimaryButtonStyle())
+            .accessibilityIdentifier("tama.setup.finish")
+        } else if model.snapshot?.validation.ok == false {
+            Button("Check again") {
+                Task { await model.refresh() }
+            }
+            .controlSize(.large)
+        } else {
+            Button(primaryActionTitle) {
+                performPrimaryAction()
+            }
+            .buttonStyle(TamaPrimaryButtonStyle())
+            .disabled(model.snapshot == nil)
+        }
+    }
+
+
+    private var advancedSetup: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            AdvancedSetupSection(title: "Local hooks", symbol: "shippingbox.fill") {
+                SetupRequirement(
+                    title: runtimeInstalled ? "Installed" : "Not installed",
+                    satisfied: runtimeInstalled
+                )
+                if let releaseID = model.installedHookReleaseID {
+                    LabeledContent("Release") {
+                        Text(releaseID)
+                            .font(.caption.monospaced())
+                            .textSelection(.enabled)
+                    }
                 }
                 if let nodeVersion = model.installedNodeVersion {
                     LabeledContent("Node", value: nodeVersion)
                 }
-            } else if let snapshot = model.snapshot {
-                if snapshot.validation.ok {
-                    Button("Install local runtime") {
+                if runtimeInstalled, model.areHooksDisabled {
+                    Button("Turn hooks on") {
+                        isConfirmingGlobalEnable = true
+                    }
+                    .disabled(model.isPolicyMutationInProgress)
+                } else if !runtimeInstalled, bundledPolicyIsValid {
+                    Button("Install local hooks") {
                         isConfirmingRuntimeInstall = true
                     }
-                    .buttonStyle(.borderedProminent)
                     .disabled(model.isPolicyMutationInProgress)
+                }
+            }
+
+            Divider()
+
+            AdvancedSetupSection(title: "System protection", symbol: "lock.shield.fill") {
+                SetupStatusLabel(text: model.systemPolicyServiceStatus, isHealthy: backendReady)
+                if !backendReady {
+                    HStack {
+                        Button("Allow system protection") {
+                            isConfirmingBackendRegistration = true
+                        }
+                        .disabled(!runtimeInstalled || model.isPolicyMutationInProgress)
+                        Button("Approval settings") {
+                            model.openSystemPolicyApprovalSettings()
+                        }
+                        Button("Full Disk Access") {
+                            model.openFullDiskAccessSettings()
+                        }
+                        Button("Refresh") {
+                            Task { await model.refreshSystemPolicyStatus() }
+                        }
+                    }
+                }
+            }
+
+            Divider()
+
+            AdvancedSetupSection(title: "Active session", symbol: "terminal.fill") {
+                if let sessionError = model.sessionErrorMessage {
+                    Label(sessionError, systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.red)
+                        .textSelection(.enabled)
+                } else if model.agentSessions.isEmpty {
+                    Text("No supervised coding-agent session is currently reporting.")
+                        .foregroundStyle(.secondary)
                 } else {
-                    Label(
-                        "The bundled policy failed integrity validation. Reinstall Tama before continuing.",
-                        systemImage: "xmark.shield.fill"
-                    )
-                    .foregroundStyle(.red)
-                }
-            } else if model.isRefreshing {
-                ProgressView("Validating the bundled policy…")
-            }
-
-            if runtimeInstalled, model.areHooksDisabled {
-                Divider()
-                Label("Managed hooks are globally disabled.", systemImage: "exclamationmark.octagon.fill")
-                    .foregroundStyle(.red)
-                Button("Re-enable managed hooks") {
-                    isConfirmingGlobalEnable = true
-                }
-                .disabled(model.isPolicyMutationInProgress)
-            }
-        }
-    }
-
-    private var backendStep: some View {
-        SetupStep(
-            title: "Approve the privileged backend",
-            explanation: "Registers the daemon, System Extension, network filter, and required macOS approvals.",
-            symbol: "lock.shield.fill",
-            status: model.systemPolicyServiceStatus,
-            isHealthy: backendReady
-        ) {
-            if model.isRegisteringSystemPolicyService {
-                ProgressView("Registering privileged backend…")
-            } else if !backendReady {
-                Button("Register privileged backend") {
-                    isConfirmingBackendRegistration = true
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!runtimeInstalled || model.isPolicyMutationInProgress)
-                HStack {
-                    Button("Open approval settings") {
-                        model.openSystemPolicyApprovalSettings()
+                    Picker("Session", selection: $model.selectedAgentSessionID) {
+                        ForEach(model.agentSessions) { session in
+                            Text(session.displayName)
+                                .tag(Optional(session.id))
+                        }
                     }
-                    Button("Open Full Disk Access") {
-                        model.openFullDiskAccessSettings()
+                    if let session = model.selectedAgentSession {
+                        SessionSetupStatus(
+                            session: session,
+                            installedReleaseID: model.installedHookReleaseID
+                        )
                     }
-                    Button("Refresh backend status") {
-                        Task { await model.refreshSystemPolicyStatus() }
+                    if !model.areAllHooksEnabledInSelectedSession {
+                        Button("Protect selected session") {
+                            isConfirmingSessionEnable = true
+                        }
+                        .disabled(model.isPolicyMutationInProgress || model.snapshot == nil)
                     }
                 }
-            } else {
-                Label("The local policy backend is enabled.", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-            }
-        }
-    }
-
-    private var sessionStep: some View {
-        SetupStep(
-            title: "Verify one supervised session",
-            explanation: "Start or resume an agent normally, then confirm its loaded release and kernel policy.",
-            symbol: "terminal.fill",
-            status: model.setupReadySession == nil ? "Waiting" : "Verified",
-            isHealthy: model.setupReadySession != nil
-        ) {
-            if let sessionError = model.sessionErrorMessage {
-                Label(sessionError, systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.red)
-                    .textSelection(.enabled)
-            }
-
-            if model.agentSessions.isEmpty {
-                Text(
-                    "No live supervised session is reporting yet. Start or resume a supported "
-                        + "coding-agent session after the runtime and backend are ready."
-                )
-                .foregroundStyle(.secondary)
-            } else {
-                Picker("Session", selection: $model.selectedAgentSessionID) {
-                    ForEach(model.agentSessions) { session in
-                        Text(session.displayName)
-                            .tag(Optional(session.id))
-                    }
-                }
-                if let session = model.selectedAgentSession {
-                    SessionSetupStatus(
-                        session: session,
-                        installedReleaseID: model.installedHookReleaseID
-                    )
-                }
-                if !model.areAllHooksEnabledInSelectedSession {
-                    Button("Enable all hooks in selected session") {
-                        isConfirmingSessionEnable = true
-                    }
-                    .disabled(model.isPolicyMutationInProgress || model.snapshot == nil)
+                Button("Refresh sessions", systemImage: "arrow.clockwise") {
+                    Task { await model.refreshAgentSessions() }
                 }
             }
 
-            Button("Refresh sessions", systemImage: "arrow.clockwise") {
-                Task { await model.refreshAgentSessions() }
-            }
-        }
-    }
+            Divider()
 
-    private var completion: some View {
-        GroupBox("Completion") {
-            VStack(alignment: .leading) {
+            AdvancedSetupSection(title: "Readiness", symbol: "checklist") {
                 SetupRequirement(
                     title: "Bundled policy is valid",
-                    satisfied: model.snapshot?.validation.ok == true
+                    satisfied: bundledPolicyIsValid
                 )
                 SetupRequirement(
-                    title: "Local runtime is installed and enabled",
-                    satisfied: runtimeInstalled && !model.areHooksDisabled
+                    title: "Local hooks are installed and enabled",
+                    satisfied: hooksEnabled
                 )
                 SetupRequirement(
-                    title: "Privileged backend is enabled",
+                    title: "System protection is enabled",
                     satisfied: backendReady
                 )
                 SetupRequirement(
-                    title: "A matching kernel-gated session is live",
+                    title: "An active protected session is reporting",
                     satisfied: model.setupReadySession != nil
                 )
-                Divider()
-                HStack {
-                    Text(
-                        model.isSetupComplete
-                            ? "Setup evidence is complete."
-                            : "Complete every requirement before entering policy controls."
-                    )
-                    .foregroundStyle(.secondary)
-                    Spacer()
-                    Button("Finish setup and open Tama") {
-                        complete()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!model.isSetupComplete)
-                    .accessibilityIdentifier("tama.setup.finish")
-                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func performPrimaryAction() {
+        if !runtimeInstalled {
+            isConfirmingRuntimeInstall = true
+        } else if model.areHooksDisabled {
+            isConfirmingGlobalEnable = true
+        } else if !backendReady {
+            isConfirmingBackendRegistration = true
+        } else if model.agentSessions.isEmpty {
+            Task { await model.refreshAgentSessions() }
+        } else if !model.areAllHooksEnabledInSelectedSession {
+            isConfirmingSessionEnable = true
+        } else {
+            Task { await model.refreshAgentSessions() }
         }
     }
 }
 
-private struct SetupStep<Content: View>: View {
+private struct AdvancedSetupSection<Content: View>: View {
     let title: String
-    let explanation: String
     let symbol: String
-    let status: String
-    let isHealthy: Bool
     @ViewBuilder let content: Content
 
     var body: some View {
-        GroupBox {
-            VStack(alignment: .leading) {
-                HStack {
-                    Label(title, systemImage: symbol)
-                        .font(.headline)
-                    Spacer()
-                    SetupStatusLabel(text: status, isHealthy: isHealthy)
-                }
-                Text(explanation)
-                    .foregroundStyle(.secondary)
-                Divider()
-                content
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 10) {
+            Label(title, systemImage: symbol)
+                .font(.headline)
+            content
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct TamaPrimaryButtonStyle: ButtonStyle {
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 10)
+            .background(
+                Color.accentColor.opacity(
+                    isEnabled ? (configuration.isPressed ? 0.78 : 1) : 0.32
+                ),
+                in: RoundedRectangle(cornerRadius: 9)
+            )
     }
 }
 

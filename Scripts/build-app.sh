@@ -199,6 +199,9 @@ if [ -n "${WISENT_UPDATE_FEED_URL:-}" ]; then
     plutil -replace SUFeedURL -string "$WISENT_UPDATE_FEED_URL" "$CONTENTS/Info.plist"
 fi
 install -m 0755 "$BIN_DIR/Tama" "$MACOS/Tama"
+install -m 0644 \
+    "$DESKTOP_ROOT/Sources/TamaDesktop/Resources/tama-first-use.json" \
+    "$RESOURCES/tama-first-use.json"
 SPARKLE_FRAMEWORK="$BIN_DIR/Sparkle.framework"
 if [ ! -d "$SPARKLE_FRAMEWORK" ]; then
     printf 'Sparkle.framework is unavailable: %s\n' "$SPARKLE_FRAMEWORK" >&2

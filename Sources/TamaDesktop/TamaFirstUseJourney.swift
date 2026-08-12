@@ -25,7 +25,13 @@ final class TamaFirstUseJourney: ObservableObject {
     func start() async {
         guard client == nil else { return }
         do {
-            guard let url = Bundle.module.url(forResource: "tama-first-use", withExtension: "json") else {
+            guard let url = Bundle.main.url(
+                forResource: "tama-first-use",
+                withExtension: "json"
+            ) ?? Bundle.module.url(
+                forResource: "tama-first-use",
+                withExtension: "json"
+            ) else {
                 throw JourneyClientError.storage
             }
             let fallback = try JourneyRouter.makeBundle(
