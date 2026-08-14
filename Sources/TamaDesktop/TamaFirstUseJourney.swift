@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import WisentDesignSystem
 import WisentOnboarding
 
 @MainActor
@@ -165,41 +166,52 @@ struct TamaOnboardingView: View {
     @ObservedObject var journey: TamaFirstUseJourney
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            Spacer()
-            Label("Welcome to Tama", systemImage: "checkmark.shield.fill")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(.tint)
-            if let screen = journey.currentScreen {
-                Text(screen.presentation.text("title") ?? screen.titleKey)
-                    .font(.largeTitle.bold())
-                Text(screen.presentation.text("body") ?? screen.bodyKey)
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                if screen.screenKind == "promise" {
-                    GroupBox("What stays separate") {
-                        Text("Authentication identifies the operator. Setup installs and approves local enforcement. Onboarding only explains the product and leads to the first observed policy result.")
-                            .frame(maxWidth: .infinity, alignment: .leading)
+        ZStack {
+            WisentCanvasBackground()
+
+            WisentPanel(padding: WisentDesign.Space.x8) {
+                VStack(alignment: .leading, spacing: WisentDesign.Space.x6) {
+                    WisentPageHeader(
+                        eyebrow: "Policy control",
+                        title: journey.currentScreen.flatMap {
+                            $0.presentation.text("title")
+                        } ?? journey.currentScreen?.titleKey ?? "Welcome to Tama",
+                        detail: journey.currentScreen.flatMap {
+                            $0.presentation.text("body")
+                        } ?? journey.currentScreen?.bodyKey ?? "Prepare local policy enforcement for your coding agents.",
+                        symbol: "checkmark.shield.fill"
+                    )
+
+                    if journey.currentScreen?.screenKind == "promise" {
+                        TamaNotice(
+                            title: "Clear trust boundaries",
+                            detail: "Authentication identifies the operator. Setup installs and approves local enforcement. Onboarding only explains the product and leads to the first observed policy result.",
+                            symbol: "rectangle.3.group.bubble.left.fill",
+                            tone: .info
+                        )
+                    }
+
+                    Divider()
+
+                    HStack(spacing: WisentDesign.Space.x3) {
+                        Button("Skip Explanation") {
+                            Task { await journey.skipExplanation() }
+                        }
+                        .buttonStyle(WisentSecondaryButtonStyle())
+
+                        Spacer()
+
+                        Button("Continue") {
+                            Task { await journey.advance() }
+                        }
+                        .buttonStyle(WisentPrimaryButtonStyle())
+                        .keyboardShortcut(.defaultAction)
                     }
                 }
             }
-            Spacer()
-            HStack {
-                Button("Skip Explanation") {
-                    Task { await journey.skipExplanation() }
-                }
-                .buttonStyle(.plain)
-                Spacer()
-                Button("Continue") {
-                    Task { await journey.advance() }
-                }
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut(.defaultAction)
-            }
+            .frame(maxWidth: TamaLayout.setupMaximumWidth)
+            .padding(WisentDesign.Space.x8)
         }
-        .frame(maxWidth: 720, maxHeight: 540)
-        .padding(40)
         .task(id: journey.currentScreen?.screenId) {
             await journey.expose()
         }

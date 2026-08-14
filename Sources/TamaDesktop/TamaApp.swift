@@ -1,6 +1,7 @@
 import SwiftUI
 import WisentAuth
 import WisentDesktopUpdate
+import WisentDesignSystem
 
 @main
 struct TamaDesktopApp: App {
@@ -10,25 +11,32 @@ struct TamaDesktopApp: App {
 
     var body: some Scene {
         WindowGroup("Tama") {
-            if Self.testIdentityOverride != nil {
-                TamaAuthorizedControlRootView(bypassesSetup: true)
-                    .environment(\.wisentIdentity, Self.testIdentityOverride)
-            } else if isInspectingPolicy {
-                ReadOnlyRootView {
-                    isInspectingPolicy = false
-                }
-            } else {
-                WisentAuthGate(store: auth) {
-                    TamaAuthorizedControlRootView()
-                }
-                .toolbar {
-                    ToolbarItem {
-                        Button("Inspect policy without controls", systemImage: "eye") {
-                            isInspectingPolicy = true
+            Group {
+                if Self.testIdentityOverride != nil {
+                    TamaAuthorizedControlRootView(bypassesSetup: true)
+                        .environment(\.wisentIdentity, Self.testIdentityOverride)
+                } else if isInspectingPolicy {
+                    ReadOnlyRootView {
+                        isInspectingPolicy = false
+                    }
+                } else {
+                    WisentAuthGate(store: auth) {
+                        TamaAuthorizedControlRootView()
+                    }
+                    .toolbar {
+                        ToolbarItem {
+                            Button("Inspect policy without controls", systemImage: "eye") {
+                                isInspectingPolicy = true
+                            }
                         }
                     }
                 }
             }
+            .frame(
+                minWidth: TamaLayout.minimumWindowWidth,
+                minHeight: TamaLayout.minimumWindowHeight
+            )
+            .tint(WisentDesign.brand)
         }
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
@@ -71,13 +79,14 @@ private struct TamaAuthorizedControlRootView: View {
                 bypassesSetup: bypassesSetup
             )
         } else {
-            ContentUnavailableView(
-                "Policy controls unavailable",
-                systemImage: "person.badge.shield.checkmark",
-                description: Text(
-                    "A current owner, admin, or member role in the selected Wisent organization is required."
+            ZStack {
+                WisentCanvasBackground()
+                WisentEmptyState(
+                    title: "Policy controls unavailable",
+                    detail: "A current owner, admin, or member role in the selected Wisent organization is required.",
+                    symbol: "person.badge.shield.checkmark"
                 )
-            )
+            }
         }
     }
 }
@@ -105,22 +114,24 @@ private struct TamaAuthenticatedRootView: View {
                 RootView(model: model, violationsModel: violations)
                     .overlay(alignment: .bottom) {
                         if firstUseJourney.isAwaitingFirstSession {
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(firstUseJourney.currentTitle)
-                                    .font(.headline)
-                                Text(firstUseJourney.currentBody)
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                            .padding(16)
-                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
-                            .padding()
+                            TamaNotice(
+                                title: firstUseJourney.currentTitle,
+                                detail: firstUseJourney.currentBody,
+                                symbol: "terminal.fill",
+                                tone: .info
+                            )
+                            .frame(maxWidth: TamaLayout.setupMaximumWidth)
+                            .padding(WisentDesign.Space.x4)
                             .allowsHitTesting(false)
                         }
                     }
             } else if firstUseJourney.isLoading {
-                ProgressView("Loading Tama…")
-                    .controlSize(.large)
+                ZStack {
+                    WisentCanvasBackground()
+                    ProgressView("Loading Tama…")
+                        .controlSize(.large)
+                        .font(WisentTypography.bodyMedium(13))
+                }
             } else if !firstUseJourney.isAtSetup {
                 TamaOnboardingView(journey: firstUseJourney)
             } else {

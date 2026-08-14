@@ -1,4 +1,5 @@
 import SwiftUI
+import WisentDesignSystem
 
 struct ViolationReportView: View {
     let report: ViolationReport
@@ -6,54 +7,35 @@ struct ViolationReportView: View {
     @State private var isConfirmingClean = false
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                summary
-                if report.totals.violations > 0 || model.cleanState != .idle {
-                    cleanSection
-                }
-                if !report.problems.isEmpty {
-                    GroupBox("Problems") {
-                        VStack(alignment: .leading, spacing: 6) {
-                            ForEach(report.problems, id: \.error) { problem in
-                                Label(
-                                    "\([problem.owner, problem.repo].compactMap { $0 }.joined(separator: " ")): \(problem.error)",
-                                    systemImage: "exclamationmark.triangle.fill"
-                                )
-                                .foregroundStyle(.red)
-                                .textSelection(.enabled)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-                ForEach(report.repos) { repo in
-                    repoSection(repo)
-                }
+        TamaPage {
+            HStack(alignment: .firstTextBaseline) {
+                WisentSectionHeader(
+                    "Scan report",
+                    detail: "Read-only findings for the selected working tree",
+                    trailing: "\(report.totals.violations.formatted()) violations"
+                )
+                Spacer()
+                WisentBadge(
+                    report.totals.violations == 0 ? "Clean" : "Review required",
+                    symbol: report.totals.violations == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill",
+                    tone: report.totals.violations == 0 ? .success : .warning
+                )
             }
-            .padding()
+            summary
+            if report.totals.violations > 0 || model.cleanState != .idle { cleanSection }
+            if !report.problems.isEmpty { problemsSection }
+            ForEach(report.repos) { repo in repoSection(repo) }
         }
-        .alert(
-            "Clean violations with a headless agent?",
-            isPresented: $isConfirmingClean
-        ) {
-            Button("Clean violations") {
-                Task { await model.clean() }
-            }
+        .alert("Clean violations with a headless agent?", isPresented: $isConfirmingClean) {
+            Button("Clean violations") { Task { await model.clean() } }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text(
-                "A headless model agent will edit files in \(model.repoPath) to resolve the violations. "
-                    + "Tama requests working-tree edits only and rejects changed HEAD, checked-out "
-                    + "branch, or local branch refs; it does not perform commits or pushes itself. "
-                    + "The provider remains external. Review git status, branch refs, remote state, "
-                    + "and the final diff afterwards."
-            )
+            Text("A headless model agent will edit files in \(model.repoPath) to resolve the violations. Tama requests working-tree edits only and rejects changed HEAD, checked-out branch, or local branch refs; it does not perform commits or pushes itself. The provider remains external. Review git status, branch refs, remote state, and the final diff afterwards.")
         }
     }
 
     private var summary: some View {
-        GroupBox("Summary") {
+        TamaPanelSection("Summary", detail: "Scanner coverage and result totals") {
             LabeledContent("Files scanned", value: report.scannedFiles.formatted())
             Divider()
             LabeledContent("Skipped files", value: report.skippedFiles.formatted())
@@ -61,151 +43,143 @@ struct ViolationReportView: View {
             LabeledContent("Scan errors", value: report.scanErrors.formatted())
             Divider()
             LabeledContent("Total violations") {
-                Text(report.totals.violations.formatted())
-                    .foregroundStyle(report.totals.violations > 0 ? .red : .green)
+                WisentBadge(
+                    report.totals.violations.formatted(),
+                    symbol: report.totals.violations > 0 ? "exclamationmark.triangle.fill" : "checkmark.circle.fill",
+                    tone: report.totals.violations > 0 ? .danger : .success
+                )
             }
         }
     }
 
     private var cleanSection: some View {
-        GroupBox("Clean") {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    switch model.cleanState {
-                    case .idle:
-                        Text("A headless model agent can try to resolve these violations.")
-                            .foregroundStyle(.secondary)
-                    case .running:
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("Cleaning… a headless model agent is editing the working tree.")
-                            .foregroundStyle(.secondary)
-                    case .cancelling:
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("Stopping cleanup… partial edits will be preserved and rescanned.")
-                            .foregroundStyle(.secondary)
-                    case .rescanning:
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("Rescanning the working tree before reporting the result…")
-                            .foregroundStyle(.secondary)
-                    case .done:
-                        Label("Clean finished", systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                    case .failed:
-                        Label("Clean failed", systemImage: "xmark.octagon.fill")
-                            .foregroundStyle(.red)
-                    }
-                    Spacer()
-                    if model.cleanState == .running {
-                        Button("Stop cleanup", role: .destructive) {
-                            model.cancelClean()
-                        }
-                    } else if report.totals.violations > .zero {
-                        Button("Clean violations", systemImage: "wand.and.stars") {
-                            isConfirmingClean = true
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(
-                            model.cleanState == .cancelling
-                                || model.cleanState == .rescanning
-                        )
-                    }
-                }
-                if case let .done(summary) = model.cleanState {
-                    Text(summary)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                }
-                if case let .failed(message) = model.cleanState {
-                    Text(message)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                        .textSelection(.enabled)
+        TamaPanelSection("Agent-assisted cleanup", detail: "Explicit working-tree edits with a mandatory final rescan") {
+            HStack(spacing: WisentDesign.Space.x3) {
+                cleanStatus
+                Spacer()
+                if model.cleanState == .running {
+                    Button("Stop cleanup", role: .destructive) { model.cancelClean() }
+                } else if report.totals.violations > 0 {
+                    Button("Clean violations", systemImage: "wand.and.stars") { isConfirmingClean = true }
+                        .buttonStyle(WisentPrimaryButtonStyle())
+                        .disabled(model.cleanState == .cancelling || model.cleanState == .rescanning)
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            if case let .done(summary) = model.cleanState {
+                Text(summary)
+                    .font(WisentTypography.mono(10))
+                    .foregroundStyle(WisentDesign.secondary)
+                    .textSelection(.enabled)
+            }
+            if case let .failed(message) = model.cleanState {
+                TamaNotice(title: "Cleanup failed", detail: message, symbol: "xmark.octagon.fill", tone: .danger)
+                    .textSelection(.enabled)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var cleanStatus: some View {
+        switch model.cleanState {
+        case .idle:
+            Text("A headless model agent can try to resolve these violations.")
+                .font(WisentTypography.body(12))
+                .foregroundStyle(WisentDesign.secondary)
+        case .running:
+            ProgressView("Cleaning… a headless model agent is editing the working tree.")
+        case .cancelling:
+            ProgressView("Stopping cleanup… partial edits will be preserved and rescanned.")
+        case .rescanning:
+            ProgressView("Rescanning the working tree before reporting the result…")
+        case .done:
+            WisentBadge("Clean finished", symbol: "checkmark.circle.fill", tone: .success)
+        case .failed:
+            WisentBadge("Clean failed", symbol: "xmark.octagon.fill", tone: .danger)
+        }
+    }
+
+    private var problemsSection: some View {
+        TamaPanelSection("Problems", detail: "Repository-level failures reported by the scanner") {
+            ForEach(Array(report.problems.enumerated()), id: \.offset) { index, problem in
+                if index > 0 { Divider() }
+                Label(
+                    "\([problem.owner, problem.repo].compactMap { $0 }.joined(separator: " ")): \(problem.error)",
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(WisentTypography.body(12))
+                .foregroundStyle(WisentDesign.danger)
+                .textSelection(.enabled)
+            }
         }
     }
 
     private func repoSection(_ repo: ViolationRepoReport) -> some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 12) {
-                LabeledContent("Repository") {
-                    Text(repo.repo)
-                        .font(.caption.monospaced())
-                        .textSelection(.enabled)
-                }
-                LabeledContent("Enumeration", value: repo.mode)
+        TamaPanelSection(repo.repo, detail: "\(repo.mode) enumeration") {
+            LabeledContent("Repository") {
+                Text(repo.repo).font(WisentTypography.mono(10)).textSelection(.enabled)
+            }
+            LabeledContent("Enumeration", value: repo.mode)
 
-                if repo.violations.isEmpty {
-                    Label("No violations found", systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                } else {
-                    ForEach(repo.ruleGroups) { group in
-                        DisclosureGroup {
-                            VStack(alignment: .leading, spacing: 10) {
-                                ForEach(group.violations) { violation in
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(violation.path)
-                                            .font(.body.monospaced())
-                                            .textSelection(.enabled)
-                                        Text(violation.message)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                            .textSelection(.enabled)
-                                    }
+            if repo.violations.isEmpty {
+                WisentBadge("No violations found", symbol: "checkmark.circle.fill", tone: .success)
+            } else {
+                Divider()
+                ForEach(repo.ruleGroups) { group in
+                    DisclosureGroup {
+                        VStack(alignment: .leading, spacing: WisentDesign.Space.x3) {
+                            ForEach(group.violations) { violation in
+                                VStack(alignment: .leading, spacing: WisentDesign.Space.x1) {
+                                    Text(violation.path)
+                                        .font(WisentTypography.monoMedium(11))
+                                        .foregroundStyle(WisentDesign.ink)
+                                        .textSelection(.enabled)
+                                    Text(violation.message)
+                                        .font(WisentTypography.body(12))
+                                        .foregroundStyle(WisentDesign.secondary)
+                                        .textSelection(.enabled)
                                 }
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 4)
-                        } label: {
-                            HStack {
-                                Text(group.rule)
-                                    .font(.headline)
-                                    .lineLimit(1)
-                                Spacer()
-                                Text("\(group.violations.count.formatted()) hit(s)")
-                                    .font(.caption)
-                                    .foregroundStyle(.orange)
-                            }
                         }
-                    }
-                }
-
-                if !repo.errors.isEmpty {
-                    DisclosureGroup("Scan errors (\(repo.errors.count.formatted()))") {
-                        VStack(alignment: .leading, spacing: 6) {
-                            ForEach(repo.errors, id: \.path) { error in
-                                Text("\(error.path) — \(error.message)")
-                                    .font(.caption)
-                                    .foregroundStyle(.red)
-                                    .textSelection(.enabled)
-                            }
+                        .padding(.vertical, WisentDesign.Space.x2)
+                    } label: {
+                        HStack {
+                            Text(group.rule).font(WisentTypography.bodyMedium(13)).lineLimit(1)
+                            Spacer()
+                            WisentBadge("\(group.violations.count.formatted()) hits", tone: .warning)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 4)
-                    }
-                }
-
-                if !repo.skippedFiles.isEmpty {
-                    DisclosureGroup("Skipped files (\(repo.skippedFiles.count.formatted()))") {
-                        VStack(alignment: .leading, spacing: 6) {
-                            ForEach(repo.skippedFiles, id: \.path) { skipped in
-                                Text("\(skipped.path) — \(skipped.reason)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                    .textSelection(.enabled)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 4)
                     }
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if !repo.errors.isEmpty {
+                Divider()
+                DisclosureGroup("Scan errors (\(repo.errors.count.formatted()))") {
+                    VStack(alignment: .leading, spacing: WisentDesign.Space.x2) {
+                        ForEach(repo.errors, id: \.path) { error in
+                            Text("\(error.path) — \(error.message)")
+                                .font(WisentTypography.body(11))
+                                .foregroundStyle(WisentDesign.danger)
+                                .textSelection(.enabled)
+                        }
+                    }
+                    .padding(.vertical, WisentDesign.Space.x2)
+                }
+            }
+
+            if !repo.skippedFiles.isEmpty {
+                Divider()
+                DisclosureGroup("Skipped files (\(repo.skippedFiles.count.formatted()))") {
+                    VStack(alignment: .leading, spacing: WisentDesign.Space.x2) {
+                        ForEach(repo.skippedFiles, id: \.path) { skipped in
+                            Text("\(skipped.path) — \(skipped.reason)")
+                                .font(WisentTypography.body(11))
+                                .foregroundStyle(WisentDesign.secondary)
+                                .textSelection(.enabled)
+                        }
+                    }
+                    .padding(.vertical, WisentDesign.Space.x2)
+                }
+            }
         }
     }
 }

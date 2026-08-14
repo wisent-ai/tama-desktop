@@ -1,4 +1,5 @@
 import SwiftUI
+import WisentDesignSystem
 
 struct JustificationsView: View {
     let collections: [JustificationCollection]
@@ -16,12 +17,9 @@ struct JustificationsView: View {
         guard let collection = selectedCollection else { return [] }
         return collection.entries.filter { entry in
             let matchesFilter = switch filter {
-            case .all:
-                true
-            case .valid:
-                isValid(entry, requirement: collection.requirement)
-            case .issues:
-                !isValid(entry, requirement: collection.requirement)
+            case .all: true
+            case .valid: isValid(entry, requirement: collection.requirement)
+            case .issues: !isValid(entry, requirement: collection.requirement)
             }
             guard matchesFilter else { return false }
             guard !searchText.isEmpty else { return true }
@@ -37,197 +35,183 @@ struct JustificationsView: View {
     }
 
     var body: some View {
-        if collections.isEmpty {
-            ContentUnavailableView(
-                "No justification hooks",
-                systemImage: "text.badge.checkmark",
-                description: Text("The catalog has no requires_justification hook definitions.")
-            )
-        } else {
-            VStack(spacing: 0) {
-                registryPicker
-                Divider()
-                if let collection = selectedCollection, let loadError = collection.loadError {
-                    ContentUnavailableView(
-                        "Registry unavailable",
-                        systemImage: "exclamationmark.triangle",
-                        description: Text(loadError)
-                    )
-                } else {
-                    HSplitView {
-                        entryList
-                            .frame(minWidth: 360, idealWidth: 460)
-                        if let collection = selectedCollection, let entry = selectedEntry {
-                            entryDetail(entry, requirement: collection.requirement)
+        ZStack {
+            WisentCanvasBackground()
+            if collections.isEmpty {
+                WisentEmptyState(
+                    title: "No justification hooks",
+                    detail: "The catalog has no requires_justification hook definitions.",
+                    symbol: "text.badge.checkmark"
+                )
+            } else {
+                VStack(spacing: 0) {
+                    registryPicker
+                    Divider()
+                    if let collection = selectedCollection, let loadError = collection.loadError {
+                        WisentEmptyState(title: "Registry unavailable", detail: loadError, symbol: "exclamationmark.triangle")
+                    } else {
+                        HSplitView {
+                            entryList
+                                .frame(minWidth: TamaLayout.justificationListMinimumWidth, idealWidth: TamaLayout.justificationListIdealWidth)
+                            if let collection = selectedCollection, let entry = selectedEntry {
+                                entryDetail(entry, requirement: collection.requirement)
+                                    .frame(maxWidth: .infinity)
+                            } else {
+                                WisentEmptyState(
+                                    title: "Select a justification",
+                                    detail: "Choose a registry record to inspect its contract and evidence.",
+                                    symbol: "text.badge.checkmark"
+                                )
                                 .frame(maxWidth: .infinity)
-                        } else {
-                            ContentUnavailableView(
-                                "Select a justification",
-                                systemImage: "text.badge.checkmark"
-                            )
-                            .frame(maxWidth: .infinity)
+                            }
                         }
                     }
                 }
             }
-            .onAppear {
-                selectInitialCollection()
-            }
-            .onChange(of: selectedCollectionID) {
-                selectedEntryID = filteredEntries.first?.id
-            }
         }
+        .onAppear { selectInitialCollection() }
+        .onChange(of: selectedCollectionID) { selectedEntryID = filteredEntries.first?.id }
     }
 
     private var registryPicker: some View {
-        HStack(spacing: 12) {
-            Picker("Registry", selection: $selectedCollectionID) {
-                ForEach(collections) { collection in
-                    Text(collection.requirement.title).tag(collection.id)
+        HStack(spacing: WisentDesign.Space.x3) {
+            VStack(alignment: .leading, spacing: WisentDesign.Space.x1) {
+                Text("JUSTIFICATION REGISTRY")
+                    .font(WisentTypography.monoSemibold(10))
+                    .tracking(0.6)
+                    .foregroundStyle(WisentDesign.muted)
+                Picker("Registry", selection: $selectedCollectionID) {
+                    ForEach(collections) { collection in
+                        Text(collection.requirement.title).tag(collection.id)
+                    }
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .frame(maxWidth: TamaLayout.registryPickerMaximumWidth)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(maxWidth: 420)
-
             if let collection = selectedCollection {
                 Text(collection.requirement.registryPath)
-                    .font(.caption.monospaced())
-                    .foregroundStyle(.secondary)
+                    .font(WisentTypography.mono(10))
+                    .foregroundStyle(WisentDesign.secondary)
                     .textSelection(.enabled)
                 Spacer()
-                Text("\(collection.entries.count.formatted()) entries")
-                    .foregroundStyle(.secondary)
+                WisentBadge("\(collection.entries.count.formatted()) entries", symbol: "text.badge.checkmark", tone: .info)
             }
         }
-        .padding()
+        .padding(WisentDesign.Space.x4)
+        .background(WisentDesign.surface)
     }
 
     private var entryList: some View {
         VStack(spacing: 0) {
             Picker("Status", selection: $filter) {
-                ForEach(JustificationFilter.allCases) { item in
-                    Text(item.rawValue).tag(item)
-                }
+                ForEach(JustificationFilter.allCases) { item in Text(item.rawValue).tag(item) }
             }
             .pickerStyle(.segmented)
-            .padding()
-
+            .padding(WisentDesign.Space.x4)
             Divider()
-
             List(filteredEntries, selection: $selectedEntryID) { entry in
-                VStack(alignment: .leading, spacing: 5) {
+                VStack(alignment: .leading, spacing: WisentDesign.Space.x1) {
                     Text(URL(fileURLWithPath: entry.registryKey).lastPathComponent)
-                        .font(.headline)
+                        .font(WisentTypography.bodyMedium(13))
+                        .foregroundStyle(WisentDesign.ink)
                     Text(entry.registryKey)
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
+                        .font(WisentTypography.mono(10))
+                        .foregroundStyle(WisentDesign.secondary)
                         .lineLimit(2)
                     if let collection = selectedCollection {
-                        JustificationStatusBadge(
-                            entry: entry,
-                            requirement: collection.requirement
-                        )
+                        JustificationStatusBadge(entry: entry, requirement: collection.requirement)
                     }
                 }
-                .padding(.vertical, 4)
+                .padding(.vertical, WisentDesign.Space.x1)
                 .tag(entry.id)
             }
             .searchable(text: $searchText, prompt: "Path or justification")
             .overlay {
                 if filteredEntries.isEmpty {
-                    ContentUnavailableView.search(text: searchText)
+                    WisentEmptyState(
+                        title: "No matching justifications",
+                        detail: searchText.isEmpty ? "Adjust the status filter to show registry records." : "No path or justification matches “\(searchText)”.",
+                        symbol: "line.3.horizontal.decrease.circle"
+                    )
                 }
             }
         }
+        .background(WisentDesign.canvasMuted)
     }
 
-    private func entryDetail(
-        _ entry: JustificationEntry,
-        requirement: JustificationRequirement
-    ) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(alignment: .firstTextBaseline) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(URL(fileURLWithPath: entry.registryKey).lastPathComponent)
-                            .font(.title2.bold())
-                        Text(requirement.title)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    JustificationStatusBadge(entry: entry, requirement: requirement)
-                }
+    private func entryDetail(_ entry: JustificationEntry, requirement: JustificationRequirement) -> some View {
+        TamaPage {
+            HStack(alignment: .top, spacing: WisentDesign.Space.x4) {
+                WisentPageHeader(
+                    eyebrow: requirement.title,
+                    title: URL(fileURLWithPath: entry.registryKey).lastPathComponent,
+                    detail: "Recorded evidence for a policy exception or explicitly justified operation.",
+                    symbol: "text.badge.checkmark",
+                    tone: isValid(entry, requirement: requirement) ? .success : .warning
+                )
+                Spacer()
+                JustificationStatusBadge(entry: entry, requirement: requirement)
+            }
 
-                GroupBox("Contract") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        LabeledContent("Hook type", value: "requires_justification")
-                        Divider()
-                        LabeledContent("Kind", value: requirement.kind)
-                        Divider()
-                        LabeledContent("Field", value: requirement.field)
-                        if let directUserQuoteField = requirement.directUserQuoteField {
-                            Divider()
-                            LabeledContent("Direct user quote field", value: directUserQuoteField)
-                        }
-                        Divider()
-                        LabeledContent("Words") {
-                            Text("\(entry.wordCount) / \(requirement.minimumWords) minimum")
-                                .monospacedDigit()
-                        }
-                        Divider()
-                        LabeledContent("Target file") {
-                            Text(entry.targetExists ? "Present" : "Missing")
-                                .foregroundStyle(entry.targetExists ? .green : .red)
-                        }
-                        if let expiresAt = entry.expiresAt {
-                            Divider()
-                            LabeledContent("Expires") {
-                                Text(expiresAt, format: .dateTime.year().month().day().hour().minute())
-                                    .foregroundStyle(entry.isExpired ? .red : .primary)
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            TamaPanelSection("Contract", detail: "Requirements enforced by this registry") {
+                LabeledContent("Hook type", value: "requires_justification")
+                Divider()
+                LabeledContent("Kind", value: requirement.kind)
+                Divider()
+                LabeledContent("Field", value: requirement.field)
+                if let directUserQuoteField = requirement.directUserQuoteField {
+                    Divider()
+                    LabeledContent("Direct user quote field", value: directUserQuoteField)
                 }
-
-                GroupBox("Path") {
-                    Text(entry.registryKey)
-                        .font(.body.monospaced())
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                Divider()
+                LabeledContent("Words") {
+                    Text("\(entry.wordCount) / \(requirement.minimumWords) minimum")
+                        .font(WisentTypography.monoMedium(11))
                 }
-
-                GroupBox("Justification") {
-                    Text(entry.justification.isEmpty ? "No value recorded for \(requirement.field)." : entry.justification)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                Divider()
+                LabeledContent("Target file") {
+                    WisentBadge(entry.targetExists ? "Present" : "Missing", symbol: entry.targetExists ? "checkmark.circle.fill" : "doc.badge.ellipsis", tone: entry.targetExists ? .success : .danger)
                 }
-                if let quoteField = requirement.directUserQuoteField {
-                    GroupBox("Direct user request") {
-                        Text(recordedUserQuote(entry) ?? "No value recorded for \(quoteField).")
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                if let expiresAt = entry.expiresAt {
+                    Divider()
+                    LabeledContent("Expires") {
+                        Text(expiresAt, format: .dateTime.year().month().day().hour().minute())
+                            .foregroundStyle(entry.isExpired ? WisentDesign.danger : WisentDesign.ink)
                     }
                 }
             }
-            .padding()
+
+            TamaPanelSection("Path") {
+                Text(entry.registryKey)
+                    .font(WisentTypography.mono(12))
+                    .textSelection(.enabled)
+            }
+
+            TamaPanelSection("Justification") {
+                Text(entry.justification.isEmpty ? "No value recorded for \(requirement.field)." : entry.justification)
+                    .font(WisentTypography.body(13))
+                    .foregroundStyle(WisentDesign.secondary)
+                    .textSelection(.enabled)
+            }
+
+            if let quoteField = requirement.directUserQuoteField {
+                TamaPanelSection("Direct user request") {
+                    Text(recordedUserQuote(entry) ?? "No value recorded for \(quoteField).")
+                        .font(WisentTypography.body(13))
+                        .foregroundStyle(WisentDesign.secondary)
+                        .textSelection(.enabled)
+                }
+            }
         }
     }
 
     private func selectInitialCollection() {
-        if selectedCollectionID.isEmpty {
-            selectedCollectionID = collections.first?.id ?? ""
-        }
-        if selectedEntryID == nil {
-            selectedEntryID = filteredEntries.first?.id
-        }
+        if selectedCollectionID.isEmpty { selectedCollectionID = collections.first?.id ?? "" }
+        if selectedEntryID == nil { selectedEntryID = filteredEntries.first?.id }
     }
 
-    private func isValid(
-        _ entry: JustificationEntry,
-        requirement: JustificationRequirement
-    ) -> Bool {
+    private func isValid(_ entry: JustificationEntry, requirement: JustificationRequirement) -> Bool {
         entry.targetExists
             && !entry.isExpired
             && entry.wordCount >= requirement.minimumWords
@@ -244,18 +228,11 @@ private enum JustificationFilter: String, CaseIterable, Identifiable {
 }
 
 private func recordedUserQuote(_ entry: JustificationEntry) -> String? {
-    guard let quote = entry.directUserQuote,
-          quote.contains(where: { !$0.isWhitespace })
-    else {
-        return nil
-    }
+    guard let quote = entry.directUserQuote, quote.contains(where: { !$0.isWhitespace }) else { return nil }
     return quote
 }
 
-private func hasRequiredDirectUserQuote(
-    _ entry: JustificationEntry,
-    requirement: JustificationRequirement
-) -> Bool {
+private func hasRequiredDirectUserQuote(_ entry: JustificationEntry, requirement: JustificationRequirement) -> Bool {
     guard requirement.directUserQuoteField != nil else { return true }
     guard let quote = recordedUserQuote(entry) else { return false }
     return entry.justification.contains(quote)
@@ -265,31 +242,19 @@ private struct JustificationStatusBadge: View {
     let entry: JustificationEntry
     let requirement: JustificationRequirement
 
-    private var presentation: (text: String, symbol: String, color: Color) {
-        if !entry.targetExists {
-            return ("Missing file", "doc.badge.ellipsis", .red)
-        }
-        if entry.isExpired {
-            return ("Expired", "calendar.badge.exclamationmark", .red)
-        }
+    private var presentation: (text: String, symbol: String, tone: WisentTone) {
+        if !entry.targetExists { return ("Missing file", "doc.badge.ellipsis", .danger) }
+        if entry.isExpired { return ("Expired", "calendar.badge.exclamationmark", .danger) }
         if requirement.directUserQuoteField != nil {
-            guard let quote = recordedUserQuote(entry) else {
-                return ("Missing user quote", "quote.bubble.fill", .red)
-            }
-            if !entry.justification.contains(quote) {
-                return ("Quote not embedded", "quote.bubble.fill", .red)
-            }
+            guard let quote = recordedUserQuote(entry) else { return ("Missing user quote", "quote.bubble.fill", .danger) }
+            if !entry.justification.contains(quote) { return ("Quote not embedded", "quote.bubble.fill", .danger) }
         }
-        if entry.wordCount < requirement.minimumWords {
-            return ("Too short", "text.badge.exclamationmark", .orange)
-        }
-        return ("Valid", "checkmark.seal.fill", .green)
+        if entry.wordCount < requirement.minimumWords { return ("Too short", "text.badge.exclamationmark", .warning) }
+        return ("Valid", "checkmark.seal.fill", .success)
     }
 
     var body: some View {
-        Label(presentation.text, systemImage: presentation.symbol)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(presentation.color)
+        WisentBadge(presentation.text, symbol: presentation.symbol, tone: presentation.tone)
             .accessibilityLabel("Justification status: \(presentation.text)")
     }
 }

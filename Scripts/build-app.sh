@@ -208,6 +208,10 @@ if [ ! -d "$SPARKLE_FRAMEWORK" ]; then
     false
 fi
 ditto "$SPARKLE_FRAMEWORK" "$FRAMEWORKS/Sparkle.framework"
+for resource_bundle in "$BIN_DIR"/*.bundle; do
+    [ -d "$resource_bundle" ] || continue
+    ditto "$resource_bundle" "$RESOURCES/$(basename "$resource_bundle")"
+done
 if ! otool -l "$MACOS/Tama" | grep -q '@executable_path/../Frameworks'; then
     install_name_tool -add_rpath '@executable_path/../Frameworks' "$MACOS/Tama"
 fi
