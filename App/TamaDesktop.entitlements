@@ -8,5 +8,9 @@
     <array>
         <string>content-filter-provider-systemextension</string>
     </array>
+    <key>keychain-access-groups</key>
+    <array>
+        <string>LNTWB5B9DV.ai.wisent.identity</string>
+    </array>
 </dict>
 </plist>
