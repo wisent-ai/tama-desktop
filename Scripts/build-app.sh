@@ -357,6 +357,15 @@ codesign \
     --options runtime \
     $CODESIGN_TIMESTAMP \
     "$FRAMEWORKS/Sparkle.framework"
+IDENTITY_HELPER="$CONTENTS/Helpers/WisentIdentityKeychainHelper"
+"$DESKTOP_ROOT/.build/checkouts/wisent-desktop-auth/scripts/build-keychain-helper.sh" "$IDENTITY_HELPER"
+codesign \
+    --force \
+    --sign "$CODESIGN_IDENTITY" \
+    --options runtime \
+    $CODESIGN_TIMESTAMP \
+    --identifier ai.wisent.identity.keychain-helper \
+    "$IDENTITY_HELPER"
 if [ -n "$APP_PROVISIONING_PROFILE" ]; then
     install -m 0644 \
         "$APP_PROVISIONING_PROFILE" \
