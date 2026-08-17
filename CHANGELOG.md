@@ -11,6 +11,9 @@ All user-visible changes follow the categories required by `docs/releases.md`. A
 - Desktop build provenance and immutable release packaging contract.
 - Public Tama CLI for portable catalog status, opt-in local runtime-drift checks, namespaced hook operations with atomic registry resealing, provider-declared coverage, Git dispatcher installation, repository workflows, adaptive recovery, and MCP configuration.
 - Runnable `examples/` shell commands with inline risk, required-input, side-effect, and rollback comments; CLI link installation is retry-safe, and prose runbooks plus the Markdown coverage matrix were removed.
+- Session destination that renders the capability a supervised session holds — lifetime, expiry, remaining uses and every tool grant — together with the register of semantic decisions that session published.
+- Coverage destination for registry-declared provider coverage, and an Install plan destination that states each scope's target paths, the exact commands that write them, and the MCP server snippet.
+- Settings destination that names the operations deliberately left to the `tama` CLI, each with the command and the reason it stays there.
 
 ### Changed
 
@@ -26,6 +29,9 @@ All user-visible changes follow the categories required by `docs/releases.md`. A
 - Product and hook-release identities are displayed separately.
 - OMP session-control reload actions use the documented v2 identity, persist checksum-bound hook state, and schedule one native runtime reload after the active agent turn settles; the desktop waits for the matching authoritative response and distinguishes a scheduled reload from a stale or failed runtime.
 - Per-session controls now expose only policy-permitted enable operations and wait for the live supervisor response; the desktop no longer offers or optimistically reports prohibited hook disablement.
+- The interface is organized by operator decision rather than by data container: a grouped sidebar of eight destinations, a 44 pt context bar on every screen instead of a hero header, three-zone data screens with counted facet rails and inspectors, and the repository under repair selected once in the sidebar header.
+- Disabling every managed hook, repairing violations with a headless agent, and deactivating local enforcement now open a decision dialog that quotes the exact effect, lists what it touches, and keeps the safe verb as the primary button.
+- Mutations report the backend's own sentence in place on the screen that started them, instead of a modal alert that closes without a trace.
 
 ### Fixed
 
@@ -54,6 +60,10 @@ All user-visible changes follow the categories required by `docs/releases.md`. A
 - Violations command output is retained within explicit bounds and output-limit failures remain visible.
 - Cleanup rejects changed HEAD, checked-out branch, or local branch refs and states the remaining external-provider verification boundary.
 - Backend status exposes partial installation, and deactivation attempts every privileged component while preserving aggregate failure and restart-required recovery.
+- Backend unavailability is reported as a full-width panel carrying the backend's literal sentence and a reproducing command, rather than a dismissable alert or a swallowed read; the catalog, session control, provider coverage, install plan and repository scan each name their own command.
+- The session capability document was decoded from every session record and displayed nowhere.
+- A privileged backend that is merely not registered, a provider with no declared mapping, and a justification whose evidence is incomplete are no longer coloured as failures.
+- A refresh that fails keeps the previous read on screen instead of replacing it with an empty state.
 
 ### Removed or deprecated
 

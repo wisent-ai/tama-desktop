@@ -1,8 +1,8 @@
-import Darwin
 import AppKit
 import Combine
 import Foundation
 import WisentAuth
+import WisentDesignSystem
 
 struct ControlAuthorization: Sendable {
     private static let acceptedRoles: Set<String> = [
@@ -22,24 +22,26 @@ struct ControlAuthorization: Sendable {
 final class AppModel: ObservableObject {
     @Published private(set) var snapshot: CatalogSnapshot?
     @Published private(set) var isRefreshing = false
-    @Published private(set) var errorMessage: String?
-    @Published var selection: SidebarSelection? = .overview
-    @Published var selectedHookID: HookRecord.ID?
-    @Published var searchText = ""
-    @Published var hookFilter: HookFilter = .all
+    @Published private(set) var refreshedAt: Date?
+
+    /// Two failures, never merged into one field again.
+    ///
+    /// The baseline used a single `errorMessage` for the catalog read and for
+    /// every mutation, so a failed write erased a failed read and both arrived
+    /// as the same modal alert. A catalog that will not load is the screen's
+    /// subject; a write that was refused is an outcome of something the
+    /// operator just did.
+    @Published private(set) var catalogError: String?
+    @Published private(set) var mutation: WisentMutationOutcome = .idle
+    @Published private(set) var sessionError: String?
+
     @Published private(set) var areHooksDisabled = false
-    @Published private(set) var isChangingHookState = false
     @Published private(set) var installedHookReleaseID: String?
     @Published private(set) var installedNodeExecutable: String?
     @Published private(set) var installedNodeVersion: String?
     @Published private(set) var agentSessions: [AgentSessionRecord] = []
     @Published var selectedAgentSessionID: AgentSessionRecord.ID?
-    @Published private(set) var isChangingSessionHook = false
     @Published private(set) var systemPolicyServiceStatus = "Not registered"
-    @Published private(set) var isInstallingLocalRuntime = false
-    @Published private(set) var isRegisteringSystemPolicyService = false
-    @Published private(set) var isDeactivatingLocalSetup = false
-    @Published private(set) var sessionErrorMessage: String?
 
     private let client = HookCatalogClient()
     private let emergencySwitch = HookEmergencySwitch()
@@ -48,39 +50,10 @@ final class AppModel: ObservableObject {
     private var isControlMonitoring = false
     private var sessionPollingTask: Task<Void, Never>?
 
-    var filteredHooks: [HookRecord] {
-        guard let hooks = snapshot?.catalog.hooks else { return [] }
-        return hooks.filter { hook in
-            let matchesFilter = switch hookFilter {
-            case .all: true
-            case .blocking: hook.isBlocking
-            case .nonblocking: !hook.isBlocking
-            }
-            guard matchesFilter else { return false }
-            guard !searchText.isEmpty else { return true }
-            return hook.id.localizedStandardContains(searchText)
-                || hook.category.localizedStandardContains(searchText)
-                || hook.eventNames.localizedStandardContains(searchText)
-                || (hook.description?.localizedStandardContains(searchText) ?? false)
-        }
-    }
+    var hooks: [HookRecord] { snapshot?.catalog.hooks ?? [] }
 
-    var selectedHook: HookRecord? {
-        guard let selectedHookID else { return filteredHooks.first }
-        return snapshot?.catalog.hooks.first(where: { $0.id == selectedHookID })
-    }
+    var isPolicyMutationInProgress: Bool { mutation.isWorking }
 
-    var isLocalSetupOperationInProgress: Bool {
-        isInstallingLocalRuntime
-            || isRegisteringSystemPolicyService
-            || isDeactivatingLocalSetup
-    }
-
-    var isPolicyMutationInProgress: Bool {
-        isLocalSetupOperationInProgress
-            || isChangingHookState
-            || isChangingSessionHook
-    }
     var setupReadySession: AgentSessionRecord? {
         guard let installedHookReleaseID else { return nil }
         return agentSessions.first { session in
@@ -111,6 +84,27 @@ final class AppModel: ObservableObject {
             && setupReadySession != nil
     }
 
+    /// The question the baseline could not answer: why did my agent stop.
+    ///
+    /// `semanticRuntime.recentEvents` carries the decision, the hook that made
+    /// it and the reason string, and the whole list was being reduced to one
+    /// "Last event" label. The most recent blocking decision across live
+    /// sessions is the headline of Posture.
+    var lastBlockingDecision: (session: AgentSessionRecord, event: SemanticEventSummary)? {
+        agentSessions
+            .compactMap { session -> (AgentSessionRecord, SemanticEventSummary)? in
+                guard
+                    let blocked = session.semanticRuntime?.recentEvents
+                        .last(where: { $0.decision != "allow" })
+                else {
+                    return nil
+                }
+                return (session, blocked)
+            }
+            .max { left, right in left.1.timestamp < right.1.timestamp }
+            .map { (session: $0.0, event: $0.1) }
+    }
+
     init(
         inspectionOnly: Bool = false,
         authorization: ControlAuthorization? = nil
@@ -119,9 +113,12 @@ final class AppModel: ObservableObject {
         allowsControlAccess = authorization != nil
         Task { await refresh() }
     }
+
     deinit {
         sessionPollingTask?.cancel()
     }
+
+    var allowsControl: Bool { allowsControlAccess }
 
     func startControlMonitoring() {
         guard allowsControlAccess, sessionPollingTask == nil else { return }
@@ -142,7 +139,7 @@ final class AppModel: ObservableObject {
         sessionPollingTask = nil
         agentSessions = []
         selectedAgentSessionID = nil
-        sessionErrorMessage = nil
+        sessionError = nil
         systemPolicyServiceStatus = "Not registered"
         areHooksDisabled = false
         installedHookReleaseID = nil
@@ -150,12 +147,24 @@ final class AppModel: ObservableObject {
         installedNodeVersion = nil
     }
 
-    private func refreshLocalPolicyState() {
-        let installedRuntime = emergencySwitch.installedRuntime
-        areHooksDisabled = emergencySwitch.isDisabled
-        installedHookReleaseID = installedRuntime?.releaseID
-        installedNodeExecutable = installedRuntime?.nodeExecutable
-        installedNodeVersion = installedRuntime?.nodeVersion
+    func refresh() async {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        do {
+            let loadsLocalJustifications = loadsLocalJustifications
+            snapshot = try await Task.detached(priority: .userInitiated) {
+                try HookCatalogClient().load(
+                    includeLocalJustifications: loadsLocalJustifications
+                )
+            }.value
+            catalogError = nil
+            refreshedAt = Date()
+        } catch {
+            // The previous snapshot is deliberately kept: a failed re-read
+            // banners itself above the catalog the operator was reading.
+            catalogError = Self.sentence(error)
+        }
+        isRefreshing = false
     }
 
     func refreshSystemPolicyStatus() async {
@@ -164,54 +173,83 @@ final class AppModel: ObservableObject {
         systemPolicyServiceStatus = status
     }
 
-    func installLocalRuntime() {
-        guard allowsControlAccess, !isPolicyMutationInProgress else { return }
-        isInstallingLocalRuntime = true
-        Task {
-            defer { isInstallingLocalRuntime = false }
-            do {
-                try await Task.detached(priority: .userInitiated) {
-                    try HookEmergencySwitch().installSessionController()
-                }.value
-                refreshLocalPolicyState()
-                errorMessage = nil
-                await refreshAgentSessions()
-            } catch {
-                errorMessage = (error as? LocalizedError)?.errorDescription
-                    ?? error.localizedDescription
+    func refreshAgentSessions() async {
+        guard isControlMonitoring else { return }
+        do {
+            let loaded = try await Task.detached(priority: .utility) {
+                try SessionControlClient().liveSessions()
+            }.value
+            guard isControlMonitoring else { return }
+            agentSessions = loaded
+            sessionError = nil
+            if !loaded.contains(where: { $0.id == selectedAgentSessionID }) {
+                selectedAgentSessionID = loaded.first?.id
             }
+        } catch {
+            guard isControlMonitoring else { return }
+            agentSessions = []
+            selectedAgentSessionID = nil
+            sessionError = Self.sentence(error)
         }
     }
 
-    func installSystemPolicyService() async {
-        guard allowsControlAccess, !isPolicyMutationInProgress else { return }
-        isRegisteringSystemPolicyService = true
-        defer { isRegisteringSystemPolicyService = false }
-        do {
-            systemPolicyServiceStatus = try await SystemPolicyServiceManager().register()
-        } catch {
-            systemPolicyServiceStatus = "Registration failed: \(error.localizedDescription)"
+    // MARK: - Local setup
+
+    func installLocalRuntime() {
+        mutate("Installing the integrity-checked hook runtime…") {
+            try await Task.detached(priority: .userInitiated) {
+                try HookEmergencySwitch().installSessionController()
+            }.value
+            self.refreshLocalPolicyState()
+            await self.refreshAgentSessions()
+            return "Installed hook release \(self.installedHookReleaseID ?? "unknown")."
+        } recover: {
+            self.refreshLocalPolicyState()
+        }
+    }
+
+    func installSystemPolicyService() {
+        mutate("Registering the privileged macOS policy backend…") {
+            let status = try await SystemPolicyServiceManager().register()
+            self.systemPolicyServiceStatus = status
+            return status
+        } recover: {
+            self.systemPolicyServiceStatus = await SystemPolicyServiceManager().status()
         }
     }
 
     func deactivateLocalSetup() {
-        guard allowsControlAccess, !isPolicyMutationInProgress else { return }
-        isDeactivatingLocalSetup = true
-        Task {
-            defer { isDeactivatingLocalSetup = false }
-            do {
-                try await Task.detached(priority: .userInitiated) {
-                    try HookEmergencySwitch().setDisabled(true)
-                }.value
-                refreshLocalPolicyState()
-                systemPolicyServiceStatus = try await SystemPolicyServiceManager().unregister()
-                errorMessage = nil
-            } catch {
-                refreshLocalPolicyState()
-                systemPolicyServiceStatus = await SystemPolicyServiceManager().status()
-                errorMessage = (error as? LocalizedError)?.errorDescription
-                    ?? error.localizedDescription
+        mutate("Deactivating the local policy setup…") {
+            try await Task.detached(priority: .userInitiated) {
+                try HookEmergencySwitch().setDisabled(true)
+            }.value
+            self.refreshLocalPolicyState()
+            let status = try await SystemPolicyServiceManager().unregister()
+            self.systemPolicyServiceStatus = status
+            return "Managed dispatchers disabled. Privileged backend: \(status)."
+        } recover: {
+            self.refreshLocalPolicyState()
+            self.systemPolicyServiceStatus = await SystemPolicyServiceManager().status()
+        }
+    }
+
+    func setHooksDisabled(_ disabled: Bool) {
+        let verb = disabled
+            ? "Disabling every managed hook dispatcher…"
+            : "Verifying the bundled release and restoring every managed dispatcher…"
+        mutate(verb) {
+            try await Task.detached(priority: .userInitiated) {
+                try HookEmergencySwitch().setDisabled(disabled)
+            }.value
+            self.refreshLocalPolicyState()
+            guard self.areHooksDisabled == disabled else {
+                throw HookEmergencyError.stateDidNotPersist
             }
+            return disabled
+                ? "All Tama-managed hooks are bypassed on this machine."
+                : "Every managed hook dispatcher is active again."
+        } recover: {
+            self.refreshLocalPolicyState()
         }
     }
 
@@ -223,166 +261,59 @@ final class AppModel: ObservableObject {
         SystemPolicyServiceManager().openFullDiskAccessSettings()
     }
 
-    func refresh() async {
-        guard !isRefreshing else { return }
-        isRefreshing = true
-        errorMessage = nil
-        do {
-            let loadsLocalJustifications = loadsLocalJustifications
-            let loaded = try await Task.detached(priority: .userInitiated) {
-                try HookCatalogClient().load(
-                    includeLocalJustifications: loadsLocalJustifications
-                )
-            }.value
-            snapshot = loaded
-            if selectedHookID == nil {
-                selectedHookID = loaded.catalog.hooks.first?.id
-            }
-        } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-        }
-        isRefreshing = false
-    }
-    func setHooksDisabled(_ disabled: Bool) {
-        guard allowsControlAccess, !isPolicyMutationInProgress else { return }
-        isChangingHookState = true
-        let emergencySwitch = emergencySwitch
-        Task {
-            defer { isChangingHookState = false }
-            do {
-                try await Task.detached(priority: .userInitiated) {
-                    try emergencySwitch.setDisabled(disabled)
-                }.value
-                refreshLocalPolicyState()
-                guard areHooksDisabled == disabled else {
-                    throw HookEmergencyError.stateDidNotPersist
-                }
-                errorMessage = nil
-            } catch {
-                refreshLocalPolicyState()
-                errorMessage = (error as? LocalizedError)?.errorDescription
-                    ?? error.localizedDescription
-            }
-        }
-    }
+    // MARK: - Session control
 
     var selectedAgentSession: AgentSessionRecord? {
         guard let selectedAgentSessionID else { return agentSessions.first }
         return agentSessions.first(where: { $0.id == selectedAgentSessionID })
     }
 
-    func isHookEnabledInSelectedSession(_ hookId: String) -> Bool? {
-        selectedAgentSession?.isHookEnabled(hookId)
+    func areAllHooksEnabled(in session: AgentSessionRecord?) -> Bool {
+        guard let session, !hooks.isEmpty else { return false }
+        return hooks.allSatisfy { session.isHookEnabled($0.id) }
     }
 
-    var areAllHooksEnabledInSelectedSession: Bool {
-        guard
-            let session = selectedAgentSession,
-            let hooks = snapshot?.catalog.hooks,
-            !hooks.isEmpty
-        else {
-            return false
-        }
-        return hooks.allSatisfy {
-            session.isHookEnabled($0.id)
-        }
-    }
-
-    func refreshAgentSessions() async {
-        guard isControlMonitoring else { return }
-        do {
-            let loaded = try await Task.detached(priority: .utility) {
-                try SessionControlClient().liveSessions()
+    func enableHook(_ hookId: String, in session: AgentSessionRecord) {
+        mutate("Enabling \(hookId) in session \(session.sessionId)…") {
+            let updated = try await Task.detached(priority: .userInitiated) {
+                try SessionControlClient().enableHook(hookId, session: session)
             }.value
-            guard isControlMonitoring else { return }
-            agentSessions = loaded
-            sessionErrorMessage = nil
-            if !loaded.contains(where: { $0.id == selectedAgentSessionID }) {
-                selectedAgentSessionID = loaded.first?.id
-            }
-        } catch {
-            guard isControlMonitoring else { return }
-            agentSessions = []
-            selectedAgentSessionID = nil
-            sessionErrorMessage = (error as? LocalizedError)?.errorDescription
-                ?? error.localizedDescription
+            self.merge(updated)
+            return "\(hookId) is enabled in \(session.agentDisplayName) session \(session.sessionId)."
+        } recover: {
+            await self.refreshAgentSessions()
         }
     }
 
-    func enableSelectedSessionHook(_ hookId: String) {
-        guard
-            allowsControlAccess,
-            !isPolicyMutationInProgress,
-            let session = selectedAgentSession
-        else {
-            return
-        }
-        isChangingSessionHook = true
-        Task {
-            defer { isChangingSessionHook = false }
-            do {
-                let updated = try await Task.detached(priority: .userInitiated) {
-                    try SessionControlClient().enableHook(
-                        hookId,
-                        session: session
-                    )
-                }.value
-                if let index = agentSessions.firstIndex(where: { $0.id == updated.id }) {
-                    agentSessions[index] = updated
-                } else {
-                    agentSessions.append(updated)
-                }
-                errorMessage = nil
-            } catch {
-                errorMessage = (error as? LocalizedError)?.errorDescription
-                    ?? error.localizedDescription
-                await refreshAgentSessions()
-            }
+    func enableAllHooks(in session: AgentSessionRecord) {
+        guard !hooks.isEmpty else { return }
+        mutate("Enabling every registered hook in session \(session.sessionId)…") {
+            let updated = try await Task.detached(priority: .userInitiated) {
+                try SessionControlClient().setAllHooksEnabled(session: session)
+            }.value
+            self.merge(updated)
+            let loaded = updated.runtime?.loadedHookCount ?? self.hooks.count
+            return "\(counted(loaded, "hook")) enabled in \(session.agentDisplayName) session \(session.sessionId)."
+        } recover: {
+            await self.refreshAgentSessions()
         }
     }
 
-    func enableAllHooksInSelectedSession() {
-        guard
-            allowsControlAccess,
-            !isPolicyMutationInProgress,
-            let session = selectedAgentSession,
-            snapshot?.catalog.hooks.isEmpty == false
-        else {
-            return
-        }
-        isChangingSessionHook = true
-        Task {
-            defer { isChangingSessionHook = false }
-            do {
-                let updated = try await Task.detached(priority: .userInitiated) {
-                    try SessionControlClient().setAllHooksEnabled(session: session)
-                }.value
-                if let index = agentSessions.firstIndex(where: { $0.id == updated.id }) {
-                    agentSessions[index] = updated
-                } else {
-                    agentSessions.append(updated)
-                }
-                errorMessage = nil
-            } catch {
-                errorMessage = (error as? LocalizedError)?.errorDescription
-                    ?? error.localizedDescription
-                await refreshAgentSessions()
-            }
-        }
+    func clearMutation() {
+        mutation = .idle
     }
 
-    func clearError() {
-        errorMessage = nil
-    }
+    // MARK: - Revealing
 
-    func revealSelectedSource() {
-        guard let sourcePath = selectedHook?.sourcePath else { return }
+    func revealSource(for hook: HookRecord) {
+        guard let sourcePath = hook.sourcePath else { return }
         do {
             let root = try client.hookReleaseRoot()
-            let source = root.appendingPathComponent(sourcePath)
-            NSWorkspace.shared.activateFileViewerSelecting([source])
+            NSWorkspace.shared.activateFileViewerSelecting([
+                root.appendingPathComponent(sourcePath)
+            ])
         } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            mutation = .failed(Self.sentence(error))
         }
     }
 
@@ -390,225 +321,47 @@ final class AppModel: ObservableObject {
         do {
             NSWorkspace.shared.activateFileViewerSelecting([try client.hookReleaseRoot()])
         } catch {
-            errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            mutation = .failed(Self.sentence(error))
         }
     }
-}
 
-private struct HookEmergencySwitch: @unchecked Sendable {
-    private static let schema = "ai.wisent.tama.hook-emergency-state.v1"
-    private let manager = FileManager.default
+    // MARK: - Plumbing
 
-    var isDisabled: Bool {
-        guard
-            manager.fileExists(atPath: manifestURL.path),
-            let data = try? Data(contentsOf: stateURL),
-            let state = try? JSONDecoder().decode(State.self, from: data)
-        else {
-            return false
-        }
-        return state.schema == Self.schema && state.disabled
-    }
-
-    var installedRuntime: (
-        releaseID: String,
-        nodeExecutable: String?,
-        nodeVersion: String?
-    )? {
-        guard
-            let data = try? Data(contentsOf: installedReleaseURL),
-            let release = try? JSONDecoder().decode(InstalledRelease.self, from: data)
-        else {
-            return nil
-        }
-        return (release.releaseId, release.nodeExecutable, release.nodeVersion)
-    }
-
-    func setDisabled(_ disabled: Bool) throws {
-        guard let scriptURL = Bundle.main.url(
-            forResource: "emergency_disable_hooks",
-            withExtension: nil
-        ) else {
-            throw HookEmergencyError.scriptMissing
-        }
-
-        var environment = ProcessInfo.processInfo.environment
-        environment["TAMA_EMERGENCY_ACTION"] = disabled ? "disable" : "enable"
-        try runCommand(
-            executableURL: URL(fileURLWithPath: "/bin/sh"),
-            arguments: [scriptURL.path],
-            environment: environment
-        )
-    }
-    func installSessionController() throws {
-        guard
-            let installerURL = Bundle.main.url(
-                forResource: "install_hook_release",
-                withExtension: "py"
-            ),
-            let resourcesURL = Bundle.main.resourceURL
-        else {
-            throw HookEmergencyError.controllerInstallerMissing
-        }
-        let releaseURL = resourcesURL.appendingPathComponent(
-            "hooks-release",
-            isDirectory: true
-        )
-        guard manager.fileExists(atPath: releaseURL.appendingPathComponent("release.json").path) else {
-            throw HookEmergencyError.controllerReleaseMissing
-        }
-
-        try runCommand(
-            executableURL: URL(fileURLWithPath: "/usr/bin/python3"),
-            arguments: [
-                installerURL.path,
-                "--release", releaseURL.path,
-                "--home", NSHomeDirectory(),
-                "--session-control-only",
-            ],
-            environment: ProcessInfo.processInfo.environment
-        )
-    }
-
-    private func runCommand(
-        executableURL: URL,
-        arguments: [String],
-        environment: [String: String]
-    ) throws {
-        let process = Process()
-        let output = Pipe()
-        let outputBox = DataBox()
-        let drainGroup = DispatchGroup()
-        let completed = DispatchSemaphore(value: .zero)
-        process.executableURL = executableURL
-        process.arguments = arguments
-        process.environment = environment
-        process.standardOutput = output
-        process.standardError = output
-        process.terminationHandler = { _ in completed.signal() }
-        try process.run()
-
-        drainGroup.enter()
-        DispatchQueue.global(qos: .userInitiated).async {
-            outputBox.drain(
-                output.fileHandleForReading,
-                retaining: Int("65536")!
-            )
-            drainGroup.leave()
-        }
-
-        let deadline = DispatchTime.now() + .seconds(Int("300")!)
-        let pollInterval = DispatchTimeInterval.milliseconds(Int("100")!)
-        while completed.wait(timeout: .now() + pollInterval) == .timedOut {
-            guard DispatchTime.now() < deadline else {
-                signalProcessTree(
-                    rootPID: process.processIdentifier,
-                    signal: SIGTERM
-                )
-                if completed.wait(
-                    timeout: .now() + .seconds(Int("5")!)
-                ) == .timedOut {
-                    signalProcessTree(
-                        rootPID: process.processIdentifier,
-                        signal: SIGKILL
-                    )
-                    completed.wait()
-                }
-                if drainGroup.wait(
-                    timeout: .now() + .seconds(Int("5")!)
-                ) == .timedOut {
-                    try? output.fileHandleForReading.close()
-                }
-                throw HookEmergencyError.commandTimedOut
+    /// One write path, so every mutation reports the backend's own sentence.
+    private func mutate(
+        _ working: String,
+        _ perform: @escaping () async throws -> String,
+        recover: @escaping () async -> Void = {}
+    ) {
+        guard allowsControlAccess, !mutation.isWorking else { return }
+        mutation = .working(working)
+        Task {
+            do {
+                mutation = .succeeded(try await perform())
+            } catch {
+                await recover()
+                mutation = .failed(Self.sentence(error))
             }
         }
-        if drainGroup.wait(
-            timeout: .now() + .seconds(Int("5")!)
-        ) == .timedOut {
-            try? output.fileHandleForReading.close()
-            throw HookEmergencyError.commandOutputReadFailed(
-                "output pipe did not close after the command exited"
-            )
-        }
-        if let readError = outputBox.readError {
-            throw HookEmergencyError.commandOutputReadFailed(readError)
-        }
-        guard !outputBox.wasTruncated else {
-            throw HookEmergencyError.commandOutputExceeded
-        }
-        let message = String(
-            data: outputBox.data,
-            encoding: .utf8
-        )?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard process.terminationStatus == .zero else {
-            throw HookEmergencyError.commandFailed(message)
+    }
+
+    private func merge(_ session: AgentSessionRecord) {
+        if let index = agentSessions.firstIndex(where: { $0.id == session.id }) {
+            agentSessions[index] = session
+        } else {
+            agentSessions.append(session)
         }
     }
 
-    private var supportURL: URL {
-        manager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("Tama", isDirectory: true)
+    private func refreshLocalPolicyState() {
+        let installedRuntime = emergencySwitch.installedRuntime
+        areHooksDisabled = emergencySwitch.isDisabled
+        installedHookReleaseID = installedRuntime?.releaseID
+        installedNodeExecutable = installedRuntime?.nodeExecutable
+        installedNodeVersion = installedRuntime?.nodeVersion
     }
 
-    private var stateURL: URL {
-        supportURL.appendingPathComponent("hook-emergency-state.json")
-    }
-
-    private var manifestURL: URL {
-        supportURL
-            .appendingPathComponent("emergency-backup", isDirectory: true)
-            .appendingPathComponent("manifest.json")
-    }
-
-    private var installedReleaseURL: URL {
-        supportURL
-            .appendingPathComponent("hooks-runtime", isDirectory: true)
-            .appendingPathComponent("installed.json")
-    }
-
-    private struct State: Codable {
-        let schema: String
-        let disabled: Bool
-        let changedAt: String
-    }
-
-    private struct InstalledRelease: Decodable {
-        let releaseId: String
-        let nodeExecutable: String?
-        let nodeVersion: String?
-    }
-}
-
-private enum HookEmergencyError: LocalizedError {
-    case stateDidNotPersist
-    case scriptMissing
-    case controllerInstallerMissing
-    case controllerReleaseMissing
-    case commandFailed(String)
-    case commandTimedOut
-    case commandOutputExceeded
-    case commandOutputReadFailed(String)
-
-    var errorDescription: String? {
-        switch self {
-        case .stateDidNotPersist:
-            "Tama could not persist the emergency hook state."
-        case .scriptMissing:
-            "The Tama bundle does not contain the emergency hook controller."
-        case .controllerInstallerMissing:
-            "The Tama bundle does not contain the agent session-controller installer."
-        case .controllerReleaseMissing:
-            "The Tama bundle does not contain an approved hook release for agent session control."
-        case let .commandFailed(message):
-            message.isEmpty
-                ? "Tama could not update the installed hook configuration."
-                : message
-        case .commandTimedOut:
-            "The local policy command exceeded its bounded runtime and was terminated. Inspect local policy state before retrying."
-        case .commandOutputExceeded:
-            "The local policy command exceeded Tama's bounded output limit. Inspect local policy state before retrying."
-        case let .commandOutputReadFailed(message):
-            "Tama could not read bounded local policy output: \(message)"
-        }
+    private static func sentence(_ error: Error) -> String {
+        (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
     }
 }

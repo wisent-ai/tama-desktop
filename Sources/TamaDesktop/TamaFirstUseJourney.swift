@@ -165,66 +165,80 @@ final class TamaFirstUseJourney: ObservableObject {
 struct TamaOnboardingView: View {
     @ObservedObject var journey: TamaFirstUseJourney
 
+    static let maximumWidth: CGFloat = 820
+
     var body: some View {
         ZStack {
             WisentCanvasBackground()
 
-            WisentPanel(padding: WisentDesign.Space.x8) {
-                VStack(alignment: .leading, spacing: WisentDesign.Space.x6) {
-                    WisentPageHeader(
-                        eyebrow: "Policy control",
-                        title: journey.currentScreen.flatMap {
-                            $0.presentation.text("title")
-                        } ?? journey.currentScreen?.titleKey ?? "Welcome to Tama",
-                        detail: journey.currentScreen.flatMap {
-                            $0.presentation.text("body")
-                        } ?? journey.currentScreen?.bodyKey ?? "Prepare local policy enforcement for your coding agents.",
-                        symbol: "checkmark.shield.fill"
-                    )
-
-                    if journey.currentScreen?.screenKind == "promise" {
-                        TamaNotice(
-                            title: "Clear trust boundaries",
-                            detail: "Authentication identifies the operator. Setup installs and approves local enforcement. Onboarding only explains the product and leads to the first observed policy result.",
-                            symbol: "rectangle.3.group.bubble.left.fill",
-                            tone: .info
+            VStack(alignment: .leading, spacing: WisentDesign.Space.x5) {
+                // Onboarding is the second of the two places a hero header is
+                // allowed: the operator has nothing else on screen to read.
+                WisentPanel(padding: WisentDesign.Space.x8) {
+                    VStack(alignment: .leading, spacing: WisentDesign.Space.x6) {
+                        WisentPageHeader(
+                            eyebrow: "Policy control",
+                            title: journey.currentScreen.flatMap {
+                                $0.presentation.text("title")
+                            } ?? journey.currentScreen?.titleKey ?? "Welcome to Tama",
+                            detail: journey.currentScreen.flatMap {
+                                $0.presentation.text("body")
+                            } ?? journey.currentScreen?.bodyKey ?? "Prepare local policy enforcement for your coding agents.",
+                            symbol: "checkmark.shield.fill"
                         )
-                    }
 
-                    Divider()
-
-                    HStack(spacing: WisentDesign.Space.x3) {
-                        Button("Skip Explanation") {
-                            Task { await journey.skipExplanation() }
+                        if journey.currentScreen?.screenKind == "promise" {
+                            WisentCapabilityList(
+                                title: "Clear trust boundaries",
+                                items: [
+                                    "Authentication identifies the operator",
+                                    "Setup installs and approves local enforcement",
+                                    "Onboarding explains the product and leads to the first observed policy result",
+                                ],
+                                isAvailable: true
+                            )
                         }
-                        .buttonStyle(WisentSecondaryButtonStyle())
 
-                        Spacer()
+                        Divider()
 
-                        Button("Continue") {
-                            Task { await journey.advance() }
+                        HStack(spacing: WisentDesign.Space.x3) {
+                            Button("Skip Explanation") {
+                                Task { await journey.skipExplanation() }
+                            }
+                            .buttonStyle(WisentSecondaryButtonStyle())
+
+                            Spacer()
+
+                            Button("Continue") {
+                                Task { await journey.advance() }
+                            }
+                            .buttonStyle(WisentPrimaryButtonStyle())
+                            .keyboardShortcut(.defaultAction)
                         }
-                        .buttonStyle(WisentPrimaryButtonStyle())
-                        .keyboardShortcut(.defaultAction)
                     }
                 }
+                // A journey that will not load is a failure of this screen, so
+                // it is stated on it rather than in a modal that leaves nothing
+                // behind.
+                if let errorMessage = journey.errorMessage {
+                    WisentAlertPanel(
+                        tone: .danger,
+                        title: "Onboarding is unavailable",
+                        detail: errorMessage,
+                        command: "tama status",
+                        actions: [
+                            WisentAction("Dismiss", kind: .secondary) {
+                                journey.dismissError()
+                            }
+                        ]
+                    )
+                }
             }
-            .frame(maxWidth: TamaLayout.setupMaximumWidth)
+            .frame(maxWidth: Self.maximumWidth)
             .padding(WisentDesign.Space.x8)
         }
         .task(id: journey.currentScreen?.screenId) {
             await journey.expose()
-        }
-        .alert(
-            "Tama onboarding is unavailable",
-            isPresented: Binding(
-                get: { journey.errorMessage != nil },
-                set: { if !$0 { journey.dismissError() } }
-            )
-        ) {
-            Button("OK", role: .cancel) {}
-        } message: {
-            Text(journey.errorMessage ?? "Unknown error")
         }
     }
 }

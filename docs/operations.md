@@ -45,16 +45,18 @@ Unknown UI configuration is rejected by construction: setup choices are explicit
 
 ## Observability
 
-The Overview and Session control views expose:
+The **Posture** and **Session** screens expose:
 
 - desktop product version and source revision;
 - bundled and installed hook release IDs, plus the validated Node version and executable recorded by the installed runtime;
 - catalog checksum and registered/loaded hook counts;
 - daemon and kernel-policy readiness;
 - active agent identity, session ID, project path, and liveness mode;
-- semantic event sequence and last event;
+- semantic event sequence and the register of recent decisions, including the reason string of the last blocking decision;
 - unknown hooks, reload requirement or scheduled reload, and backend diagnostics;
-- violation scan totals, skipped files, and per-file errors.
+- the capability a session holds: lifetime, expiry, remaining uses, and every tool grant;
+- violation scan totals, skipped files, and per-file errors on **Violations**;
+- registry-declared provider coverage on **Coverage**, and scope target paths on **Install plan**.
 
 Diagnostics must identify remediation without including access tokens, raw external payloads, or repository file contents beyond paths and rule messages.
 

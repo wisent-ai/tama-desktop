@@ -1,9 +1,16 @@
 import Darwin
 import Foundation
 
-struct SessionCapabilityGrant: Codable, Sendable, Equatable {
+struct SessionCapabilityGrant: Codable, Sendable, Equatable, Identifiable {
     let tool: String
     let actions: [String]?
+
+    var id: String { tool }
+
+    var actionList: String {
+        guard let actions, !actions.isEmpty else { return "every action" }
+        return actions.joined(separator: ", ")
+    }
 }
 
 struct SessionCapability: Codable, Sendable, Equatable {
@@ -34,13 +41,17 @@ struct HookRuntimeStatus: Codable, Sendable, Equatable {
     let registryLoadError: String?
 }
 
-struct SemanticEventSummary: Codable, Sendable, Equatable {
+struct SemanticEventSummary: Codable, Sendable, Equatable, Identifiable {
     let eventId: String
     let event: String
     let timestamp: String
     let decision: String
     let blockedHookId: String?
     let reason: String?
+
+    var id: String { eventId }
+
+    var isBlocking: Bool { decision != "allow" }
 }
 
 struct SemanticRuntimeStatus: Codable, Sendable, Equatable {

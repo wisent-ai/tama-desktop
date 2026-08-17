@@ -72,10 +72,10 @@ Starting state:
 
 Steps:
 
-1. On **Set up Tama**, confirm the bundled-policy requirement reads **Valid** and the local runtime reads **Required**.
-2. Select **Install local runtime**. After release-integrity validation and before any managed write, Tama resolves Node from the documented locations, rejects versions older than 20, canonicalizes the executable through symlinks, and pins it into every Node-based installed hook command and the generated supervisor launcher. Each installed hook and supervised semantic dispatch preloads the sealed version guard before its target script. Tama also checks the Python installer prerequisite before launch. Review the listed target directories and confirm.
-3. If managed hooks are disabled, select **Re-enable managed hooks**, review the boundary, and confirm.
-4. Select **Register privileged backend**, review the macOS components, and confirm. Approve the daemon/System Extension and Network filter in macOS settings. Grant Full Disk Access only to the named Tama component when prompted.
+1. On **Set up Tama**, read **Readiness**: `Bundled policy is valid` must already be satisfied, and the other three requirements are listed as outstanding.
+2. Select **Turn hooks on**. After release-integrity validation and before any managed write, Tama resolves Node from the documented locations, rejects versions older than 20, canonicalizes the executable through symlinks, and pins it into every Node-based installed hook command and the generated supervisor launcher. Each installed hook and supervised semantic dispatch preloads the sealed version guard before its target script. Tama also checks the Python installer prerequisite before launch. The bar under the status reports the command's own result.
+3. If managed hooks are disabled, **Turn hooks on** restores every managed dispatcher and reports what it restored.
+4. Select **Allow system protection** to register the privileged backend. Approve the daemon/System Extension and Network filter in macOS settings. Grant Full Disk Access only to the named Tama component when prompted.
 5. Start or resume one supported supervised coding-agent session using its normal launcher, then select **Refresh sessions**.
 6. Confirm the setup evidence shows:
    - bundled policy valid;
@@ -85,9 +85,9 @@ Steps:
    - loaded hook count equals the nonzero registered hook count;
    - no disabled or unknown hook IDs, registry error, pending reload, or reload requirement;
    - system policy is **Kernel-gated**.
-7. Select **Finish setup and open Tama**. Only this successful transition records `tama.hasCompletedSetup`.
+7. Select **Open Tama**. Only this successful transition records `tama.hasCompletedSetup`.
 
-The full control interface now opens on **Overview**. That visible, matching setup evidence is the first successful product outcome. An acknowledgement, successful login, install exit code, or partial backend registration is not sufficient.
+The full control interface now opens on **Posture**. That visible, matching setup evidence is the first successful product outcome. An acknowledgement, successful login, install exit code, or partial backend registration is not sufficient.
 
 ## Machine onboarding
 
@@ -101,9 +101,9 @@ capability records fail closed and do not trigger setup automatically.
 
 ## Optional repository scan
 
-Open **Violations**, enter an absolute path to a repository owned by the current user, and select **Scan**. The scan is read-only. Select **Stop scan** to cancel its bounded process tree without changing the repository. Success is a report with file counts and either explicit rule violations or zero violations. Scanner errors and skipped files remain visible.
+Choose the repository in **Repository in view** in the sidebar header — a directory owned by the current user — then open **Violations** and select **Scan**. The scan is read-only. Select **Stop scan** to cancel its bounded process tree without changing the repository. Success is a report with file counts and either explicit rule violations or zero violations. Scanner errors and skipped files remain visible, and the rule rail counts how many files each rule hit.
 
-**Clean violations** is separate and mutating. Back up or commit unrelated work first, inspect the confirmation text, and review the resulting working-tree diff, HEAD, checked-out branch, local branch refs, and remote state yourself. Tama does not request commits or pushes and rejects detected local history/ref mutation; the credentialed provider remains an external boundary.
+**Repair** is separate and mutating, and it opens a decision dialog that lists every file a headless agent would edit. Back up or commit unrelated work first, read that list, and review the resulting working-tree diff, HEAD, checked-out branch, local branch refs, and remote state yourself. Tama does not request commits or pushes and rejects detected local history/ref mutation; the credentialed provider remains an external boundary.
 
 ## Common failures
 
@@ -114,7 +114,7 @@ Open **Violations**, enter an absolute path to a repository owned by the current
 | Sign-in unavailable | Identity configuration, network, or account issue | Preserve existing Keychain state; retry later or contact the repository maintainers with the classified error |
 | Python or supported Node missing | Local runtime/violations dependency unavailable; installation has not mutated managed state | Install the required runtime, then retry the explicit action; catalog inspection remains available |
 | Backend requires approval | macOS has not authorized the component | Use Tama's settings buttons, approve the exact component, then refresh status |
-| Backend removal partial or restart required | One privileged component remains configured or macOS deferred System Extension removal | Stop sessions, restart if requested, reopen Tama, and repeat **Deactivate local setup** until status is `Not registered` |
+| Backend removal partial or restart required | One privileged component remains configured or macOS deferred System Extension removal | Stop sessions, restart if requested, reopen Tama, and repeat **Settings → Deactivate** until status is `Not registered` |
 | Full Disk Access missing | Endpoint Security cannot inspect required paths | Grant access only to the named Tama component and restart the affected session |
 | Runtime integrity failure | Bundled or installed hook tree does not match its digest | Reinstall the same verified app artifact; do not edit release directories |
 | No active agent sessions | No compatible supervisor record is live, or only a legacy v1 record exists | Install the verified bundled runtime, start or resume a supported session so it publishes v2 state, then refresh |
@@ -138,8 +138,8 @@ Sign out from Tama to remove its Wisent session through the normal application f
 ## Uninstall
 
 1. Stop all supervised agent sessions.
-2. In **Overview**, choose **Deactivate local setup** and confirm the operation.
-3. Confirm the red disabled banner appears and the privileged backend reports **Not registered**. If macOS still shows an approval item, complete its removal in System Settings before continuing.
+2. In **Settings**, choose **Deactivate** and confirm the decision dialog.
+3. Confirm **Posture** shows the disabled-hooks alert and the privileged backend reports **Not registered**. If macOS still shows an approval item, complete its removal in System Settings before continuing.
 4. Sign out and quit Tama.
 5. Remove `~/Applications/Tama.app`.
 6. Preserve `~/Library/Application Support/Tama` until rollback or incident recovery is no longer needed. It contains disabled-state and restoration evidence, not an active background service.
@@ -150,7 +150,7 @@ Sign out from Tama to remove its Wisent session through the normal application f
 After first success:
 
 - start with the read-only commands in [`../examples/getting-started/status.sh`](../examples/getting-started/status.sh), then choose only the script matching the intended operation;
-- inspect hook purpose and side effects in **Hook catalog**;
+- inspect hook purpose and side effects in **Hooks**;
 - review expiring justification records;
 - scan a repository read-only;
 - learn emergency recovery before starting critical agent work;

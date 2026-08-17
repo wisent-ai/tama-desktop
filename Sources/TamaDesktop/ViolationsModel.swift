@@ -18,25 +18,19 @@ final class ViolationsModel: ObservableObject {
         case failed(String)
     }
 
-    @Published var repoPath: String
+    @Published private(set) var repoPath: String
     @Published private(set) var scanState: ScanState = .idle
     @Published private(set) var report: ViolationReport?
     @Published private(set) var cleanState: CleanState = .idle
 
-    private let defaultRepoPath: String?
     private let allowsOperations: Bool
     private var scanTask: Task<ViolationReport, Error>?
     private var cleanTask: Task<String, Error>?
     private var cleanCancellationRequested = false
 
     init(authorization: ControlAuthorization? = nil) {
-        defaultRepoPath = nil
         repoPath = ""
         allowsOperations = authorization != nil
-    }
-
-    var isRepoPathModified: Bool {
-        repoPath != (defaultRepoPath ?? "")
     }
 
     var canScan: Bool {
@@ -52,8 +46,19 @@ final class ViolationsModel: ObservableObject {
         (report?.totals.violations ?? 0) > 0
     }
 
+    /// Changing or clearing the scope discards the report: findings belong to
+    /// the tree they were read from, and keeping them beside another tree
+    /// invites the operator to repair the wrong one.
+    func select(repository path: String) {
+        guard path != repoPath else { return }
+        repoPath = path
+        report = nil
+        scanState = .idle
+        cleanState = .idle
+    }
+
     func resetRepoPath() {
-        repoPath = defaultRepoPath ?? ""
+        select(repository: "")
     }
 
     func scan(preservingCleanState: Bool = false) async {
@@ -111,8 +116,7 @@ final class ViolationsModel: ObservableObject {
         if case let .failed(message) = scanState {
             let commandMessage: String
             if cancellationRequested {
-                commandMessage = ViolationsError.processCancelled.errorDescription
-                    ?? "Cleanup was cancelled."
+                commandMessage = ViolationsError.cleanupCancelled
             } else {
                 commandMessage = switch outcome {
                 case .success:
@@ -130,10 +134,7 @@ final class ViolationsModel: ObservableObject {
         }
         if cancellationRequested {
             cleanCancellationRequested = false
-            cleanState = .failed(
-                ViolationsError.processCancelled.errorDescription
-                    ?? "Cleanup was cancelled."
-            )
+            cleanState = .failed(ViolationsError.cleanupCancelled)
             return
         }
         cleanCancellationRequested = false

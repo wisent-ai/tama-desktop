@@ -17,6 +17,12 @@ struct ViolationReport: Decodable, Sendable {
     var scanErrors: Int {
         repos.reduce(0) { $0 + $1.errors.count }
     }
+
+    /// Every finding, flattened once, because the repair screen ranks by rule
+    /// across repositories instead of nesting disclosure groups per repository.
+    var allViolations: [ViolationRecord] {
+        repos.flatMap(\.violations)
+    }
 }
 
 struct ViolationRepoReport: Decodable, Identifiable, Sendable {
@@ -84,42 +90,82 @@ struct ViolationTotals: Decodable, Equatable, Sendable {
 }
 
 struct ViolationsClient: Sendable {
+    static let scanCommand = "find-violations"
+    static let cleanCommand = "clean"
+
     func scan(repoPath: String) throws -> ViolationReport {
         let path = try validatedRepositoryPath(repoPath)
-        let result = try run(arguments: ["find-violations", "--repo", path, "--json"])
+        let result = try TamaCLI(
+            command: Self.scanCommand,
+            arguments: [Self.scanCommand, "--repo", path, "--json"]
+        ).run()
         switch result.status {
+        // Exit 1 is "violations found", which is a report and not a failure.
         case 0, 1:
-            guard let report = try? JSONDecoder().decode(ViolationReport.self, from: result.stdout) else {
-                throw ViolationsError.unreadableReport
+            do {
+                return try JSONDecoder().decode(ViolationReport.self, from: result.stdout)
+            } catch {
+                // The decoding reason is the only evidence there is when the
+                // scanner's output and this build disagree about the report.
+                throw TamaCLIError.unreadableOutput(
+                    Self.scanCommand,
+                    error.localizedDescription
+                )
             }
-            return report
         case 2:
-            throw ViolationsError.usageRejected(result.stderrSnippet)
+            throw TamaCLIError.usageRejected(Self.scanCommand, result.stderrSnippet)
         default:
-            throw ViolationsError.scanFailed(status: result.status, message: result.stderrSnippet)
+            throw TamaCLIError.commandFailed(
+                Self.scanCommand,
+                status: result.status,
+                message: result.stderrSnippet
+            )
         }
     }
 
     func clean(repoPath: String) throws -> String {
         let path = try validatedRepositoryPath(repoPath)
         try ensureCleanupAgentAvailable()
-        let result = try run(arguments: ["clean", "--repo", path])
+        let result = try TamaCLI(
+            command: Self.cleanCommand,
+            arguments: [Self.cleanCommand, "--repo", path],
+            extraEnvironment: cleanStateEnvironment()
+        ).run()
         switch result.status {
         case EXIT_SUCCESS:
             let summary = result.stdoutSnippet
             return summary.isEmpty
                 ? "The clean command finished without printing a summary."
                 : summary
-        case let status where status == Int32("1")!:
+        case 2:
+            throw TamaCLIError.usageRejected(Self.cleanCommand, result.stderrSnippet)
+        default:
             let message = result.stderrSnippet.isEmpty
                 ? result.stdoutSnippet
                 : result.stderrSnippet
-            throw ViolationsError.cleanFailed(status: status, message: message)
-        case 2:
-            throw ViolationsError.usageRejected(result.stderrSnippet)
-        default:
-            throw ViolationsError.cleanFailed(status: result.status, message: result.stderrSnippet)
+            throw TamaCLIError.commandFailed(
+                Self.cleanCommand,
+                status: result.status,
+                message: message
+            )
         }
+    }
+
+    private func cleanStateEnvironment() -> [String: String] {
+        guard
+            let support = FileManager.default.urls(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask
+            ).first
+        else {
+            return [:]
+        }
+        return [
+            "TAMA_CLEAN_STATE_DIR": support
+                .appendingPathComponent("Tama", isDirectory: true)
+                .appendingPathComponent("violations", isDirectory: true)
+                .path
+        ]
     }
 
     private func validatedRepositoryPath(_ value: String) throws -> String {
@@ -148,327 +194,35 @@ struct ViolationsClient: Sendable {
         return root.path
     }
 
-    private func nodeURL() throws -> URL {
-        let manager = FileManager.default
-#if DEBUG
-        if let override = ProcessInfo.processInfo.environment["TAMA_NODE"],
-           manager.isExecutableFile(atPath: override) {
-            return try validatedNodeURL(URL(fileURLWithPath: override))
-        }
-#endif
-        var unsupportedVersion: String?
-        for candidate in executableCandidates(named: "node") {
-            guard manager.isExecutableFile(atPath: candidate.path) else { continue }
-            do {
-                return try validatedNodeURL(candidate)
-            } catch let ViolationsError.unsupportedNodeVersion(version) {
-                unsupportedVersion = version
-            }
-        }
-        if let unsupportedVersion {
-            throw ViolationsError.unsupportedNodeVersion(unsupportedVersion)
-        }
-        throw ViolationsError.nodeUnavailable
-    }
-
-    private func validatedNodeURL(_ url: URL) throws -> URL {
-        let process = Process()
-        let output = Pipe()
-        process.executableURL = url
-        process.arguments = ["--version"]
-        process.standardOutput = output
-        process.standardError = output
-        try process.run()
-        process.waitUntilExit()
-
-        let version = String(
-            decoding: output.fileHandleForReading.readDataToEndOfFile(),
-            as: UTF8.self
-        ).trimmingCharacters(in: .whitespacesAndNewlines)
-        let majorText = version.drop(while: { !$0.isNumber }).prefix(while: { $0.isNumber })
-        guard
-            process.terminationStatus == EXIT_SUCCESS,
-            let major = Int(majorText),
-            let minimumMajor = Int("20"),
-            major >= minimumMajor
-        else {
-            throw ViolationsError.unsupportedNodeVersion(version)
-        }
-        return url
-    }
-
     private func ensureCleanupAgentAvailable() throws {
         let manager = FileManager.default
-        guard executableCandidates(named: "codex").contains(where: {
+        guard TamaCLI.executableCandidates(named: "codex").contains(where: {
             manager.isExecutableFile(atPath: $0.path)
         }) else {
             throw ViolationsError.cleanupAgentUnavailable
         }
     }
-
-    private func executableCandidates(named name: String) -> [URL] {
-        let manager = FileManager.default
-        let environment = ProcessInfo.processInfo.environment
-        var directories = (environment["PATH"] ?? "").split(separator: ":").map {
-            URL(fileURLWithPath: String($0), isDirectory: true)
-        }
-        directories.append(contentsOf: [
-            URL(fileURLWithPath: "/opt/homebrew/bin", isDirectory: true),
-            URL(fileURLWithPath: "/usr/local/bin", isDirectory: true),
-            manager.homeDirectoryForCurrentUser
-                .appendingPathComponent(".local/bin", isDirectory: true),
-        ])
-        var seen = Set<String>()
-        return directories.compactMap { directory in
-            let candidate = directory
-                .appendingPathComponent(name)
-                .standardizedFileURL
-            return seen.insert(candidate.path).inserted ? candidate : nil
-        }
-    }
-
-    private func cliURL() throws -> URL {
-        let root = try HookCatalogClient().hookReleaseRoot()
-        let cli = root.appendingPathComponent("src/cli.mjs")
-        guard FileManager.default.fileExists(atPath: cli.path) else {
-            throw ViolationsError.cliMissing(cli.path)
-        }
-        return cli
-    }
-
-    private func run(arguments: [String]) throws -> ProcessResult {
-        let process = Process()
-        let stdout = Pipe()
-        let stderr = Pipe()
-        process.executableURL = try nodeURL()
-        process.arguments = [try cliURL().path] + arguments
-        var environment = ProcessInfo.processInfo.environment
-        if let support = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first {
-            environment["TAMA_CLEAN_STATE_DIR"] = support
-                .appendingPathComponent("Tama", isDirectory: true)
-                .appendingPathComponent("violations", isDirectory: true)
-                .path
-        }
-        environment["PATH"] = executableCandidates(named: "node")
-            .map { $0.deletingLastPathComponent().path }
-            .joined(separator: ":")
-        process.environment = environment
-        process.standardOutput = stdout
-        process.standardError = stderr
-
-        // Drain both pipes concurrently: scan JSON and clean progress can each
-        // exceed the pipe buffer, and the child blocks when nobody reads.
-        let stdoutBox = DataBox()
-        let stderrBox = DataBox()
-        let group = DispatchGroup()
-
-        let completed = DispatchSemaphore(value: .zero)
-        process.terminationHandler = { _ in completed.signal() }
-        try process.run()
-        group.enter()
-        DispatchQueue.global(qos: .userInitiated).async {
-            stdoutBox.drain(
-                stdout.fileHandleForReading,
-                retaining: Int("16777216")!
-            )
-            group.leave()
-        }
-        group.enter()
-        DispatchQueue.global(qos: .userInitiated).async {
-            stderrBox.drain(
-                stderr.fileHandleForReading,
-                retaining: Int("65536")!
-            )
-            group.leave()
-        }
-        let deadline = DispatchTime.now() + .seconds(Int("900")!)
-        let pollInterval = DispatchTimeInterval.milliseconds(Int("100")!)
-        var terminalError: ViolationsError?
-        while completed.wait(timeout: .now() + pollInterval) == .timedOut {
-            if Task.isCancelled {
-                terminalError = .processCancelled
-                break
-            }
-            if DispatchTime.now() >= deadline {
-                terminalError = .processTimedOut
-                break
-            }
-        }
-        if let terminalError {
-            signalProcessTree(rootPID: process.processIdentifier, signal: SIGTERM)
-            let grace = DispatchTime.now() + .seconds(Int("30")!)
-            if completed.wait(timeout: grace) == .timedOut {
-                signalProcessTree(rootPID: process.processIdentifier, signal: SIGKILL)
-                completed.wait()
-            }
-            if group.wait(
-                timeout: .now() + .seconds(Int("5")!)
-            ) == .timedOut {
-                try? stdout.fileHandleForReading.close()
-                try? stderr.fileHandleForReading.close()
-            }
-            throw terminalError
-        }
-        if group.wait(
-            timeout: .now() + .seconds(Int("30")!)
-        ) == .timedOut {
-            try? stdout.fileHandleForReading.close()
-            try? stderr.fileHandleForReading.close()
-            throw ViolationsError.processOutputReadFailed(
-                "output pipes did not close after the command exited"
-            )
-        }
-        if let readError = stdoutBox.readError ?? stderrBox.readError {
-            throw ViolationsError.processOutputReadFailed(readError)
-        }
-        if stdoutBox.wasTruncated || stderrBox.wasTruncated {
-            throw ViolationsError.processOutputExceeded
-        }
-        return ProcessResult(
-            stdout: stdoutBox.data,
-            stderr: stderrBox.data,
-            status: process.terminationStatus
-        )
-    }
-
-}
-
-private struct ProcessResult {
-    let stdout: Data
-    let stderr: Data
-    let status: Int32
-
-    var stdoutSnippet: String {
-        let text = String(data: stdout, encoding: .utf8)?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let limit = Int("4000")!
-        guard text.count > limit else { return text }
-        return String(text.prefix(limit)) + "…"
-    }
-
-    var stderrSnippet: String {
-        let text = String(data: stderr, encoding: .utf8)?
-            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard text.count > 600 else { return text }
-        return String(text.prefix(600)) + "…"
-    }
-}
-
-final class DataBox: @unchecked Sendable {
-    private(set) var data = Data()
-    private(set) var wasTruncated = false
-    private(set) var readError: String?
-
-    func drain(_ handle: FileHandle, retaining limit: Int) {
-        let chunkSize = Int("65536")!
-        do {
-            while let chunk = try handle.read(upToCount: chunkSize), !chunk.isEmpty {
-                let remaining = max(limit - data.count, .zero)
-                if chunk.count > remaining {
-                    wasTruncated = true
-                }
-                if remaining > .zero {
-                    data.append(contentsOf: chunk.prefix(remaining))
-                }
-            }
-        } catch {
-            readError = error.localizedDescription
-        }
-    }
-}
-
-func signalProcessTree(rootPID: pid_t, signal: Int32) {
-    var descendants: [pid_t] = []
-    var seen = Set<pid_t>()
-
-    func collectChildren(of parent: pid_t) {
-        let requiredBytes = proc_listchildpids(parent, nil, .zero)
-        guard requiredBytes > .zero else { return }
-        var children = [pid_t](
-            repeating: pid_t(),
-            count: Int(requiredBytes) / MemoryLayout<pid_t>.stride
-        )
-        let returnedBytes = children.withUnsafeMutableBytes { buffer in
-            proc_listchildpids(
-                parent,
-                buffer.baseAddress,
-                Int32(buffer.count)
-            )
-        }
-        guard returnedBytes > .zero else { return }
-        let childCount = min(
-            children.count,
-            Int(returnedBytes) / MemoryLayout<pid_t>.stride
-        )
-        for child in children.prefix(childCount)
-        where child > .zero && seen.insert(child).inserted {
-            descendants.append(child)
-            collectChildren(of: child)
-        }
-    }
-
-    collectChildren(of: rootPID)
-    for child in descendants.reversed() {
-        _ = kill(child, signal)
-    }
-    _ = kill(rootPID, signal)
 }
 
 enum ViolationsError: LocalizedError {
-    case cliMissing(String)
-    case usageRejected(String)
-    case scanFailed(status: Int32, message: String)
-    case cleanFailed(status: Int32, message: String)
-    case unreadableReport
     case invalidRepository(String)
     case repositoryNotOwned(String)
-    case nodeUnavailable
-    case unsupportedNodeVersion(String)
     case cleanupAgentUnavailable
-    case processTimedOut
-    case processCancelled
-    case processOutputExceeded
-    case processOutputReadFailed(String)
+
+    /// The sentence the repair screen shows when the operator stops a cleanup:
+    /// the working tree is not where it started, and saying so is the whole
+    /// point of reporting a cancellation at all.
+    static let cleanupCancelled =
+        "The clean command was cancelled. Partial working-tree edits remain visible; inspect them and complete a read-only scan before retrying."
 
     var errorDescription: String? {
         switch self {
-        case let .cliMissing(path):
-            "The Tama CLI was not found at \(path)."
-        case let .usageRejected(message):
-            message.isEmpty
-                ? "The Tama CLI rejected the request."
-                : message
-        case let .scanFailed(status, message):
-            message.isEmpty
-                ? "The violation scan failed with exit code \(status)."
-                : "The violation scan failed (exit \(status)): \(message)"
-        case let .cleanFailed(status, message):
-            message.isEmpty
-                ? "The clean command failed with exit code \(status)."
-                : "The clean command failed (exit \(status)): \(message)"
-        case .unreadableReport:
-            "The violation scan produced output Tama could not parse."
         case let .invalidRepository(path):
             "Choose an existing absolute Git repository directory: \(path)"
         case let .repositoryNotOwned(path):
             "Tama refuses to mutate a repository not owned by the current user: \(path)"
-        case .nodeUnavailable:
-            "Node.js is unavailable. Install Node.js 20 or newer in a supported executable location, then retry."
-        case let .unsupportedNodeVersion(version):
-            "Unsupported Node.js \(version). Install Node.js 20 or newer in a supported executable location."
         case .cleanupAgentUnavailable:
             "Codex is unavailable. Install and authenticate Codex before confirming cleanup."
-        case .processTimedOut:
-            "The violations command exceeded its bounded runtime and was terminated. Review the repository, then retry explicitly."
-        case .processCancelled:
-            "The violations command was cancelled. If cleanup was active, partial working-tree edits remain visible; inspect them and complete a read-only scan before retrying."
-        case .processOutputExceeded:
-            "The violations command exceeded Tama's bounded output limit; excess output was discarded. Review the repository before retrying."
-        case let .processOutputReadFailed(message):
-            "Tama could not read bounded violations output: \(message)"
         }
     }
 }

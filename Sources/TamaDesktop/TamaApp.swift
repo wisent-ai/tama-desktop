@@ -16,7 +16,7 @@ struct TamaDesktopApp: App {
                     TamaAuthorizedControlRootView(bypassesSetup: true)
                         .environment(\.wisentIdentity, Self.testIdentityOverride)
                 } else if isInspectingPolicy {
-                    ReadOnlyRootView {
+                    TamaInspectionRootView {
                         isInspectingPolicy = false
                     }
                 } else {
@@ -33,8 +33,8 @@ struct TamaDesktopApp: App {
                 }
             }
             .frame(
-                minWidth: TamaLayout.minimumWindowWidth,
-                minHeight: TamaLayout.minimumWindowHeight
+                minWidth: WisentAppLayout.minimumWindowWidth,
+                minHeight: WisentAppLayout.minimumWindowHeight
             )
             .tint(WisentDesign.brand)
         }
@@ -59,6 +59,25 @@ struct TamaDesktopApp: App {
 #else
         nil
 #endif
+    }
+}
+
+/// The same shell, with the control destinations removed.
+///
+/// The baseline shipped a second sidebar here whose tags mapped onto different
+/// screens, so `violations` meant Overview in one window and Violations in the
+/// other.
+private struct TamaInspectionRootView: View {
+    @StateObject private var model = AppModel(inspectionOnly: true)
+    @StateObject private var violations = ViolationsModel()
+    let continueToSignIn: () -> Void
+
+    var body: some View {
+        RootView(
+            model: model,
+            violations: violations,
+            continueToSignIn: continueToSignIn
+        )
     }
 }
 
@@ -111,18 +130,10 @@ private struct TamaAuthenticatedRootView: View {
     var body: some View {
         Group {
             if bypassesSetup || hasCompletedSetup {
-                RootView(model: model, violationsModel: violations)
+                RootView(model: model, violations: violations, continueToSignIn: nil)
                     .overlay(alignment: .bottom) {
                         if firstUseJourney.isAwaitingFirstSession {
-                            TamaNotice(
-                                title: firstUseJourney.currentTitle,
-                                detail: firstUseJourney.currentBody,
-                                symbol: "terminal.fill",
-                                tone: .info
-                            )
-                            .frame(maxWidth: TamaLayout.setupMaximumWidth)
-                            .padding(WisentDesign.Space.x4)
-                            .allowsHitTesting(false)
+                            firstSessionHint
                         }
                     }
             } else if firstUseJourney.isLoading {
@@ -130,7 +141,7 @@ private struct TamaAuthenticatedRootView: View {
                     WisentCanvasBackground()
                     ProgressView("Loading Tama…")
                         .controlSize(.large)
-                        .font(WisentTypography.bodyMedium(13))
+                        .font(WisentTypeScale.bodyStrong())
                 }
             } else if !firstUseJourney.isAtSetup {
                 TamaOnboardingView(journey: firstUseJourney)
@@ -164,5 +175,38 @@ private struct TamaAuthenticatedRootView: View {
             violations.cancelAllOperations()
         }
     }
-}
 
+    /// Waiting for the first supervised session is not a fault, so it is a quiet
+    /// strip at the foot of the window rather than an alert.
+    private var firstSessionHint: some View {
+        HStack(spacing: WisentDesign.Space.x3) {
+            Image(systemName: "terminal.fill")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(WisentDesign.brand)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: WisentDesign.Space.x1) {
+                Text(firstUseJourney.currentTitle)
+                    .font(WisentTypeScale.bodyStrong())
+                    .foregroundStyle(WisentDesign.ink)
+                Text(firstUseJourney.currentBody)
+                    .font(WisentTypeScale.caption())
+                    .foregroundStyle(WisentDesign.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(WisentDesign.Space.x4)
+        .frame(maxWidth: TamaOnboardingView.maximumWidth)
+        .background(
+            WisentDesign.surface,
+            in: RoundedRectangle(cornerRadius: WisentDesign.Radius.medium)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: WisentDesign.Radius.medium)
+                .stroke(WisentDesign.border, lineWidth: WisentDesign.hairline)
+        }
+        .padding(WisentDesign.Space.x4)
+        .allowsHitTesting(false)
+        .accessibilityElement(children: .combine)
+    }
+}

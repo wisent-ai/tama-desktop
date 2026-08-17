@@ -150,20 +150,3 @@ struct ValidationResult: Decodable, Sendable {
     let hookCount: Int
     let orphanSourceCount: Int
 }
-
-enum SidebarSelection: Hashable {
-    case overview
-    case hooks
-    case justifications
-    case validation
-    case repositories
-    case violations
-}
-
-enum HookFilter: String, CaseIterable, Identifiable {
-    case all = "All"
-    case blocking = "Blocking"
-    case nonblocking = "Non-blocking"
-
-    var id: Self { self }
-}

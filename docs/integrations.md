@@ -11,6 +11,7 @@ Integrations extend Tama's local policy-control core. They do not own product st
 | Agent supervisors | Live session status and overrides | Optional until session control | Agent adapter maintainers | Session schema `ai.wisent.tama.session-control.v2` plus capability/runtime sub-schemas |
 | macOS policy backend | Kernel/process/network enforcement | Required for supervised-agent readiness | Tama maintainers | macOS 14+, Apple silicon, signed helper identifiers fixed by release |
 | Violations CLI | Repository scan and cleanup | Optional | hooks-rotator maintainers | Bundled with exact hook release; app decodes the documented JSON report |
+| Policy inspection CLI | Declared provider coverage, install plan, MCP snippet | Optional | hooks-rotator maintainers | Bundled with exact hook release; read-only `provider coverage --json`, `install-plan --json`, `mcp-config` |
 | GitHub Releases | Immutable product artifact distribution | Required for supported installation | Tama release maintainers | Exact `v<SemVer>` tag and artifact digest |
 | Local cleanup agent | Mutating violation repair | Optional | Codex operator | The current desktop workflow uses Codex explicitly; no silent provider fallback |
 
@@ -78,6 +79,18 @@ Report contract: UTF-8 JSON with repositories, violations, skipped files, scanne
 Reliability: exit `0` and `1` carry semantic reports; usage rejection and execution failure are distinct. The scanner performs no mutation. Cleanup uses per-repository locking, bounded agent execution, a journal outside immutable release bytes, and a final rescan. Provider absence fails explicitly; Tama never substitutes a different agent.
 
 Lifecycle: bundled with the app; its writable journal and locks live in Application Support and are removed during uninstall.
+
+## Policy inspection CLI
+
+Outcome: answer which runtime carries which hook, where an install would write, and what an MCP client needs, from the same CLI the release bundles rather than from a second implementation in the desktop.
+
+Configuration: none. The three commands take no operator input, mutate nothing, and are invoked on demand — once when their screen first opens, and again only when the operator asks.
+
+Report contract: `provider coverage --json` returns provider, coverage kind, mapping/hook/event counts, adapter path, required-live-coverage flag, evidence sentence and declared mappings. `install-plan --json` returns `archiveRoot` and a `levels` object whose members intentionally differ in shape, so the desktop renders them as label/value rows instead of forcing one type. `mcp-config` prints a JSON snippet displayed verbatim.
+
+Reliability: only exit `0` is accepted; anything else, an unparseable document, an absent Node or an absent bundled CLI is reported as a failure carrying the command's own message and the command that reproduces it. Coverage is registry-declared and never presented as live execution evidence.
+
+Lifecycle: bundled with the app; the commands write nothing and hold no state.
 
 ## GitHub Releases
 

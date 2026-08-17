@@ -1,20 +1,50 @@
 import SwiftUI
 import WisentDesignSystem
 
+/// First run, and the only screen in the application that shouts its own name.
+///
+/// A hero header earns its 24 pt here because the operator has never seen this
+/// window before and there is exactly one thing to do on it. Every other screen
+/// uses the 44 pt context bar instead.
 struct TamaSetupView: View {
     @ObservedObject var model: AppModel
     let complete: () -> Void
 
-    @State private var isShowingAdvancedSetup = false
-    @State private var isConfirmingRuntimeInstall = false
-    @State private var isConfirmingBackendRegistration = false
-    @State private var isConfirmingGlobalEnable = false
-    @State private var isConfirmingSessionEnable = false
+    private static let maximumWidth: CGFloat = 820
 
     private var runtimeInstalled: Bool { model.installedHookReleaseID != nil }
     private var hooksEnabled: Bool { runtimeInstalled && !model.areHooksDisabled }
     private var backendReady: Bool { model.systemPolicyServiceStatus == "Enabled" }
     private var bundledPolicyIsValid: Bool { model.snapshot?.validation.ok == true }
+
+    var body: some View {
+        ZStack {
+            WisentCanvasBackground()
+            ScrollView {
+                VStack(alignment: .leading, spacing: WisentDesign.Space.x6) {
+                    WisentPageHeader(
+                        eyebrow: "Local enforcement",
+                        title: statusTitle,
+                        detail: statusMessage,
+                        symbol: statusSymbol,
+                        tone: statusTone
+                    )
+                    WisentMutationBar(outcome: model.mutation) { model.clearMutation() }
+                    failureAlerts
+                    control
+                    readiness
+                    session
+                }
+                .frame(maxWidth: Self.maximumWidth, alignment: .leading)
+                .frame(maxWidth: .infinity)
+                .padding(WisentDesign.Space.x8)
+            }
+        }
+        .navigationTitle("Hooks")
+        .accessibilityIdentifier("tama.setup")
+    }
+
+    // MARK: - Status
 
     private var statusTitle: String {
         if model.snapshot?.validation.ok == false { return "Hooks are unavailable" }
@@ -24,13 +54,23 @@ struct TamaSetupView: View {
     }
 
     private var statusMessage: String {
-        if model.snapshot?.validation.ok == false { return "This copy of Tama cannot verify its policy. Install a current build." }
-        if model.isSetupComplete { return "Tama is protecting this Mac and the active coding-agent session." }
+        if model.snapshot?.validation.ok == false {
+            return "This copy of Tama cannot verify its policy. Install a current build."
+        }
+        if model.isSetupComplete {
+            return "Tama is protecting this Mac and the active coding-agent session."
+        }
         if !runtimeInstalled { return "Turn hooks on to install Tama protection." }
         if model.areHooksDisabled { return "Protection is paused. Turn hooks on to restore it." }
-        if !backendReady { return "Local hooks are running. Continue setup to allow system protection." }
-        if model.agentSessions.isEmpty { return "System protection is ready. Open or resume a coding-agent session." }
-        if !model.areAllHooksEnabledInSelectedSession { return "Select an active session and enable its protection." }
+        if !backendReady {
+            return "Local hooks are running. Continue setup to allow system protection."
+        }
+        if model.agentSessions.isEmpty {
+            return "System protection is ready. Open or resume a coding-agent session."
+        }
+        if !model.areAllHooksEnabled(in: model.selectedAgentSession) {
+            return "Select an active session and enable its protection."
+        }
         return "Waiting for the selected session to report protected status."
     }
 
@@ -50,249 +90,220 @@ struct TamaSetupView: View {
 
     private var primaryActionTitle: String {
         if !runtimeInstalled || model.areHooksDisabled { return "Turn hooks on" }
-        if !backendReady { return "Continue setup" }
+        if !backendReady { return "Allow system protection" }
         if model.agentSessions.isEmpty { return "Check for an active session" }
-        if !model.areAllHooksEnabledInSelectedSession { return "Protect selected session" }
+        if !model.areAllHooksEnabled(in: model.selectedAgentSession) {
+            return "Protect selected session"
+        }
         return "Check again"
     }
 
-    var body: some View {
-        ZStack {
-            WisentCanvasBackground()
-            ScrollView {
-                VStack(alignment: .leading, spacing: WisentDesign.Space.x6) {
-                    WisentPageHeader(
-                        eyebrow: "Local enforcement",
-                        title: "Set up Tama",
-                        detail: "Install verified policy, approve the macOS backend, and confirm protection in a live coding-agent session.",
-                        symbol: "shield.lefthalf.filled",
-                        tone: statusTone
-                    )
-                    masterControl
-                    DisclosureGroup(isExpanded: $isShowingAdvancedSetup) {
-                        advancedSetup.padding(.top, WisentDesign.Space.x4)
-                    } label: {
-                        Label("Advanced setup and diagnostics", systemImage: "wrench.and.screwdriver")
-                            .font(WisentTypography.bodyMedium(13))
-                            .foregroundStyle(WisentDesign.ink)
+    // MARK: - Failures
+
+    @ViewBuilder private var failureAlerts: some View {
+        if let catalogError = model.catalogError {
+            WisentAlertPanel(
+                tone: .danger,
+                title: "Policy catalog unavailable",
+                detail: catalogError,
+                command: TamaCommand.status,
+                actions: [
+                    WisentAction("Check again", symbol: "arrow.clockwise", kind: .primary) {
+                        Task { await model.refresh() }
                     }
-                    .padding(WisentDesign.Space.x4)
-                    .background(WisentDesign.surface, in: RoundedRectangle(cornerRadius: WisentDesign.Radius.large))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: WisentDesign.Radius.large)
-                            .stroke(WisentDesign.border, lineWidth: WisentDesign.hairline)
-                    }
-                }
-                .frame(maxWidth: TamaLayout.setupMaximumWidth, alignment: .leading)
-                .frame(maxWidth: .infinity)
-                .padding(WisentDesign.Space.x8)
+                ]
+            )
+        }
+        if let snapshot = model.snapshot, !snapshot.validation.ok {
+            ForEach(snapshot.validation.errors, id: \.self) { error in
+                WisentAlertPanel(
+                    tone: .danger,
+                    title: "Bundled policy is invalid",
+                    detail: error,
+                    command: TamaCommand.hooksValidate
+                )
             }
         }
-        .navigationTitle("Hooks")
-        .accessibilityIdentifier("tama.setup")
-        .confirmationDialog("Turn hooks on?", isPresented: $isConfirmingRuntimeInstall, titleVisibility: .visible) {
-            Button("Install and continue") { model.installLocalRuntime() }
-                .disabled(model.isPolicyMutationInProgress)
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Tama will install its verified local protection files while preserving unrelated settings.")
-        }
-        .confirmationDialog("Allow system protection?", isPresented: $isConfirmingBackendRegistration, titleVisibility: .visible) {
-            Button("Continue") { Task { await model.installSystemPolicyService() } }
-                .disabled(model.isPolicyMutationInProgress)
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("macOS may ask you to approve Tama and Full Disk Access. Tama uses these permissions to enforce process and network policy.")
-        }
-        .confirmationDialog("Resume Tama protection?", isPresented: $isConfirmingGlobalEnable, titleVisibility: .visible) {
-            Button("Turn hooks on") { model.setHooksDisabled(false) }
-                .disabled(model.isPolicyMutationInProgress)
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Tama will restore every managed hook dispatcher on this Mac.")
-        }
-        .confirmationDialog("Protect the selected session?", isPresented: $isConfirmingSessionEnable, titleVisibility: .visible) {
-            Button("Enable protection") { model.enableAllHooksInSelectedSession() }
-                .disabled(model.isPolicyMutationInProgress)
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("Every registered Tama policy will be enabled for the selected session.")
-        }
-        .alert(
-            "Tama couldn’t update protection",
-            isPresented: Binding(
-                get: { model.errorMessage != nil },
-                set: { if !$0 { model.clearError() } }
+        if let sessionError = model.sessionError {
+            WisentAlertPanel(
+                tone: .danger,
+                title: "Session status unavailable",
+                detail: sessionError,
+                command: TamaCommand.status,
+                actions: [
+                    WisentAction("Retry", symbol: "arrow.clockwise", kind: .primary) {
+                        Task { await model.refreshAgentSessions() }
+                    }
+                ]
             )
-        ) {
-            Button("OK", role: .cancel) { model.clearError() }
-        } message: {
-            Text(model.errorMessage ?? "Unknown error")
         }
     }
 
-    private var masterControl: some View {
-        WisentPanel(padding: WisentDesign.Space.x6) {
-            HStack(spacing: WisentDesign.Space.x5) {
-                Image(systemName: statusSymbol)
-                    .font(.system(size: TamaLayout.setupStatusSymbolSize, weight: .semibold))
-                    .foregroundStyle(statusTone.color)
-                    .frame(
-                        width: TamaLayout.setupStatusControlSize,
-                        height: TamaLayout.setupStatusControlSize
-                    )
-                    .background(statusTone.softColor, in: RoundedRectangle(cornerRadius: WisentDesign.Radius.large))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: WisentDesign.Radius.large)
-                            .stroke(statusTone.color.opacity(0.18), lineWidth: WisentDesign.hairline)
-                    }
+    // MARK: - The one control
+
+    private var control: some View {
+        WisentPanel {
+            HStack(spacing: WisentDesign.Space.x4) {
                 VStack(alignment: .leading, spacing: WisentDesign.Space.x1) {
-                    Text(statusTitle)
-                        .font(WisentTypography.heading(24))
+                    Text(model.isSetupComplete ? "Ready" : "Next step")
+                        .font(WisentTypeScale.eyebrow())
+                        .tracking(0.6)
+                        .foregroundStyle(WisentDesign.muted)
+                    Text(model.isSetupComplete ? "Open Tama" : primaryActionTitle)
+                        .font(WisentTypeScale.section())
                         .foregroundStyle(WisentDesign.ink)
-                    Text(statusMessage)
-                        .font(WisentTypography.body(14))
-                        .foregroundStyle(WisentDesign.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: WisentDesign.Space.x4)
-                primaryControl
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var primaryControl: some View {
-        if model.isPolicyMutationInProgress {
-            ProgressView().controlSize(.small).accessibilityLabel("Updating Tama protection")
-        } else if model.isSetupComplete {
-            Button("Open Tama") { complete() }
-                .buttonStyle(WisentPrimaryButtonStyle())
-                .accessibilityIdentifier("tama.setup.finish")
-        } else if model.snapshot?.validation.ok == false {
-            Button("Check again") { Task { await model.refresh() } }
-                .buttonStyle(WisentSecondaryButtonStyle())
-        } else {
-            Button(primaryActionTitle) { performPrimaryAction() }
-                .buttonStyle(WisentPrimaryButtonStyle())
-                .disabled(model.snapshot == nil)
-        }
-    }
-
-    private var advancedSetup: some View {
-        VStack(alignment: .leading, spacing: WisentDesign.Space.x4) {
-            TamaPanelSection("Local hooks", detail: "Integrity-sealed runtime and managed dispatchers") {
-                TamaRequirement(title: runtimeInstalled ? "Installed" : "Not installed", satisfied: runtimeInstalled)
-                if let releaseID = model.installedHookReleaseID {
-                    LabeledContent("Release") {
-                        Text(releaseID).font(WisentTypography.mono(11)).textSelection(.enabled)
-                    }
-                }
-                if let nodeVersion = model.installedNodeVersion { LabeledContent("Node", value: nodeVersion) }
-                if runtimeInstalled, model.areHooksDisabled {
-                    Button("Turn hooks on") { isConfirmingGlobalEnable = true }
+                if model.isSetupComplete {
+                    Button("Open Tama") { complete() }
                         .buttonStyle(WisentPrimaryButtonStyle())
-                        .disabled(model.isPolicyMutationInProgress)
-                } else if !runtimeInstalled, bundledPolicyIsValid {
-                    Button("Install local hooks") { isConfirmingRuntimeInstall = true }
-                        .buttonStyle(WisentPrimaryButtonStyle())
-                        .disabled(model.isPolicyMutationInProgress)
-                }
-            }
-
-            TamaPanelSection("System protection", detail: "Privileged macOS process and network policy") {
-                WisentBadge(model.systemPolicyServiceStatus, symbol: backendReady ? "checkmark.circle.fill" : "circle.dashed", tone: backendReady ? .success : .warning)
-                if !backendReady {
-                    HStack(spacing: WisentDesign.Space.x2) {
-                        Button("Allow system protection") { isConfirmingBackendRegistration = true }
-                            .buttonStyle(WisentPrimaryButtonStyle())
-                            .disabled(!runtimeInstalled || model.isPolicyMutationInProgress)
-                        Button("Approval settings") { model.openSystemPolicyApprovalSettings() }
-                            .buttonStyle(WisentSecondaryButtonStyle())
-                        Button("Full Disk Access") { model.openFullDiskAccessSettings() }
-                            .buttonStyle(WisentSecondaryButtonStyle())
-                        Button("Refresh") { Task { await model.refreshSystemPolicyStatus() } }
-                            .buttonStyle(WisentSecondaryButtonStyle())
-                    }
-                }
-            }
-
-            TamaPanelSection("Active session", detail: "Live provider runtime and per-session policy") {
-                if let sessionError = model.sessionErrorMessage {
-                    TamaNotice(title: "Session status unavailable", detail: sessionError, symbol: "exclamationmark.triangle.fill", tone: .danger)
-                        .textSelection(.enabled)
-                } else if model.agentSessions.isEmpty {
-                    TamaNotice(title: "No supervised session", detail: "Open or resume a supported coding-agent session, then refresh this view.", symbol: "terminal", tone: .neutral)
+                        .accessibilityIdentifier("tama.setup.finish")
+                } else if model.snapshot?.validation.ok == false {
+                    Button("Check again") { Task { await model.refresh() } }
+                        .buttonStyle(WisentSecondaryButtonStyle())
                 } else {
-                    Picker("Session", selection: $model.selectedAgentSessionID) {
-                        ForEach(model.agentSessions) { session in
-                            Text(session.displayName).tag(Optional(session.id))
+                    WisentActionButton(
+                        action: WisentAction(
+                            primaryActionTitle,
+                            kind: .primary,
+                            isEnabled: model.snapshot != nil && !model.isPolicyMutationInProgress
+                        ) {
+                            performPrimaryAction()
                         }
+                    )
+                }
+            }
+        }
+    }
+
+    /// Satisfied requirements and outstanding ones are two lists, not one list
+    /// of half-filled circles: the operator reads the second one.
+    private var readiness: some View {
+        let requirements = [
+            ("Bundled policy is valid", bundledPolicyIsValid),
+            ("Local hooks are installed and enabled", hooksEnabled),
+            ("System protection is enabled", backendReady),
+            ("A protected session is reporting", model.setupReadySession != nil),
+        ]
+        return WisentSectionBox(
+            title: "Readiness",
+            detail: "All four must hold before control opens.",
+            trailing: "\(requirements.filter(\.1).count) of \(requirements.count)"
+        ) {
+            WisentPanel {
+                VStack(alignment: .leading, spacing: WisentDesign.Space.x4) {
+                    let satisfied = requirements.filter(\.1).map(\.0)
+                    let outstanding = requirements.filter { !$0.1 }.map(\.0)
+                    if !outstanding.isEmpty {
+                        WisentCapabilityList(
+                            title: "Outstanding",
+                            items: outstanding,
+                            isAvailable: false
+                        )
                     }
-                    if let session = model.selectedAgentSession {
-                        SessionSetupStatus(session: session, installedReleaseID: model.installedHookReleaseID)
-                    }
-                    if !model.areAllHooksEnabledInSelectedSession {
-                        Button("Protect selected session") { isConfirmingSessionEnable = true }
-                            .buttonStyle(WisentPrimaryButtonStyle())
-                            .disabled(model.isPolicyMutationInProgress || model.snapshot == nil)
+                    if !satisfied.isEmpty {
+                        WisentCapabilityList(
+                            title: "Satisfied",
+                            items: satisfied,
+                            isAvailable: true
+                        )
                     }
                 }
-                Button("Refresh sessions", systemImage: "arrow.clockwise") { Task { await model.refreshAgentSessions() } }
-                    .buttonStyle(WisentSecondaryButtonStyle())
             }
+        }
+    }
 
-            TamaPanelSection("Readiness", detail: "All requirements must be satisfied before control opens") {
-                TamaRequirement(title: "Bundled policy is valid", satisfied: bundledPolicyIsValid)
-                TamaRequirement(title: "Local hooks are installed and enabled", satisfied: hooksEnabled)
-                TamaRequirement(title: "System protection is enabled", satisfied: backendReady)
-                TamaRequirement(title: "An active protected session is reporting", satisfied: model.setupReadySession != nil)
+    @ViewBuilder private var session: some View {
+        if backendReady {
+            WisentSectionBox(
+                title: "Active session",
+                detail: "Protection is proved by a live session reporting a matching release.",
+                trailing: model.agentSessions.isEmpty
+                    ? "none"
+                    : counted(model.agentSessions.count, "session")
+            ) {
+                WisentPanel {
+                    VStack(alignment: .leading, spacing: WisentDesign.Space.x3) {
+                        if model.agentSessions.isEmpty {
+                            Text("Open or resume a supported coding-agent session. Tama publishes its state within a second, and this screen picks it up on its own.")
+                                .font(WisentTypeScale.body())
+                                .foregroundStyle(WisentDesign.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        } else {
+                            Picker("Session", selection: $model.selectedAgentSessionID) {
+                                ForEach(model.agentSessions) { session in
+                                    Text(session.displayName).tag(Optional(session.id))
+                                }
+                            }
+                            .labelsHidden()
+                            if let session = model.selectedAgentSession {
+                                sessionRequirements(session)
+                            }
+                        }
+                        WisentActionButton(
+                            action: WisentAction(
+                                "Refresh sessions",
+                                symbol: "arrow.clockwise",
+                                kind: .secondary
+                            ) {
+                                Task { await model.refreshAgentSessions() }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private func sessionRequirements(_ session: AgentSessionRecord) -> some View {
+        let runtimeMatches = model.installedHookReleaseID.map { installed in
+            session.runtime.map { runtime in
+                runtime.installedReleaseId == installed
+                    && runtime.loadedReleaseId == installed
+                    && runtime.registryLoadError == nil
+                    && !runtime.reloadRequired
+                    && runtime.reloadPending != true
+            } ?? false
+        } ?? false
+        let hooksLoaded = session.runtime.map { runtime in
+            runtime.registeredHookCount > .zero
+                && runtime.loadedHookCount == runtime.registeredHookCount
+                && runtime.unknownHookIds.isEmpty
+                && !session.globallyDisabled
+                && session.disabledHookIds.isEmpty
+        } ?? false
+        let kernelGated = session.systemPolicy.map { policy in
+            policy.ready && policy.mode == "kernel-gated" && policy.error == nil
+        } ?? false
+        let requirements = [
+            ("Installed and loaded release identities match", runtimeMatches),
+            ("Every registered hook is loaded and enabled", hooksLoaded),
+            ("System policy is kernel-gated", kernelGated),
+        ]
+        return VStack(alignment: .leading, spacing: WisentDesign.Space.x3) {
+            let outstanding = requirements.filter { !$0.1 }.map(\.0)
+            let satisfied = requirements.filter(\.1).map(\.0)
+            if !outstanding.isEmpty {
+                WisentCapabilityList(title: "Outstanding", items: outstanding, isAvailable: false)
+            }
+            if !satisfied.isEmpty {
+                WisentCapabilityList(title: "Reporting", items: satisfied, isAvailable: true)
             }
         }
     }
 
     private func performPrimaryAction() {
-        if !runtimeInstalled { isConfirmingRuntimeInstall = true }
-        else if model.areHooksDisabled { isConfirmingGlobalEnable = true }
-        else if !backendReady { isConfirmingBackendRegistration = true }
-        else if model.agentSessions.isEmpty { Task { await model.refreshAgentSessions() } }
-        else if !model.areAllHooksEnabledInSelectedSession { isConfirmingSessionEnable = true }
-        else { Task { await model.refreshAgentSessions() } }
-    }
-}
-
-private struct SessionSetupStatus: View {
-    let session: AgentSessionRecord
-    let installedReleaseID: String?
-
-    private var runtimeMatches: Bool {
-        guard let installedReleaseID, let runtime = session.runtime else { return false }
-        return runtime.installedReleaseId == installedReleaseID
-            && runtime.loadedReleaseId == installedReleaseID
-            && runtime.registryLoadError == nil
-            && !runtime.reloadRequired
-            && runtime.reloadPending != true
-    }
-
-    private var hooksLoaded: Bool {
-        guard let runtime = session.runtime else { return false }
-        return runtime.registeredHookCount > 0
-            && runtime.loadedHookCount == runtime.registeredHookCount
-            && runtime.unknownHookIds.isEmpty
-            && !session.globallyDisabled
-            && session.disabledHookIds.isEmpty
-    }
-
-    private var kernelGated: Bool {
-        guard let policy = session.systemPolicy else { return false }
-        return policy.ready && policy.mode == "kernel-gated" && policy.error == nil
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: WisentDesign.Space.x2) {
-            TamaRequirement(title: "Installed and loaded release identities match", satisfied: runtimeMatches)
-            TamaRequirement(title: "Every registered hook is loaded and enabled", satisfied: hooksLoaded)
-            TamaRequirement(title: "System policy is kernel-gated", satisfied: kernelGated)
+        if !runtimeInstalled {
+            model.installLocalRuntime()
+        } else if model.areHooksDisabled {
+            model.setHooksDisabled(false)
+        } else if !backendReady {
+            model.installSystemPolicyService()
+        } else if let session = model.selectedAgentSession,
+                  !model.areAllHooksEnabled(in: session) {
+            model.enableAllHooks(in: session)
+        } else {
+            Task { await model.refreshAgentSessions() }
         }
     }
 }
