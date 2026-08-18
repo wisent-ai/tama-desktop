@@ -1,14 +1,38 @@
+import AppKit
 import SwiftUI
 import WisentAuth
 import WisentDesktopUpdate
 import WisentDesignSystem
 
+/// Guarantees a window exists, whatever AppKit restored.
+///
+/// Measured here: launching the installed bundle after the interface changed left
+/// the process alive with zero windows, because restoration was keyed to the
+/// previous root view type and SwiftUI opens nothing once it fails. Rule 11 of
+/// the shared shell; the logic lives in `wisentEnsureWindow` so it is stated once
+/// for the whole pack.
+@MainActor
+final class TamaAppDelegate: NSObject, NSApplicationDelegate {
+    let auth = WisentAuthStore(productName: "Tama")
+    private var fallbackWindow: NSWindow?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        DispatchQueue.main.async { [self] in
+            fallbackWindow = wisentEnsureWindow(title: "Tama") {
+                WisentAuthGate(store: auth) {
+                    TamaAuthorizedControlRootView()
+                }
+                .tint(WisentDesign.brand)
+            }
+        }
+    }
+}
+
 @main
 struct TamaDesktopApp: App {
-    @StateObject private var auth = WisentAuthStore(productName: "Tama")
+    @NSApplicationDelegateAdaptor(TamaAppDelegate.self) private var delegate
     @StateObject private var updater = WisentUpdater()
     @State private var isInspectingPolicy = false
-
     var body: some Scene {
         WindowGroup("Tama") {
             Group {
@@ -20,7 +44,7 @@ struct TamaDesktopApp: App {
                         isInspectingPolicy = false
                     }
                 } else {
-                    WisentAuthGate(store: auth) {
+                    WisentAuthGate(store: delegate.auth) {
                         TamaAuthorizedControlRootView()
                     }
                     .toolbar {
@@ -38,6 +62,16 @@ struct TamaDesktopApp: App {
             )
             .tint(WisentDesign.brand)
         }
+        // `.frame(minWidth:minHeight:)` on the content is a request; this is what
+        // makes AppKit refuse a frame narrower than the three zones need. The
+        // setup gate is a separate compact window and is unaffected — it is
+        // deliberately small, and it opened at 520 × 504 both with and without a
+        // saved state on this machine.
+        .windowResizability(.contentMinSize)
+        .defaultSize(
+            width: WisentAppLayout.minimumWindowWidth,
+            height: WisentAppLayout.minimumWindowHeight
+        )
         .windowStyle(.titleBar)
         .windowToolbarStyle(.unified)
         .commands {
