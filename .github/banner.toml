@@ -1,11 +1,13 @@
 [automation]
 managed = true
-source_fingerprint = "cdb52fb0036e79d8"
+source_fingerprint = "b0d511c668c1ff35"
 category = "agent"
+copy_status = "approved"
+approved_in = "019fe3db-84a1-7000-bf79-c5455aefd43f@2026-08-09T23:59:29Z"
 
 [banner]
-title = "Enforce coding-agent policy across Mac fleets."
-description = "Native control plane for inspecting, enforcing, recovering, and auditing local agent hooks."
+title = "Tama: Never Get Frustrated by AI Again—Block the Behaviors You Don’t Want"
+description = ""
 product = "Wisent"
 url = "wisent.com"
 theme = "dark"
