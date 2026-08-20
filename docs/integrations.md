@@ -7,11 +7,11 @@ Integrations extend Tama's local policy-control core. They do not own product st
 | Integration | Capability | Required | Owner | Compatibility |
 |---|---|---|---|---|
 | Wisent Auth | User and organization identity | Required for mutations | `wisent-desktop-auth` maintainers | Swift package requirement declared in `Package.swift`; a supported release requires a committed resolution and records the exact revision in provenance |
-| Hook release | Catalog and local agent/Git adapters | Bundled core data; installation optional | hooks-rotator maintainers | Manifest `ai.wisent.tama.hook-release.v1`; catalog version recorded in release |
+| Hook release | Catalog and local agent/Git adapters | Bundled core data; installation optional | tama maintainers | Manifest `ai.wisent.tama.hook-release.v1`; catalog version recorded in release |
 | Agent supervisors | Live session status and overrides | Optional until session control | Agent adapter maintainers | Session schema `ai.wisent.tama.session-control.v2` plus capability/runtime sub-schemas |
 | macOS policy backend | Kernel/process/network enforcement | Required for supervised-agent readiness | Tama maintainers | macOS 14+, Apple silicon, signed helper identifiers fixed by release |
-| Violations CLI | Repository scan and cleanup | Optional | hooks-rotator maintainers | Bundled with exact hook release; app decodes the documented JSON report |
-| Policy inspection CLI | Declared provider coverage, install plan, MCP snippet | Optional | hooks-rotator maintainers | Bundled with exact hook release; read-only `provider coverage --json`, `install-plan --json`, `mcp-config` |
+| Violations CLI | Repository scan and cleanup | Optional | tama maintainers | Bundled with exact hook release; app decodes the documented JSON report |
+| Policy inspection CLI | Declared provider coverage, install plan, MCP snippet | Optional | tama maintainers | Bundled with exact hook release; read-only `provider coverage --json`, `install-plan --json`, `mcp-config` |
 | GitHub Releases | Immutable product artifact distribution | Required for supported installation | Tama release maintainers | Exact `v<SemVer>` tag and artifact digest |
 | Local cleanup agent | Mutating violation repair | Optional | Codex operator | The current desktop workflow uses Codex explicitly; no silent provider fallback |
 
@@ -72,7 +72,7 @@ Disable/removal unregisters preferences and privileged components before deletin
 
 Outcome: replay the real bundled pre-write policy against a selected repository and optionally ask one local headless agent to fix reported violations.
 
-Configuration: absolute repository path; cleanup provider; bounded rounds; optional skip fragments. The app invokes the exact CLI bundled with its hook release and passes the bundled hook path explicitly. It does not require `hooks-rotator` source checkout.
+Configuration: absolute repository path; cleanup provider; bounded rounds; optional skip fragments. The app invokes the exact CLI bundled with its hook release and passes the bundled hook path explicitly. It does not require `tama` source checkout.
 
 Report contract: UTF-8 JSON with repositories, violations, skipped files, scanner errors, problems, and totals. External paths, Git metadata, command output, and agent results are untrusted and bounded before UI display.
 

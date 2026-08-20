@@ -3,7 +3,7 @@ set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 DESKTOP_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
-HOOKS_ROOT=${TAMA_HOOK_ROOT:-"$DESKTOP_ROOT/../hooks-rotator"}
+HOOKS_ROOT=${TAMA_HOOK_ROOT:-"$DESKTOP_ROOT/../tama"}
 if [ ! -f "$DESKTOP_ROOT/Package.resolved" ]; then
     printf '%s\n' "A committed Package.resolved is required for release."
     false

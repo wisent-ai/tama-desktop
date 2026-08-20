@@ -246,7 +246,7 @@ struct HooksView: View {
             } else if model.hooks.isEmpty {
                 WisentEmptyPanel(
                     title: "This build carries no hooks",
-                    detail: "The sealed catalog declares no policies. Rebuild Tama against a hooks-rotator release that does.",
+                    detail: "The sealed catalog declares no policies. Rebuild Tama against a tama release that does.",
                     symbol: "tray"
                 )
                 Spacer(minLength: 0)

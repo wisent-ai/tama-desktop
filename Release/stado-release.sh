@@ -24,7 +24,7 @@ verify_input() {
 
 prepare_source() {
   updater="$WISENT_INPUTS_DIR/wisent-desktop-update.tar.gz"
-  hooks="$WISENT_INPUTS_DIR/hooks-rotator.tar.gz"
+  hooks="$WISENT_INPUTS_DIR/tama.tar.gz"
   swiftpm="$WISENT_INPUTS_DIR/swiftpm-cache.tar.gz"
   verify_input "$updater" "$UPDATER_SHA256"
   verify_input "$hooks" "$HOOKS_SHA256"
@@ -35,7 +35,7 @@ prepare_source() {
   mkdir -p "$work"
   tar -xzf "$hooks" -C "$work"
   tar -xzf "$swiftpm" -C "$source"
-  hooks_root="$work/hooks-rotator"
+  hooks_root="$work/tama"
   [ -f "$hooks_root/package.json" ] || { printf 'immutable hook source is incomplete\n' >&2; exit 1; }
 }
 

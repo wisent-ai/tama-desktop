@@ -215,7 +215,7 @@ struct SettingsView: View {
     private var boundary: some View {
         WisentSectionBox(
             title: "Data boundary",
-            detail: "Tama displays a catalog snapshot generated from hooks-rotator at build time.",
+            detail: "Tama displays a catalog snapshot generated from tama at build time.",
             trailing: "credential-free"
         ) {
             WisentPanel {

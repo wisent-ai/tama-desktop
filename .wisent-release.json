@@ -56,10 +56,10 @@
       "mount": "wisent-desktop-update.tar.gz",
       "extract": false
     },
-    "hooks-rotator": {
-      "uri": "stado://sources/hooks-rotator/sha256/415d6b9824d6fc47a7ebdc4395ed94cb18113c2553251cad50e1f9000d5ab326/source.tar.gz",
+    "tama": {
+      "uri": "stado://sources/tama/sha256/415d6b9824d6fc47a7ebdc4395ed94cb18113c2553251cad50e1f9000d5ab326/source.tar.gz",
       "sha256": "415d6b9824d6fc47a7ebdc4395ed94cb18113c2553251cad50e1f9000d5ab326",
-      "mount": "hooks-rotator.tar.gz",
+      "mount": "tama.tar.gz",
       "extract": false
     },
     "swiftpm-cache": {

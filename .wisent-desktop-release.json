@@ -9,8 +9,8 @@
   "feed_url": "https://github.com/wisent-ai/tama-desktop/releases/latest/download/appcast.xml",
   "minimum_system_version": "14.0",
   "backend": {
-    "repository": "wisent-ai/hooks-rotator",
-    "revision_file": "Release/hooks-rotator-revision",
+    "repository": "wisent-ai/tama",
+    "revision_file": "Release/tama-revision",
     "checkout_path": ".release-source"
   }
 }

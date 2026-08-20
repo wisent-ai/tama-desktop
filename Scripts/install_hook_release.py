@@ -185,12 +185,12 @@ def without_tama_agent_hooks(config: dict) -> dict:
 def dispatcher_body(runtime_root: Path, hook_name: str, backup_path: Path) -> bytes:
     repo_hook = "${repo_root}/.githooks/" + hook_name
     body = f'''#!/bin/sh
-# hooks-rotator managed global Git dispatcher
+# tama managed global Git dispatcher
 set -eu
 ROOT={shlex.quote(str(runtime_root))}
 HOOK_NAME={shlex.quote(hook_name)}
 BACKUP={shlex.quote(str(backup_path))}
-INPUT_FILE="${{TMPDIR:-/tmp}}/hooks-rotator-$HOOK_NAME-$$.stdin"
+INPUT_FILE="${{TMPDIR:-/tmp}}/tama-$HOOK_NAME-$$.stdin"
 cat > "$INPUT_FILE"
 trap 'rm -f "$INPUT_FILE"' EXIT
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
@@ -550,7 +550,7 @@ def install_release(
         for hook_name in ("pre-commit", "pre-push"):
             active = hooks_path / hook_name
             target = moved_by_source.get(active, active)
-            backup = hooks_path / f"{hook_name}.before-hooks-rotator"
+            backup = hooks_path / f"{hook_name}.before-tama"
             writes[target] = (dispatcher_body(stable_runtime, hook_name, backup), 0o755)
 
         repo_hook_targets: set[Path] = set()

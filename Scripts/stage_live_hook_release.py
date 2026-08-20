@@ -14,7 +14,7 @@ def main() -> None:
     project = Path(__file__).resolve().parent.parent
     runtime = home / "Library/Application Support/Tama/hooks-runtime/current"
     source_root = Path(
-        os.environ.get("TAMA_HOOK_SOURCE_ROOT") or project.parent / "hooks-rotator"
+        os.environ.get("TAMA_HOOK_SOURCE_ROOT") or project.parent / "tama"
     )
     destination = project / ".work/inline-hook-release"
     shutil.rmtree(destination, ignore_errors=True)

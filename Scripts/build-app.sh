@@ -97,7 +97,7 @@ unregister_bundle() {
     printf '%s\n' "$output" >&2
     return 1
 }
-HOOKS_ROOT=${TAMA_HOOK_ROOT:-"$DESKTOP_ROOT/../hooks-rotator"}
+HOOKS_ROOT=${TAMA_HOOK_ROOT:-"$DESKTOP_ROOT/../tama"}
 if ! HOOK_SOURCE_REVISION=$(git -C "$HOOKS_ROOT" rev-parse HEAD); then
     printf '%s\n' "Tama hook source is unavailable at $HOOKS_ROOT; set TAMA_HOOK_ROOT for a developer build."
     false

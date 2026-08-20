@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 
 const [repositoryRoot, outputPath] = process.argv.slice(2);
 if (!repositoryRoot || !outputPath) {
-  throw new Error('usage: export-catalog.mjs <hooks-rotator-root> <output-path>');
+  throw new Error('usage: export-catalog.mjs <tama-root> <output-path>');
 }
 
 const catalogModuleURL = pathToFileURL(join(repositoryRoot, 'src', 'core', 'catalog.mjs')).href;

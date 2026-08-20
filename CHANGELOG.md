@@ -69,7 +69,7 @@ All user-visible changes follow the categories required by `docs/releases.md`. A
 
 - Automatic service registration on application launch.
 - Automatic session-controller installation on application launch.
-- Supported-runtime dependence on `~/Documents/CodingProjects/Wisent/hooks-rotator`.
+- Supported-runtime dependence on `~/Documents/CodingProjects/Wisent/tama`.
 
 ### Security
 
