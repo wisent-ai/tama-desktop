@@ -18,29 +18,24 @@ struct TamaSetupView: View {
     private var bundledPolicyIsValid: Bool { model.snapshot?.validation.ok == true }
 
     var body: some View {
-        ZStack {
-            WisentCanvasBackground()
-            ScrollView {
-                VStack(alignment: .leading, spacing: WisentDesign.Space.x6) {
-                    WisentPageHeader(
-                        eyebrow: "Local enforcement",
-                        title: statusTitle,
-                        detail: statusMessage,
-                        symbol: statusSymbol,
-                        tone: statusTone
-                    )
-                    WisentMutationBar(outcome: model.mutation) { model.clearMutation() }
-                    failureAlerts
-                    control
-                    readiness
-                    session
-                }
-                .frame(maxWidth: Self.maximumWidth, alignment: .leading)
-                .frame(maxWidth: .infinity)
-                .padding(WisentDesign.Space.x8)
-            }
+        WisentScreen(
+            title: "Tama",
+            scope: "Setup",
+            freshness: model.installedHookReleaseID.map { "release \($0.prefix(8))" }
+        ) {
+            WisentPageHeader(
+                eyebrow: "Local enforcement",
+                title: statusTitle,
+                detail: statusMessage,
+                symbol: statusSymbol,
+                tone: statusTone
+            )
+            WisentMutationBar(outcome: model.mutation) { model.clearMutation() }
+            failureAlerts
+            control
+            readiness
+            session
         }
-        .navigationTitle("Hooks")
         .accessibilityIdentifier("tama.setup")
     }
 

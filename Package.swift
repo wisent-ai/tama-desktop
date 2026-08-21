@@ -10,13 +10,13 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/wisent-ai/wisent-desktop-auth.git",
-            revision: "3fa84dc99e2a470c06655882de0c536874e4c8c3"
+            revision: "ef895bb"
         ),
         .package(url: "https://github.com/wisent-ai/wisent-desktop-update.git", exact: "0.1.0"),
         .package(url: "https://github.com/wisent-ai/echo.git", exact: "0.1.2"),
         .package(
             url: "https://github.com/wisent-ai/wisent-components.git",
-            revision: "63aab577abc78c4d1993a711236479dbc2c2571a"
+            revision: "35d8cc4a528de3e4ab8c67a64e68ce8a9c994ef1"
         ),
     ],
     targets: [
