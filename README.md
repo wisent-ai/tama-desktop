@@ -81,7 +81,7 @@ An operator selects a supervised agent session and a catalog hook, reviews the e
 
 ### Recover from a blocking policy failure
 
-An operator confirms the emergency disable action. Tama pauses supervised sessions, preserves managed configuration, quarantines session overrides, records the emergency state, and bypasses the already-loaded runtime immediately. Re-enable installs the integrity-checked bundled release, restores managed entrypoints transactionally, and keeps emergency state active unless the Brama-backed objective-authority preflight succeeds.
+An operator confirms the emergency disable action. Tama pauses supervised sessions through their supervisor, quiesces other live agent sessions in place, preserves managed configuration, quarantines session overrides, records the emergency state, and bypasses the already-loaded runtime immediately. Re-enable installs the integrity-checked bundled release, restores managed entrypoints transactionally, resumes every quiesced process, and keeps emergency state active unless the Brama-backed objective-authority preflight succeeds.
 
 ### Find repository policy violations
 
