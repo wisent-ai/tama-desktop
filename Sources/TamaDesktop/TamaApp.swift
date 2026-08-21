@@ -177,15 +177,17 @@ private struct TamaAuthenticatedRootView: View {
                         .controlSize(.large)
                         .font(WisentTypeScale.bodyStrong())
                 }
-            } else if !firstUseJourney.isAtSetup {
-                TamaOnboardingView(journey: firstUseJourney)
             } else {
-                TamaSetupView(model: model) {
-                    Task {
+                RootView(model: model, violations: violations, continueToSignIn: nil)
+                    .task {
                         guard await firstUseJourney.completeSetup() else { return }
                         hasCompletedSetup = true
                     }
-                }
+                    .overlay(alignment: .bottom) {
+                        if firstUseJourney.isAwaitingFirstSession {
+                            firstSessionHint
+                        }
+                    }
             }
         }
         .task {
