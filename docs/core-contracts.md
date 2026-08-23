@@ -48,7 +48,7 @@ The desktop writes a private, session-keyed `set-hook` or `enable-all` request a
 
 ### Emergency disable and re-enable
 
-Disable requires explicit destructive confirmation. Supervised sessions pause before dispatcher mutation and resume through an exit trap. Original configuration and moved entrypoints are recorded once in an emergency manifest. Repeated disable is idempotent.
+Disable requires explicit destructive confirmation. Sessions launched through `tama-agent` pause through their supervisor. Other live agent sessions are quiesced in place with `SIGSTOP`, recorded in private Tama state, and resumed with `SIGCONT`; no relaunch command is required. The exit trap resumes both classes after success, failure, or interruption. Original configuration and moved entrypoints are recorded once in an emergency manifest. Repeated disable is idempotent.
 
 Re-enable requires the manifest and a valid bundled release. Installation is transactional. Success removes emergency state only after managed configuration is restored. Failure preserves recovery evidence and does not claim enabled state.
 
