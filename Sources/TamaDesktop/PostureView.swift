@@ -48,8 +48,7 @@ struct PostureView: View {
                     tone: .danger,
                     title: "Catalog unavailable",
                     detail: catalogError,
-                    command: TamaCommand.status,
-                    actions: [
+                                        actions: [
                         WisentAction("Retry", symbol: "arrow.clockwise", kind: .primary) {
                             Task { await model.refresh() }
                         }
@@ -113,8 +112,7 @@ struct PostureView: View {
                 tone: .danger,
                 title: "All hooks are disabled",
                 detail: "Agent, editor and Git dispatchers bypass every Tama policy on this machine until the approved release is reinstalled. Blocking hooks cannot stop unsafe work while this is true.",
-                command: TamaCommand.status,
-                actions: [
+                                actions: [
                     WisentAction(
                         "Re-enable all hooks",
                         kind: .primary,
@@ -133,8 +131,7 @@ struct PostureView: View {
                 tone: .danger,
                 title: "Catalog validation failed",
                 detail: error,
-                command: TamaCommand.hooksValidate
-            )
+                            )
         }
     }
 
@@ -146,8 +143,7 @@ struct PostureView: View {
                 tone: .danger,
                 title: "Session control unavailable",
                 detail: sessionError,
-                command: TamaCommand.status,
-                actions: [
+                                actions: [
                     WisentAction("Open Session", symbol: "person.badge.key", kind: .secondary) {
                         onNavigate(.session)
                     }
@@ -160,16 +156,14 @@ struct PostureView: View {
                     tone: .danger,
                     title: "System policy error in \(session.agentDisplayName) session",
                     detail: error,
-                    command: TamaCommand.status
-                )
+                                    )
             }
             if let error = session.runtime?.registryLoadError {
                 WisentAlertPanel(
                     tone: .danger,
                     title: "Hook registry failed to load in \(session.agentDisplayName) session",
                     detail: error,
-                    command: TamaCommand.hooksValidate
-                )
+                                    )
             }
         }
     }
@@ -186,9 +180,7 @@ struct PostureView: View {
                 title: blockingTitle(decision.event),
                 detail: decision.event.reason
                     ?? "The runtime recorded the decision without a reason string.",
-                command: decision.event.blockedHookId.map { "tama hooks show \($0)" }
-                    ?? TamaCommand.status,
-                actions: [
+                                actions: [
                     WisentAction("Open Session", symbol: "person.badge.key", kind: .secondary) {
                         onNavigate(.session)
                     }

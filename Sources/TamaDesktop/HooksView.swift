@@ -229,8 +229,7 @@ struct HooksView: View {
                         tone: .danger,
                         title: "Catalog unavailable",
                         detail: catalogError,
-                        command: TamaCommand.hooksValidate,
-                        actions: [
+                                                actions: [
                             WisentAction("Retry", symbol: "arrow.clockwise", kind: .primary) {
                                 Task { await model.refresh() }
                             }

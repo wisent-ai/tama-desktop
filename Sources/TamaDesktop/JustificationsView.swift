@@ -153,8 +153,7 @@ struct JustificationsView: View {
                 WisentAlertPanel(
                     tone: .danger,
                     title: "Registry unreadable",
-                    detail: loadError,
-                    command: "python3 -m json.tool \(collection.requirement.registryPath)"
+                                        detail: "\(loadError) Registry: \(collection.requirement.registryPath)"
                 )
             }
             if let collection { contract(collection) }

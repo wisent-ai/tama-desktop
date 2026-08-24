@@ -73,7 +73,7 @@ final class ViolationsModel: ObservableObject {
         }
         scanState = .scanning
         let task = Task.detached(priority: .userInitiated) {
-            try ViolationsClient().scan(repoPath: path)
+            try await ViolationsClient().scan(repoPath: path)
         }
         scanTask = task
         do {
@@ -100,7 +100,7 @@ final class ViolationsModel: ObservableObject {
         cleanState = .running
         cleanCancellationRequested = false
         let task = Task.detached(priority: .userInitiated) {
-            try ViolationsClient().clean(repoPath: path)
+            try await ViolationsClient().clean(repoPath: path)
         }
         cleanTask = task
         let outcome: Result<String, Error>

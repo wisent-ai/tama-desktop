@@ -78,26 +78,6 @@ enum SidebarDestination: String, Identifiable, CaseIterable {
     }
 }
 
-/// The command that reproduces what the screen is reporting.
-///
-/// A failure the operator cannot reproduce outside the application is a rumour;
-/// every alert on every screen carries one of these.
-enum TamaCommand {
-    static let status = "tama status --runtime"
-    static let hooksValidate = "tama hooks validate --runtime"
-    static let providerCoverage = "tama provider coverage --json"
-    static let installPlan = "tama install-plan --json"
-    static let mcpConfig = "tama mcp-config"
-
-    static func findViolations(repository: String) -> String {
-        "tama find-violations --repo \(repository.isEmpty ? "<path>" : repository)"
-    }
-
-    static func clean(repository: String) -> String {
-        "tama clean --repo \(repository.isEmpty ? "<path>" : repository)"
-    }
-}
-
 /// Availability mapped to tone in one place instead of in every view.
 enum TamaTone {
     /// `Not registered` is a fresh install, not an outage.

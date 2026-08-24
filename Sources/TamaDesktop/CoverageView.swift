@@ -107,8 +107,7 @@ struct CoverageView: View {
                     tone: .danger,
                     title: "Coverage could not be read",
                     detail: coverageError,
-                    command: TamaCommand.providerCoverage,
-                    actions: [
+                                        actions: [
                         WisentAction("Retry", symbol: "arrow.clockwise", kind: .primary) {
                             Task { await inspection.loadCoverage(force: true) }
                         }
@@ -120,7 +119,7 @@ struct CoverageView: View {
                 if inspection.isReadingCoverage {
                     WisentLoadingPanel(
                         title: "Reading declared provider coverage",
-                        detail: "tama provider coverage maps every registry event onto the runtimes that claim it."
+                        detail: "Every registry event mapped onto the runtimes that claim it."
                     )
                 } else if inspection.coverageError == nil {
                     WisentEmptyPanel(

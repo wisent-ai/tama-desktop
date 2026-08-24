@@ -4,10 +4,10 @@ import WisentDesignSystem
 /// Where an install would write, scope by scope, and the MCP snippet that goes
 /// with it.
 ///
-/// `tama install-plan` and `tama mcp-config` had no surface, so an operator
+/// The install plan and the MCP snippet had no surface, so an operator
 /// approving a privileged install could not see which files it would touch. The
-/// plan is read-only: this screen states target paths and the exact commands
-/// that act on them, and performs none of them.
+/// plan is read-only: this screen states target paths, and performs none of
+/// the changes.
 struct InstallPlanView: View {
     @ObservedObject var inspection: InspectionModel
 
@@ -32,8 +32,7 @@ struct InstallPlanView: View {
                     tone: .danger,
                     title: "Install plan could not be read",
                     detail: planError,
-                    command: TamaCommand.installPlan,
-                    actions: [
+                                        actions: [
                         WisentAction("Retry", symbol: "arrow.clockwise", kind: .primary) {
                             Task { await inspection.loadPlan(force: true) }
                         }
@@ -128,15 +127,13 @@ struct InstallPlanView: View {
         WisentSectionBox(
             title: "MCP server",
             detail: "Paste this into a client configuration to expose the bundled Tama tools.",
-            trailing: TamaCommand.mcpConfig
-        ) {
+                    ) {
             if let mcpError = inspection.mcpError {
                 WisentAlertPanel(
                     tone: .warning,
                     title: "MCP snippet could not be read",
                     detail: mcpError,
-                    command: TamaCommand.mcpConfig
-                )
+                                    )
             } else if let configuration = inspection.mcpConfiguration {
                 WisentPanel {
                     Text(configuration)
@@ -149,7 +146,7 @@ struct InstallPlanView: View {
             } else if inspection.isReadingMCP {
                 WisentLoadingPanel(
                     title: "Reading the MCP snippet",
-                    detail: "tama mcp-config prints the server command and arguments for this release."
+                    detail: "The server command and arguments for this release."
                 )
             }
         }

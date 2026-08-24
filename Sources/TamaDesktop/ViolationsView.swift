@@ -176,8 +176,7 @@ struct ViolationsView: View {
                     tone: .danger,
                     title: "Scan failed",
                     detail: message,
-                    command: TamaCommand.findViolations(repository: model.repoPath),
-                    actions: [
+                                        actions: [
                         WisentAction(
                             "Scan again",
                             symbol: "arrow.clockwise",
@@ -194,8 +193,7 @@ struct ViolationsView: View {
                     tone: .danger,
                     title: "Repair did not finish clean",
                     detail: message,
-                    command: TamaCommand.clean(repository: model.repoPath)
-                )
+                                    )
             }
             if let report { counters(report) }
             problems
@@ -268,8 +266,7 @@ struct ViolationsView: View {
                 tone: .warning,
                 title: "The scanner could not enumerate \([problem.owner, problem.repo].compactMap { $0 }.joined(separator: "/"))",
                 detail: problem.error,
-                command: TamaCommand.findViolations(repository: model.repoPath)
-            )
+                            )
         }
     }
 

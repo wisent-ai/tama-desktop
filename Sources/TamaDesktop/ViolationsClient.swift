@@ -90,82 +90,65 @@ struct ViolationTotals: Decodable, Equatable, Sendable {
 }
 
 struct ViolationsClient: Sendable {
-    static let scanCommand = "find-violations"
-    static let cleanCommand = "clean"
+    private static let scanOperation = "The violation scan"
+    private static let cleanOperation = "The cleanup"
 
-    func scan(repoPath: String) throws -> ViolationReport {
+    func scan(repoPath: String) async throws -> ViolationReport {
         let path = try validatedRepositoryPath(repoPath)
-        let result = try TamaCLI(
-            command: Self.scanCommand,
-            arguments: [Self.scanCommand, "--repo", path, "--json"]
-        ).run()
+        let result = try await client().postStreaming(
+            "violations/scan",
+            body: ["repo": path],
+            operation: Self.scanOperation
+        )
         switch result.status {
-        // Exit 1 is "violations found", which is a report and not a failure.
+        // Status 1 is "violations found", which is a report and not a failure.
         case 0, 1:
             do {
-                return try JSONDecoder().decode(ViolationReport.self, from: result.stdout)
+                return try JSONDecoder().decode(ViolationReport.self, from: result.document)
             } catch {
                 // The decoding reason is the only evidence there is when the
                 // scanner's output and this build disagree about the report.
-                throw TamaCLIError.unreadableOutput(
-                    Self.scanCommand,
+                throw TamaBackendError.unreadableOutput(
+                    Self.scanOperation,
                     error.localizedDescription
                 )
             }
-        case 2:
-            throw TamaCLIError.usageRejected(Self.scanCommand, result.stderrSnippet)
         default:
-            throw TamaCLIError.commandFailed(
-                Self.scanCommand,
-                status: result.status,
-                message: result.stderrSnippet
+            let message = result.failureSentence
+            throw TamaBackendError.refused(
+                message.isEmpty
+                    ? "\(Self.scanOperation) reported status \(result.status)."
+                    : message
             )
         }
     }
 
-    func clean(repoPath: String) throws -> String {
+    func clean(repoPath: String) async throws -> String {
         let path = try validatedRepositoryPath(repoPath)
         try ensureCleanupAgentAvailable()
-        let result = try TamaCLI(
-            command: Self.cleanCommand,
-            arguments: [Self.cleanCommand, "--repo", path],
-            extraEnvironment: cleanStateEnvironment()
-        ).run()
+        let result = try await client().postStreaming(
+            "violations/clean",
+            body: ["repo": path],
+            operation: Self.cleanOperation
+        )
         switch result.status {
-        case EXIT_SUCCESS:
-            let summary = result.stdoutSnippet
+        case 0:
+            let summary = result.stdoutText.trimmingCharacters(in: .whitespacesAndNewlines)
             return summary.isEmpty
-                ? "The clean command finished without printing a summary."
+                ? "The cleanup finished without printing a summary."
                 : summary
-        case 2:
-            throw TamaCLIError.usageRejected(Self.cleanCommand, result.stderrSnippet)
         default:
-            let message = result.stderrSnippet.isEmpty
-                ? result.stdoutSnippet
-                : result.stderrSnippet
-            throw TamaCLIError.commandFailed(
-                Self.cleanCommand,
-                status: result.status,
-                message: message
+            let message = result.failureSentence
+            throw TamaBackendError.refused(
+                message.isEmpty
+                    ? "\(Self.cleanOperation) reported status \(result.status)."
+                    : message
             )
         }
     }
 
-    private func cleanStateEnvironment() -> [String: String] {
-        guard
-            let support = FileManager.default.urls(
-                for: .applicationSupportDirectory,
-                in: .userDomainMask
-            ).first
-        else {
-            return [:]
-        }
-        return [
-            "TAMA_CLEAN_STATE_DIR": support
-                .appendingPathComponent("Tama", isDirectory: true)
-                .appendingPathComponent("violations", isDirectory: true)
-                .path
-        ]
+    private func client() async throws -> TamaClient {
+        TamaClient(baseURL: try await TamaBackend.shared.endpoint())
     }
 
     private func validatedRepositoryPath(_ value: String) throws -> String {
@@ -196,7 +179,7 @@ struct ViolationsClient: Sendable {
 
     private func ensureCleanupAgentAvailable() throws {
         let manager = FileManager.default
-        guard TamaCLI.executableCandidates(named: "codex").contains(where: {
+        guard executableCandidates(named: "codex").contains(where: {
             manager.isExecutableFile(atPath: $0.path)
         }) else {
             throw ViolationsError.cleanupAgentUnavailable

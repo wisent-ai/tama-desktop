@@ -86,8 +86,7 @@ struct SessionView: View {
                         tone: .danger,
                         title: "Session control unavailable",
                         detail: sessionError,
-                        command: TamaCommand.status,
-                        actions: [
+                                                actions: [
                             WisentAction("Retry", symbol: "arrow.clockwise", kind: .primary) {
                                 Task { await model.refreshAgentSessions() }
                             }
@@ -123,8 +122,7 @@ struct SessionView: View {
                 tone: .danger,
                 title: "System policy error",
                 detail: error,
-                command: TamaCommand.status,
-                actions: policyActions(session)
+                                actions: policyActions(session)
             )
         }
         if let error = session.runtime?.registryLoadError {
@@ -132,16 +130,14 @@ struct SessionView: View {
                 tone: .danger,
                 title: "Hook registry failed to load",
                 detail: error,
-                command: TamaCommand.hooksValidate
-            )
+                            )
         }
         if let runtime = session.runtime, runtime.reloadRequired, runtime.reloadPending != true {
             WisentAlertPanel(
                 tone: .warning,
                 title: "The runtime is serving a stale registry",
                 detail: "This session loaded release \(runtime.loadedReleaseId) and the installed release is \(runtime.installedReleaseId ?? "not recorded"). Enabling every hook reloads the registry in place.",
-                command: TamaCommand.status,
-                actions: [
+                                actions: [
                     WisentAction(
                         "Enable all hooks",
                         kind: .primary,
@@ -157,8 +153,7 @@ struct SessionView: View {
                 tone: .warning,
                 title: "The runtime holds overrides for hooks this build does not declare",
                 detail: (session.runtime?.unknownHookIds ?? []).joined(separator: ", "),
-                command: TamaCommand.hooksValidate
-            )
+                            )
         }
     }
 

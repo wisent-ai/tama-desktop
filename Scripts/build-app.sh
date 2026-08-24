@@ -118,6 +118,14 @@ if ! "$NODE_BIN" -e 'const major = Number.parseInt(process.versions.node.split("
     printf '%s\n' "Node.js 20 or newer is required to export the bundled catalog."
     false
 fi
+CARGO_BIN=${TAMA_CARGO:-}
+if [ -z "$CARGO_BIN" ]; then
+    CARGO_BIN=$(command -v cargo || true)
+fi
+if [ -z "$CARGO_BIN" ] || [ ! -x "$CARGO_BIN" ]; then
+    printf '%s\n' "cargo is required to build the bundled Tama backend."
+    false
+fi
 CODESIGN_IDENTITY=${WISENT_CODESIGN_IDENTITY:-}
 APP_PROVISIONING_PROFILE=${WISENT_APP_PROVISIONING_PROFILE:-}
 CODESIGN_TIMESTAMP=${TAMA_CODESIGN_TIMESTAMP:---timestamp=none}
@@ -302,6 +310,30 @@ codesign \
     --entitlements "$SYSTEM_POLICY_SOURCE/TamaNetworkFilter.entitlements" \
     "$SYSTEM_EXTENSION"
 codesign --verify --strict "$SYSTEM_EXTENSION"
+# The desktop spawns the sealed Rust CLI once as its loopback backend, and
+# the MCP snippet names the server next to it. Both ship inside the release
+# so the binary the app runs is the one this build sealed.
+"$CARGO_BIN" build \
+    --release \
+    --manifest-path "$HOOKS_ROOT/rust/Cargo.toml" \
+    -p tama-cli \
+    -p tama-mcp-server
+mkdir -p "$HOOK_RELEASE/bin"
+install -m 0755 \
+    "$HOOKS_ROOT/rust/target/release/tama-cli" \
+    "$HOOK_RELEASE/bin/tama-cli"
+install -m 0755 \
+    "$HOOKS_ROOT/rust/target/release/tama-mcp-server" \
+    "$HOOK_RELEASE/bin/tama-mcp-server"
+for executable in "$HOOK_RELEASE/bin/tama-cli" "$HOOK_RELEASE/bin/tama-mcp-server"; do
+    codesign \
+        --force \
+        --sign "$CODESIGN_IDENTITY" \
+        --options runtime \
+        $CODESIGN_TIMESTAMP \
+        "$executable"
+    codesign --verify --strict "$executable"
+done
 TAMA_HOOK_SOURCE_DIRTY="$HOOK_SOURCE_DIRTY" \
 TAMA_HOOK_SOURCE_REVISION="$HOOK_SOURCE_REVISION" \
 python3 "$SCRIPT_DIR/seal_hook_release.py" "$HOOK_RELEASE" >/dev/null

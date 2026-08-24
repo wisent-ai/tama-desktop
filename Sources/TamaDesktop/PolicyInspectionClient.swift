@@ -50,48 +50,40 @@ struct InstallPlan: Sendable {
     let levels: [InstallPlanLevel]
 }
 
-/// The read-only half of the `tama` CLI: coverage the registry declares, the
-/// install plan, and the MCP snippet.
+/// The read-only half of the Tama backend: coverage the registry declares,
+/// the install plan, and the MCP snippet.
 ///
-/// These three commands exist in the core and had no surface at all, so the
+/// These three reads exist in the core and had no surface at all, so the
 /// operator had to leave the application to answer "which provider is covered"
-/// and "where would an install write". Nothing here mutates: every argument is
-/// a read, and each failure carries the exact command back to the screen.
+/// and "where would an install write". Nothing here mutates: every read is a
+/// GET, and each failure carries the backend's own sentence back to the screen.
 struct PolicyInspectionClient: Sendable {
-    static let coverageCommand = "provider coverage"
-    static let planCommand = "install-plan"
-    static let mcpCommand = "mcp-config"
+    private static let coverageOperation = "The provider coverage read"
+    private static let planOperation = "The install plan read"
+    private static let mcpOperation = "The MCP snippet read"
 
-    func providerCoverage() throws -> [ProviderCoverage] {
-        try TamaCLI(
-            command: Self.coverageCommand,
-            arguments: ["provider", "coverage", "--json"],
-            timeoutSeconds: Int("60")!
-        ).readJSON([ProviderCoverage].self)
+    func providerCoverage() async throws -> [ProviderCoverage] {
+        try await client().get(
+            "coverage",
+            as: [ProviderCoverage].self,
+            operation: Self.coverageOperation
+        )
     }
 
-    func installPlan() throws -> InstallPlan {
-        let result = try TamaCLI(
-            command: Self.planCommand,
-            arguments: ["install-plan", "--json"],
-            timeoutSeconds: Int("60")!
-        ).run()
-        guard result.status == EXIT_SUCCESS else {
-            throw TamaCLIError.commandFailed(
-                Self.planCommand,
-                status: result.status,
-                message: result.stderrSnippet
-            )
-        }
-        return try Self.decodePlan(result.stdout)
+    func installPlan() async throws -> InstallPlan {
+        let document = try await client().getDocument(
+            "install-plan",
+            operation: Self.planOperation
+        )
+        return try Self.decodePlan(document)
     }
 
-    func mcpConfiguration() throws -> String {
-        try TamaCLI(
-            command: Self.mcpCommand,
-            arguments: ["mcp-config"],
-            timeoutSeconds: Int("60")!
-        ).readText()
+    func mcpConfiguration() async throws -> String {
+        try await client().getPrettyText("mcp-config", operation: Self.mcpOperation)
+    }
+
+    private func client() async throws -> TamaClient {
+        TamaClient(baseURL: try await TamaBackend.shared.endpoint())
     }
 
     /// The plan's levels do not share a shape: one carries seven runtime
@@ -103,15 +95,15 @@ struct PolicyInspectionClient: Sendable {
         do {
             parsed = try JSONSerialization.jsonObject(with: data)
         } catch {
-            throw TamaCLIError.unreadableOutput(planCommand, error.localizedDescription)
+            throw TamaBackendError.unreadableOutput(planOperation, error.localizedDescription)
         }
         guard
             let root = parsed as? [String: Any],
             let archiveRoot = root["archiveRoot"] as? String,
             let levels = root["levels"] as? [String: Any]
         else {
-            throw TamaCLIError.unreadableOutput(
-                planCommand,
+            throw TamaBackendError.unreadableOutput(
+                planOperation,
                 "the plan document carries no archiveRoot string and levels object"
             )
         }

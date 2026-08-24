@@ -2,9 +2,9 @@ import Foundation
 
 /// The declared coverage and the install plan, read on demand.
 ///
-/// Both are read-only `tama` commands that had no surface at all. They are not
-/// polled: each is read the first time its screen opens and then only when the
-/// operator asks, because each read spawns the bundled CLI.
+/// Both are read-only backend endpoints that had no surface at all. They are
+/// not polled: each is read the first time its screen opens and then only when
+/// the operator asks.
 @MainActor
 final class InspectionModel: ObservableObject {
     @Published private(set) var coverage: [ProviderCoverage] = []
@@ -30,7 +30,7 @@ final class InspectionModel: ObservableObject {
         isReadingCoverage = true
         do {
             coverage = try await Task.detached(priority: .userInitiated) {
-                try PolicyInspectionClient().providerCoverage()
+                try await PolicyInspectionClient().providerCoverage()
             }.value
             coverageError = nil
             coverageReadAt = Date()
@@ -45,7 +45,7 @@ final class InspectionModel: ObservableObject {
         hasRequestedPlan = true
         isReadingPlan = true
         async let planResult = Task.detached(priority: .userInitiated) {
-            try PolicyInspectionClient().installPlan()
+            try await PolicyInspectionClient().installPlan()
         }.value
         do {
             plan = try await planResult
@@ -66,7 +66,7 @@ final class InspectionModel: ObservableObject {
         isReadingMCP = true
         do {
             mcpConfiguration = try await Task.detached(priority: .userInitiated) {
-                try PolicyInspectionClient().mcpConfiguration()
+                try await PolicyInspectionClient().mcpConfiguration()
             }.value
             mcpError = nil
         } catch {

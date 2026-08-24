@@ -225,8 +225,7 @@ struct TamaOnboardingView: View {
                         tone: .danger,
                         title: "Onboarding is unavailable",
                         detail: errorMessage,
-                        command: "tama status",
-                        actions: [
+                                                actions: [
                             WisentAction("Dismiss", kind: .secondary) {
                                 journey.dismissError()
                             }

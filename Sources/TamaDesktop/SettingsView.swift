@@ -30,8 +30,7 @@ struct SettingsView: View {
                 inspectionOnly
             }
             build
-            deferredToCLI
-        }
+                    }
         .sheet(isPresented: $isDecidingDeactivation) { deactivationDecision }
     }
 
@@ -207,75 +206,6 @@ struct SettingsView: View {
         }
     }
 
-
-    // MARK: - What stays in the CLI
-
-    /// Named rather than hidden. Each of these is a real capability of the core
-    /// that deliberately has no button, and an operator is better served by the
-    /// exact command than by hunting for a control that does not exist.
-    private var deferredToCLI: some View {
-        WisentSectionBox(
-            title: "Only in the tama CLI",
-            detail: "Operations this application deliberately does not perform, and the command that does.",
-            trailing: "by design"
-        ) {
-            WisentPanel(padding: 0) {
-                VStack(spacing: 0) {
-                    ForEach(Self.deferred, id: \.command) { entry in
-                        VStack(alignment: .leading, spacing: WisentDesign.Space.x1) {
-                            Text(entry.command)
-                                .font(WisentTypeScale.identifier())
-                                .foregroundStyle(WisentDesign.ink)
-                                .textSelection(.enabled)
-                            Text(entry.reason)
-                                .font(WisentTypeScale.caption())
-                                .foregroundStyle(WisentDesign.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .padding(WisentDesign.Space.x4)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        Divider()
-                    }
-                }
-            }
-        }
-    }
-
-    private struct DeferredCommand {
-        let command: String
-        let reason: String
-    }
-
-    private static let deferred = [
-        DeferredCommand(
-            command: "tama adaptive status | drift | queue | repair | apply",
-            reason: "The adaptive doctor prints diagnostic key=value lines with no JSON contract, and drift hashes the live installed scripts. This application reads a sealed snapshot and states so on every screen; parsing terminal prose would let it disagree with the core silently."
-        ),
-        DeferredCommand(
-            command: "tama adaptive install | uninstall | claude-config",
-            reason: "These write the legacy-runner shim and the operator's Claude settings routing. Tama installs its own dispatchers only, and never edits another product's configuration."
-        ),
-        DeferredCommand(
-            command: "tama docs --out <path>",
-            reason: "Renders the same description, rationale, side effects and events the Hooks inspector already shows, into a Markdown file. A second rendering of one source would be a second thing to keep true."
-        ),
-        DeferredCommand(
-            command: "tama verify",
-            reason: "Runs the release's own hook-block fixtures. Test execution and its evidence belong to Probierz, not to a desktop button."
-        ),
-        DeferredCommand(
-            command: "tama hooks add | remove --root <source-tree>",
-            reason: "Mutates a source tree's registry and reseals it. The catalog in this build is sealed at build time, so editing it from here would produce a policy no release can reproduce."
-        ),
-        DeferredCommand(
-            command: "tama install --set-git-config",
-            reason: "Writes user-global Git configuration. The Install plan screen states the exact paths and the command, so the operator approves it where the change is visible."
-        ),
-        DeferredCommand(
-            command: "tama clean --model kimi | --max-rounds N | --dry-run | --skip",
-            reason: "Repair from this application is deliberately one shape: Codex, bounded rounds, mandatory final rescan. Every other combination stays where its output is fully visible."
-        ),
-    ]
 
     // MARK: - The decision
 
