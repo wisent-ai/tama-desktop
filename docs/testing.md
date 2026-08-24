@@ -30,16 +30,17 @@ risk before the command.
 
 | CLI contract | Command example | Required proof | Current evidence |
 |---|---|---|---|
-| Bundled CLI discovery | `examples/getting-started/install-cli.sh` | Creates or idempotently retains the matching link, refuses unrelated entries, and reports missing PATH configuration | Not executed in current work |
-| Catalog health and aggregate provider summary | `examples/getting-started/status.sh` | Stable human output, valid JSON, truthful nonzero status for an invalid catalog, and explicit optional runtime-drift scope | Not executed in current work |
-| Hook listing and exact hook inspection | `examples/core/hooks-list.sh` | Human and JSON output agree on ID, source, command, and events | Not executed in current work |
-| Hook occurrence registration and removal | `examples/core/hooks-add.sh`, `examples/core/hooks-remove.sh` | Exact event mutation, atomic resealed registry write, validation, and reversible removal | Not executed in current work |
-| Provider coverage | `examples/core/provider-coverage.sh` | Provider filtering and complete registry-declared hook/event mappings without claiming live evidence | Not executed in current work |
-| Repository read-only scan | `examples/core/scan-repository.sh` | Existing owned repository; clean and violation reports; tree unchanged; bounded error | Parser unit evidence only |
+| Bundled CLI discovery | `examples/getting-started/install-cli.sh` | Creates or idempotently retains the matching link to the bundled `bin/tama-cli`, refuses unrelated entries, and reports missing PATH configuration | Not executed in current work |
+| Catalog health and live sessions | `examples/getting-started/status.sh` | Stable human output and valid JSON from `validate` and `sessions`, with an explicit `--home` scope | Executed read-only against the 2026-08-24 source build |
+| Release seal verification | `examples/integrity/verify-release-seal.sh` | Intact release digests to its recorded `releaseId`; drift names the files written after the seal | Executed with pasted output in [walkthrough-verify-release](walkthrough-verify-release.md) |
+| Installed runtime status | `examples/integrity/runtime-status.sh` | Live sessions listed; every installed tree digested against its content-addressed name; second-gate verdict stated | Executed with pasted output in [walkthrough-runtime-status](walkthrough-runtime-status.md) |
+| Hook listing and exact hook inspection | `examples/core/hooks-list.sh` | Human and JSON output agree on ID, source, command, and events | Executed read-only against the 2026-08-24 source build |
+| Provider coverage | `examples/core/provider-coverage.sh` | Complete registry-declared hook/event mappings from the loopback backend without claiming live evidence | Executed read-only against the 2026-08-24 source build |
+| Repository read-only scan | `examples/core/scan-repository.sh` | Existing owned repository; clean and violation reports; tree unchanged; bounded error | Executed read-only against a throwaway repository |
 | Provider-backed cleanup and final rescan | `examples/core/clean-repository.sh` | Recoverable repository, bounded agent execution, preserved Git identity, final independent scan | Missing; credentialed provider qualification required |
-| User-global Git dispatcher installation | `examples/operations/install-user-git-hooks.sh` | Reviewed plan, exact target writes, Git config result, post-install status | Missing; controlled mutation qualification required |
-| MCP configuration | `examples/operations/mcp-config.sh` | Emitted server command resolves to the selected release | Not executed in current work |
-| Adaptive recovery triage | `examples/recovery/adaptive-status.sh` | Status, drift, and queue remain read-only; repair/apply stay explicit | Not executed in current work |
+| User-global Git dispatcher installation | `examples/operations/install-user-git-hooks.sh` | Reviewed plan, exact target writes, Git config result, post-install validation | Missing; controlled mutation qualification required |
+| MCP configuration | `examples/operations/mcp-config.sh` | Emitted server command resolves to the selected release | Executed read-only against the 2026-08-24 source build |
+| Adaptive recovery triage | `examples/recovery/adaptive-status.sh` | Status, drift, and queue stay read-only beyond first-run state directories; repair/apply stay explicit | Executed read-only against a scratch home |
 
 ## Required suites
 

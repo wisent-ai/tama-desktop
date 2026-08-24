@@ -113,22 +113,20 @@ Every error includes the failed operation, whether retry is safe, and one correc
 
 ## CLI policy surface
 
-`tama status` validates the immutable catalog without treating absent local provider
-configuration as catalog corruption. `tama status --runtime` additionally checks Claude
-and Codex installation drift at `~/.claude/settings.json` and `~/.codex/hooks.json` for
-the current user. `--home <path>` selects a different explicit home. JSON output states
-both `runtimeInstallChecked` and the resolved `runtimeHome`, so automation cannot confuse
-catalog scope with local-runtime scope. `tama provider coverage` reports registry-declared
-hook/event mappings only and explicitly does not claim live execution.
+`tama validate` judges the sealed catalog and the local installation together without
+conflating them: hook and orphan-source counts first, one `WARN <id>: source path could
+not be mapped from command` per sealed-backend hook, then labelled `install drift` lines
+for the current user's provider configurations (`~/.claude/settings.json`,
+`~/.codex/hooks.json`) — non-material drift warns, material drift makes the exit status
+nonzero. `tama sessions [--home <path>]` reads exactly one explicit home's session
+records and prints nothing (exit 0) when none are live. Provider coverage is served
+read-only at `/v1/coverage` and states its own evidence in every row:
+`Registry-declared mappings; not live execution evidence.`
 
-Hook inspection is read-only. `tama hooks add` and `tama hooks remove` are maintainer
-operations: both require an explicit writable `--root`, refuse implicit signed bundles or
-installed releases, keep one command identity per hook ID, preserve occurrences on other
-events, write the complete resealed registry atomically, and expose an exact rollback
-command in the corresponding example. Missing option values are usage errors. Hook
-timeouts must be integer seconds in the inclusive range 1–3600; invalid values are
-rejected before the registry is written.
-Registry read, parse, temporary-write, and rename failures produce a bounded diagnostic and a nonzero exit without exposing a stack trace. Replacement preserves the existing registry file permissions and becomes visible through one same-directory atomic rename; failed temporary-file cleanup never masks the primary write failure.
+Hook inspection is read-only: `list`, `show`, and `docs` render the sealed catalog and
+never write. The sealed CLI carries no registry mutation — adding or removing a hook is
+maintainer work in the hook source tree, and it reaches a machine only as a new sealed
+release ([hook-releases](hook-releases.md)).
 
 ## Observability and bounds
 

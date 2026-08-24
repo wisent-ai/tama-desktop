@@ -59,7 +59,8 @@ Tama opens Wisent authentication directly. The read-only bundled-policy inspecto
 
 Enter the Wisent account email and request a one-time code, or use an enabled delegated provider. Credentials and refresh tokens are stored by Wisent Auth in the macOS Keychain. Tama does not store them in Application Support. A successful Wisent Auth state is the sole source of authentication truth; Tama does not duplicate it in preferences.
 
-After authentication, Tama opens guided setup until `tama.hasCompletedSetup` is true. Runtime installation, privileged backend registration, macOS approvals, and live-session verification remain separate explicit actions. If identity is unavailable, the read-only inspector remains usable. All runtime, service, session-control, emergency, and repository workflows remain behind authentication and their explicit mutation boundaries.
+After authentication, the full control interface opens immediately — there is no separate setup gate — and the signed first-use journey records `tama.hasCompletedSetup` only against visible setup evidence ([desktop/setup](desktop/setup.md)). Runtime installation, privileged backend registration, macOS approvals, and live-session verification remain separate explicit actions. If identity is unavailable, the read-only inspector remains usable. All runtime, service, session-control, emergency, and repository workflows remain behind authentication and their explicit mutation boundaries.
+
 ## First successful workflow
 
 Starting state:
@@ -72,11 +73,11 @@ Starting state:
 
 Steps:
 
-1. On **Set up Tama**, read **Readiness**: `Bundled policy is valid` must already be satisfied, and the other three requirements are listed as outstanding.
-2. Select **Turn hooks on**. After release-integrity validation and before any managed write, Tama resolves Node from the documented locations, rejects versions older than 20, canonicalizes the executable through symlinks, and pins it into every Node-based installed hook command and the generated supervisor launcher. Each installed hook and supervised semantic dispatch preloads the sealed version guard before its target script. Tama also checks the Python installer prerequisite before launch. The bar under the status reports the command's own result.
-3. If managed hooks are disabled, **Turn hooks on** restores every managed dispatcher and reports what it restored.
-4. Select **Allow system protection** to register the privileged backend. Approve the daemon/System Extension and Network filter in macOS settings. Grant Full Disk Access only to the named Tama component when prompted.
-5. Start or resume one supported supervised coding-agent session using its normal launcher, then select **Refresh sessions**.
+1. Open **Settings → Local enforcement** and confirm the starting state: `Installed release` reads `Not installed by Tama` and `Privileged backend` reads `Not registered`.
+2. Select **Install local runtime** (enabled only while the bundled catalog validates). After release-integrity validation and before any managed write, Tama resolves Node from the documented locations, rejects versions older than 20, canonicalizes the executable through symlinks, and pins it into every Node-based installed hook command and the generated supervisor launcher. Each installed hook and supervised semantic dispatch preloads the sealed version guard before its target script. Tama also checks the Python installer prerequisite before launch. The mutation bar reports `Installing the integrity-checked hook runtime…` then `Installed hook release <id>.`
+3. If managed hooks are globally disabled, **Posture → Re-enable all hooks** verifies the bundled release, restores every managed dispatcher, and reports `Every managed hook dispatcher is active again.`
+4. Select **Register privileged backend** in Settings. Approve the daemon/System Extension and Network filter in macOS settings via **Approval settings**, and grant Full Disk Access only to the named Tama component via **Full Disk Access**.
+5. Start or resume one supported supervised coding-agent session using its normal launcher, then select **Refresh sessions** on **Session**.
 6. Confirm the setup evidence shows:
    - bundled policy valid;
    - local runtime installed and enabled;
@@ -85,9 +86,9 @@ Steps:
    - loaded hook count equals the nonzero registered hook count;
    - no disabled or unknown hook IDs, registry error, pending reload, or reload requirement;
    - system policy is **Kernel-gated**.
-7. Select **Open Tama**. Only this successful transition records `tama.hasCompletedSetup`.
+7. The first-use journey records the verified setup handoff (`tama.hasCompletedSetup`) once exactly that evidence is visible; there is no separate confirmation button, and nothing else records it.
 
-The full control interface now opens on **Posture**. That visible, matching setup evidence is the first successful product outcome. An acknowledgement, successful login, install exit code, or partial backend registration is not sufficient.
+The control interface opens on **Posture**, the default destination. That visible, matching setup evidence is the first successful product outcome. An acknowledgement, successful login, install exit code, or partial backend registration is not sufficient.
 
 ## Machine onboarding
 

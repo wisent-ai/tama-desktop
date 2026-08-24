@@ -15,26 +15,27 @@ signed-out or under-privileged operator sees fewer rows, never dead ones.
   mutation-capable model; unknown or absent roles are denied. Explicit
   confirmation and macOS approval still gate each mutation.
 
-Until guided setup succeeds (`tama.hasCompletedSetup`), an authorized
-operator lands in **Set up Tama** — the flow in
-[quick-start](quick-start.md). Setup is considered complete only while the
-evidence still holds: valid bundled catalog, installed runtime, hooks not
-globally disabled, privileged backend `Enabled`, and at least one live
-session whose loaded release, checksum, and hook counts match the installed
-release with kernel-gated system policy.
+There is no separate setup gate: navigation is available during setup, and
+guided first use runs alongside as a signed journey that records
+`tama.hasCompletedSetup` only against visible evidence
+([desktop/setup](desktop/setup.md)). Setup is considered complete only
+while the evidence still holds: valid bundled catalog, installed runtime,
+hooks not globally disabled, privileged backend `Enabled`, and at least one
+live session whose installed and loaded release identities match, with
+equal nonzero hook counts, under kernel-gated system policy.
 
 ## Destinations
 
 | Group | Screen | What is settled there | Control required |
 |---|---|---|---|
-| Policy | Posture | Release identity, validation, last blocking decision, emergency disable | no |
-| Policy | Hooks | The sealed catalog, per-hook detail, reveal source | no |
-| Policy | Session | Live sessions, capability, decisions, session-scoped enable | yes |
-| Repair | Violations | Read-only repository scan, confirmed cleanup | yes |
-| Repair | Justifications | Local justification registries and their expiry | yes |
-| System | Coverage | Registry-declared provider/event mappings | no |
-| System | Install plan | Where an install would write, per scope level | no |
-| System | Settings | Local enforcement state, backend approvals, deactivate, build identity | no |
+| Policy | [Posture](desktop/posture.md) | Release identity, validation, last blocking decision, emergency disable | no |
+| Policy | [Hooks](desktop/hooks.md) | The sealed catalog, per-hook detail, reveal source | no |
+| Policy | [Session](desktop/session.md) | Live sessions, capability, decisions, session-scoped enable | yes |
+| Repair | [Violations](desktop/violations.md) | Read-only repository scan, confirmed cleanup | yes |
+| Repair | [Justifications](desktop/justifications.md) | Local justification registries and their expiry | yes |
+| System | [Coverage](desktop/coverage.md) | Registry-declared provider/event mappings | no |
+| System | [Install plan](desktop/install-plan.md) | Where an install would write, per scope level | no |
+| System | [Settings](desktop/settings.md) | Local enforcement state, backend approvals, deactivate, build identity | no |
 
 **Posture** is the headline screen: the desktop product version and source
 revision, the hook release the build carries, the release the installed
@@ -79,10 +80,11 @@ document. A non-2xx answer is the backend's own refusal sentence in an
 
 ## Privileged backend
 
-**Allow system protection** registers the `ai.wisent.tama.system-policy`
-daemon through ServiceManagement and activates the
-`ai.wisent.tama.network-filter` System Extension with a socket-filter
-configuration. Status is reported as macOS sees it — `Enabled`,
+**Register privileged backend** (in [Settings](desktop/settings.md))
+registers the `ai.wisent.tama.system-policy` daemon through
+ServiceManagement and activates the `ai.wisent.tama.network-filter` System
+Extension with a socket-filter configuration. Status is reported as macOS
+sees it — `Enabled`,
 `Requires administrator approval`, `Network filter requires approval`,
 `Not registered`, explicit partial-setup states, or a restart-required
 message — and approval-pending is never treated as success. Deactivation

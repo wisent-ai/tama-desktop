@@ -42,24 +42,29 @@ starts no session monitoring and mutates nothing.
 
 ## Turn enforcement on
 
-After sign-in, guided setup (**Set up Tama**) runs until its evidence is
-satisfied:
+After sign-in the full control interface opens immediately — setup is not a
+separate gate ([desktop/setup](desktop/setup.md)). Enforcement is three
+explicit actions:
 
-1. **Turn hooks on** — verifies the bundled release digest, resolves and
-   pins a supported Node.js, then transactionally installs the runtime under
-   `~/Library/Application Support/Tama` and the managed entrypoints under
-   your home ([hook-releases](hook-releases.md)).
-2. **Allow system protection** — registers the privileged daemon and
-   Network Extension; approve them in macOS settings, and grant Full Disk
-   Access only to the named Tama component.
+1. **Settings → Install local runtime** — verifies the bundled release
+   digest, resolves and pins a supported Node.js, then transactionally
+   installs the runtime under `~/Library/Application Support/Tama` and the
+   managed entrypoints under your home
+   ([hook-releases](hook-releases.md)). The bar reports `Installing the
+   integrity-checked hook runtime…` then `Installed hook release <id>.`
+2. **Settings → Register privileged backend** — registers the privileged
+   daemon and Network Extension; approve them in macOS settings via the
+   **Approval settings** and **Full Disk Access** shortcuts, and grant Full
+   Disk Access only to the named Tama component.
 3. Start or resume one supported coding-agent session with its normal
-   launcher, then **Refresh sessions**.
+   launcher, then **Refresh sessions** on the Session screen.
 
-Setup completes only when the visible evidence matches: bundled policy
-valid, installed and loaded release identities equal, loaded hook count
-equal to the nonzero registered count, no disabled or unknown hook ids, no
-pending reload, and the system policy reporting **Kernel-gated**. Only the
-successful **Open Tama** transition records setup as complete.
+Setup records complete only when the visible evidence matches: bundled
+policy valid, installed and loaded release identities equal, loaded hook
+count equal to the nonzero registered count, no disabled or unknown hook
+ids, no pending reload, and the system policy reporting **Kernel-gated**.
+The first-use journey records `tama.hasCompletedSetup` against exactly that
+evidence — there is no button that claims success without it.
 
 ## Read the result
 

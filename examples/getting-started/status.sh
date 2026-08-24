@@ -1,14 +1,18 @@
 #!/bin/sh
-# Read-only: summarize catalog health and registry-declared provider coverage.
-# Requires the `tama` CLI on PATH.
+# Read-only: every live supervised session, then catalog validation counts.
+# Requires the `tama` CLI on PATH (see install-cli.sh).
 set -eu
 
-tama status
+# One line per live session: agent id, session id, hook state.
+tama sessions
 
 # Use JSON when another command will consume the result.
-tama status --json
+tama sessions --json
 
-# After local provider adapters are configured, include install-drift checks for this user.
-# Supply --home <path> to inspect another explicit home:
-# tama status --runtime
-# tama status --runtime --home /Users/example
+# Supply --home <path> to read another explicit home's session records:
+# tama sessions --home /Users/example
+
+# Validation prints hook and orphan-source counts, per-hook warnings, and
+# local install drift; its verdict is this script's exit status.
+# `tama validate --json` is the machine-readable equivalent.
+tama validate

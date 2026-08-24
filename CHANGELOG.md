@@ -9,11 +9,12 @@ All user-visible changes follow the categories required by `docs/releases.md`. A
 - Product contract, onboarding, operational, core, integration, example, testing, release, security, and support documentation.
 - Authenticated guided setup that records completion only after the sealed runtime, enabled privileged backend, and a matching live kernel-gated agent session are all observed.
 - Desktop build provenance and immutable release packaging contract.
-- Public Tama CLI for portable catalog status, opt-in local runtime-drift checks, namespaced hook operations with atomic registry resealing, provider-declared coverage, Git dispatcher installation, repository workflows, adaptive recovery, and MCP configuration.
+- Public Tama CLI for catalog listing and validation with opt-in local install-drift checks, exact hook inspection, live session state, registry-declared provider coverage, Git dispatcher installation, repository scans and cleanup, adaptive recovery, MCP configuration, and the loopback desktop backend.
 - Runnable `examples/` shell commands with inline risk, required-input, side-effect, and rollback comments; CLI link installation is retry-safe, and prose runbooks plus the Markdown coverage matrix were removed.
 - Session destination that renders the capability a supervised session holds — lifetime, expiry, remaining uses and every tool grant — together with the register of semantic decisions that session published.
 - Coverage destination for registry-declared provider coverage, and an Install plan destination that states each scope's target paths, the exact commands that write them, and the MCP server snippet.
-- Settings destination that names the operations deliberately left to the `tama` CLI, each with the command and the reason it stays there.
+- Settings destination for local enforcement — runtime installation, privileged backend registration and macOS approvals, and the confirmed deactivation of everything — plus the product and hook-release build identities.
+- Documentation corpus: per-screen desktop reference under `docs/desktop/`, concept pages under `docs/concepts/`, two executed walkthroughs (release seal verification, runtime status), a runbook of exact refusal sentences, a scripts reference, and runnable read-only integrity examples under `examples/integrity/`.
 
 ### Changed
 

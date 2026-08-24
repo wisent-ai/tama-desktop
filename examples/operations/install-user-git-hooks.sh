@@ -14,5 +14,5 @@ fi
 tama install --set-git-config
 
 # Confirm catalog health and the resulting installation targets.
-tama status
+tama validate
 tama install-plan

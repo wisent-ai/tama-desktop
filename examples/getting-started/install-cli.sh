@@ -4,7 +4,7 @@
 set -eu
 
 TAMA_APP=${TAMA_APP:-"$HOME/Applications/Tama.app"}
-TAMA_CLI="$TAMA_APP/Contents/Resources/hooks-release/src/cli.mjs"
+TAMA_CLI="$TAMA_APP/Contents/Resources/hooks-release/bin/tama-cli"
 TAMA_LINK="$HOME/.local/bin/tama"
 
 [ -f "$TAMA_CLI" ] || { echo "Tama CLI not found: $TAMA_CLI"; false; }

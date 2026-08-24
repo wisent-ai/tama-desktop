@@ -118,15 +118,15 @@ No supported binary has been published yet. The steps below are the contract for
 
    Expected output ends with `OK`.
 3. Expand the archive and move `Tama.app` to `~/Applications`.
-4. Install the bundled CLI entrypoint with [`examples/getting-started/install-cli.sh`](examples/getting-started/install-cli.sh), then run `tama status`. After provider adapters are configured, `tama status --runtime` additionally checks install drift in the current user's `~/.claude/settings.json` and `~/.codex/hooks.json`; `--home <path>` selects a different explicit home.
-5. Open Tama, complete Wisent authentication, then follow **Set up Tama** through runtime installation, privileged backend approval, and matching live-session verification. The full control interface opens only after all setup evidence is satisfied.
+4. Install the bundled CLI entrypoint with [`examples/getting-started/install-cli.sh`](examples/getting-started/install-cli.sh), then run `tama validate` and `tama sessions`. Validation reports catalog counts and labelled `install drift` lines for the current user's `~/.claude/settings.json` and `~/.codex/hooks.json`; `tama sessions --home <path>` selects a different explicit home.
+5. Open Tama, complete Wisent authentication, then turn enforcement on from **Settings** (**Install local runtime**, **Register privileged backend**, macOS approvals) and verify one matching live session on **Session**. Setup is recorded complete only against that visible evidence.
 
 Full prerequisites, first-success steps, failure recovery, reset, and uninstall instructions are in [`docs/onboarding.md`](docs/onboarding.md).
 
 ## Primary interfaces
 
 - **SwiftUI application:** canonical human interface for inspection, setup, session control, emergency recovery, and violation scans.
-- **Tama CLI:** public machine interface for catalog status, hook inspection, provider coverage, Git dispatcher installation, repository scans/cleanup, adaptive recovery, and MCP configuration. Maintainer hook registration additionally requires an explicit writable policy source tree.
+- **Tama CLI:** public machine interface for catalog validation, hook inspection, live sessions, provider coverage, Git dispatcher installation, repository scans/cleanup, adaptive recovery, and MCP configuration.
 - **Session-control JSON protocol:** machine interface between Tama and supported local agent supervisors. Its schema and ownership rules are defined in [`docs/core-contracts.md`](docs/core-contracts.md).
 - **Release manifests:** machine-readable build and artifact identity described in [`docs/releases.md`](docs/releases.md).
 - **Command examples:** directly runnable shell commands with inline risk and side-effect comments in [`examples/`](examples/).
