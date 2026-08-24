@@ -1,15 +1,85 @@
 {
   "schemaVersion": 1,
-  "documents": {
-    "docs/what-is-tama.md": {},
-    "docs/quick-start.md": {},
-    "docs/hook-model.md": {},
-    "docs/hook-releases.md": {},
-    "docs/enforcement-control.md": {},
-    "docs/desktop.md": {},
-    "docs/cli.md": {},
-    "docs/configuration.md": {}
-  },
-  "sources": ["Sources/", "Scripts/", "examples/", "README.md"],
-  "instruction": "The docs must stay true to the Swift sources under Sources/TamaDesktop, the installer and emergency scripts under Scripts/, and the help text of the sealed tama-cli that Scripts/build-app.sh bundles into the release."
+  "documents": [
+    {
+      "output": "docs/what-is-tama.md",
+      "sources": [
+        "Sources",
+        "Scripts",
+        "examples",
+        "README.md"
+      ],
+      "instruction": "The docs must stay true to the Swift sources under Sources/TamaDesktop, the installer and emergency scripts under Scripts/, and the help text of the sealed tama-cli that Scripts/build-app.sh bundles into the release."
+    },
+    {
+      "output": "docs/quick-start.md",
+      "sources": [
+        "Sources",
+        "Scripts",
+        "examples",
+        "README.md"
+      ],
+      "instruction": "The docs must stay true to the Swift sources under Sources/TamaDesktop, the installer and emergency scripts under Scripts/, and the help text of the sealed tama-cli that Scripts/build-app.sh bundles into the release."
+    },
+    {
+      "output": "docs/hook-model.md",
+      "sources": [
+        "Sources",
+        "Scripts",
+        "examples",
+        "README.md"
+      ],
+      "instruction": "The docs must stay true to the Swift sources under Sources/TamaDesktop, the installer and emergency scripts under Scripts/, and the help text of the sealed tama-cli that Scripts/build-app.sh bundles into the release."
+    },
+    {
+      "output": "docs/hook-releases.md",
+      "sources": [
+        "Sources",
+        "Scripts",
+        "examples",
+        "README.md"
+      ],
+      "instruction": "The docs must stay true to the Swift sources under Sources/TamaDesktop, the installer and emergency scripts under Scripts/, and the help text of the sealed tama-cli that Scripts/build-app.sh bundles into the release."
+    },
+    {
+      "output": "docs/enforcement-control.md",
+      "sources": [
+        "Sources",
+        "Scripts",
+        "examples",
+        "README.md"
+      ],
+      "instruction": "The docs must stay true to the Swift sources under Sources/TamaDesktop, the installer and emergency scripts under Scripts/, and the help text of the sealed tama-cli that Scripts/build-app.sh bundles into the release."
+    },
+    {
+      "output": "docs/desktop.md",
+      "sources": [
+        "Sources",
+        "Scripts",
+        "examples",
+        "README.md"
+      ],
+      "instruction": "The docs must stay true to the Swift sources under Sources/TamaDesktop, the installer and emergency scripts under Scripts/, and the help text of the sealed tama-cli that Scripts/build-app.sh bundles into the release."
+    },
+    {
+      "output": "docs/cli.md",
+      "sources": [
+        "Sources",
+        "Scripts",
+        "examples",
+        "README.md"
+      ],
+      "instruction": "The docs must stay true to the Swift sources under Sources/TamaDesktop, the installer and emergency scripts under Scripts/, and the help text of the sealed tama-cli that Scripts/build-app.sh bundles into the release."
+    },
+    {
+      "output": "docs/configuration.md",
+      "sources": [
+        "Sources",
+        "Scripts",
+        "examples",
+        "README.md"
+      ],
+      "instruction": "The docs must stay true to the Swift sources under Sources/TamaDesktop, the installer and emergency scripts under Scripts/, and the help text of the sealed tama-cli that Scripts/build-app.sh bundles into the release."
+    }
+  ]
 }
