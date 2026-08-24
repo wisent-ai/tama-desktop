@@ -245,7 +245,7 @@ struct ViolationsView: View {
             WisentCounterRow.Counter(
                 "Files scanned",
                 value: report.scannedFiles.formatted(.number),
-                detail: "Read-only inspection"
+                detail: "Repository inspection"
             ),
             WisentCounterRow.Counter(
                 "Skipped",
@@ -291,7 +291,7 @@ struct ViolationsView: View {
         } else if model.report == nil {
             WisentEmptyPanel(
                 title: "This repository has not been scanned",
-                detail: "The scan is read-only: it lists the files that would be refused, the files it skipped, and the files it could not read.",
+                detail: "Scan the repository to list refused, skipped, and unreadable files before choosing a clean operation.",
                 symbol: "magnifyingglass",
                 action: WisentAction("Scan", kind: .primary, isEnabled: model.canScan) {
                     Task { await model.scan() }
@@ -392,7 +392,7 @@ struct ViolationsView: View {
                 WisentCapabilityList(
                     title: "This screen can",
                     items: [
-                        "Enumerate a repository you own, read-only",
+                        "Enumerate a repository you own",
                         "Ask one headless agent to edit the working tree",
                     ],
                     isAvailable: true
@@ -423,7 +423,7 @@ struct ViolationsView: View {
             lines: [
                 "One external model agent per repository edits \(model.repoPath) until the findings are gone or its bounded rounds are spent. The provider is external to Tama.",
                 "Tama requests working-tree edits only. It rejects a changed HEAD, a changed checked-out branch and changed local branch refs, and it never commits or pushes.",
-                "A final read-only rescan always runs, and the result reported here is that rescan, not the agent's own claim.",
+                "A final rescan always runs, and the reported result is that rescan rather than the agent's own claim.",
                 "Review git status, branch refs, remote state and the final diff afterwards."
             ],
             reasonCode: model.report.map { "\($0.totals.violations) violations in \($0.totals.repositories) repositories" },

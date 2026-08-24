@@ -1,7 +1,7 @@
 import SwiftUI
 import WisentDesignSystem
 
-/// The local installation, the build behind it, and the boundary around both.
+/// The local installation and the build behind it.
 ///
 /// The baseline mixed these controls into the same page as the posture
 /// verdicts, so installing a privileged backend sat one panel below a metric
@@ -19,7 +19,7 @@ struct SettingsView: View {
     var body: some View {
         WisentScreen(
             title: "Settings",
-            scope: model.allowsControl ? nil : "read-only",
+            scope: model.allowsControl ? nil : "inspection mode",
             freshness: buildIdentity.productVersion,
             actions: actions
         ) {
@@ -30,7 +30,6 @@ struct SettingsView: View {
                 inspectionOnly
             }
             build
-            boundary
             deferredToCLI
         }
         .sheet(isPresented: $isDecidingDeactivation) { deactivationDecision }
@@ -145,9 +144,9 @@ struct SettingsView: View {
 
     private var inspectionOnly: some View {
         WisentSectionBox(
-            title: "Read-only inspection",
-            detail: "This window reads the sealed catalog and the declared plan. Nothing local is monitored or changed.",
-            trailing: "no controls"
+            title: "Inspection mode",
+            detail: "The sealed catalog and declared plan remain available. Install and deactivate controls appear when the managed Tama runtime is available.",
+            trailing: "controls unavailable"
         ) {
             WisentPanel {
                 WisentCapabilityList(
@@ -208,42 +207,6 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Boundary
-
-    /// The boundary as inventory. A disabled button implies a permission that
-    /// might arrive; an absent capability states a contract.
-    private var boundary: some View {
-        WisentSectionBox(
-            title: "Data boundary",
-            detail: "Tama displays a catalog snapshot generated from tama at build time.",
-            trailing: "credential-free"
-        ) {
-            WisentPanel {
-                HStack(alignment: .top, spacing: WisentDesign.Space.x6) {
-                    WisentCapabilityList(
-                        title: "Tama reads",
-                        items: [
-                            "The catalog snapshot sealed into this build",
-                            "Session records the supervised runtime writes",
-                            "Justification registries declared by catalogued hooks",
-                            "Repositories you own, on request, read-only",
-                        ],
-                        isAvailable: true
-                    )
-                    WisentCapabilityList(
-                        title: "Tama never imports",
-                        items: [
-                            "Logs",
-                            "Credentials",
-                            "Settings",
-                            "Caches",
-                        ],
-                        isAvailable: false
-                    )
-                }
-            }
-        }
-    }
 
     // MARK: - What stays in the CLI
 

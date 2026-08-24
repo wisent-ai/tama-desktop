@@ -176,7 +176,7 @@ struct RootView: View {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.prompt = "Use repository"
-        panel.message = "Choose a Git repository you own. Tama scans it read-only."
+        panel.message = "Choose a Git repository you own. Tama can inspect it and run the canonical clean operation."
         if !violations.repoPath.isEmpty {
             panel.directoryURL = URL(fileURLWithPath: violations.repoPath, isDirectory: true)
         }
@@ -284,7 +284,7 @@ struct RootView: View {
                     continueToSignIn?()
                 } label: {
                     WisentBadge(
-                        "Read-only inspection",
+                        "Repository inspection",
                         symbol: "eye.fill",
                         tone: .neutral
                     )

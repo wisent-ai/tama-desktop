@@ -14,7 +14,7 @@ struct InstallPlanView: View {
     var body: some View {
         WisentScreen(
             title: "Install plan",
-            scope: inspection.plan.map { _ in "read-only" },
+            scope: inspection.plan.map { _ in "planned changes" },
             freshness: freshness,
             actions: [
                 WisentAction(
