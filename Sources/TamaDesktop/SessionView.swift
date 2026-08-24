@@ -94,6 +94,7 @@ struct SessionView: View {
                         ]
                     )
                 }
+                sessionHookSummary
                 if let session = model.selectedAgentSession {
                     faults(session)
                     counters(session)
@@ -475,6 +476,72 @@ struct SessionView: View {
                     .font(WisentTypeScale.caption())
                     .foregroundStyle(WisentDesign.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+    // MARK: - Per-session hook summary
+
+    /// One table showing every live session and its hook state, so the
+    /// operator sees "which hook on which session" without clicking through
+    /// each session one at a time.
+    @ViewBuilder
+    private var sessionHookSummary: some View {
+        if !model.agentSessions.isEmpty {
+            WisentSectionBox(title: "Hook state per session") {
+                VStack(alignment: .leading, spacing: WisentDesign.Space.x1) {
+                    HStack {
+                        Text("SESSION")
+                            .font(WisentTypeScale.eyebrow())
+                            .tracking(0.6)
+                            .foregroundStyle(WisentDesign.muted)
+                            .frame(width: 220, alignment: .leading)
+                        Text("GLOBAL STATE")
+                            .font(WisentTypeScale.eyebrow())
+                            .tracking(0.6)
+                            .foregroundStyle(WisentDesign.muted)
+                            .frame(width: 120, alignment: .leading)
+                        Text("LOADED")
+                            .font(WisentTypeScale.eyebrow())
+                            .tracking(0.6)
+                            .foregroundStyle(WisentDesign.muted)
+                            .frame(width: 60, alignment: .leading)
+                        Text("ALLOWLIST")
+                            .font(WisentTypeScale.eyebrow())
+                            .tracking(0.6)
+                            .foregroundStyle(WisentDesign.muted)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    Divider()
+                    ForEach(model.agentSessions) { session in
+                        HStack {
+                            Text("\(session.agentDisplayName) · \(URL(fileURLWithPath: session.cwd).lastPathComponent)")
+                                .font(WisentTypeScale.identifierSmall())
+                                .foregroundStyle(WisentDesign.ink)
+                                .lineLimit(1)
+                                .frame(width: 220, alignment: .leading)
+                            Text(session.globallyDisabled ? "Disabled" : "Enabled")
+                                .font(WisentTypeScale.identifierSmall())
+                                .foregroundStyle(session.globallyDisabled ? WisentDesign.warning : WisentDesign.success)
+                                .frame(width: 120, alignment: .leading)
+                            Text("\(session.runtime?.loadedHookCount ?? 0)")
+                                .font(WisentTypeScale.identifierSmall())
+                                .foregroundStyle(WisentDesign.secondary)
+                                .monospacedDigit()
+                                .frame(width: 60, alignment: .leading)
+                            Text(session.globallyDisabled
+                                ? session.enabledHookIds.isEmpty
+                                    ? "empty"
+                                    : session.enabledHookIds.joined(separator: ", ")
+                                : "all (\(session.disabledHookIds.isEmpty ? "no overrides" : "\(session.disabledHookIds.count) disabled"))")
+                                .font(WisentTypeScale.identifierSmall())
+                                .foregroundStyle(WisentDesign.secondary)
+                                .lineLimit(2)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .frame(height: WisentAppLayout.denseRowHeight)
+                        Divider()
+                    }
+                }
             }
         }
     }
