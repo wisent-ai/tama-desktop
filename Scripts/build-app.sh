@@ -219,7 +219,7 @@ fi
 HOOK_RELEASE="$RESOURCES/hooks-release"
 mkdir -p "$HOOK_RELEASE"
 install -m 0644 "$HOOKS_ROOT/package.json" "$HOOK_RELEASE/package.json"
-for directory in shared-hooks claude-hooks codex-hooks repo-githooks src; do
+for directory in shared-hooks claude-hooks codex-hooks repo-githooks; do
     cp -R "$HOOKS_ROOT/$directory" "$HOOK_RELEASE/$directory"
 done
 find "$HOOK_RELEASE" -name '__pycache__' -type d -prune -exec rm -rf {} +
@@ -227,8 +227,7 @@ rm -f \
     "$HOOK_RELEASE/shared-hooks/generate-configs.mjs" \
     "$HOOK_RELEASE/shared-hooks/providers.json" \
     "$HOOK_RELEASE/shared-hooks/run-one-session-hook.js"
-rm -rf "$HOOK_RELEASE/src/tests"
-rm -f "$HOOK_RELEASE/src/violations/"*tests.mjs
+
 SYSTEM_POLICY_SOURCE="$DESKTOP_ROOT/SystemPolicy/macOS"
 SYSTEM_POLICY_DIR="$HOOK_RELEASE/shared-hooks/system-policy"
 SYSTEM_POLICY_BACKEND="$SYSTEM_POLICY_DIR/tama-system-policy-macos"
