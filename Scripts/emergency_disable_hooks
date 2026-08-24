@@ -250,6 +250,35 @@ else:
         "Supervised agent sessions will resume without an editor restart."
     )
 
+# Reload running OMP agent sessions so they pick up the new hook state.
+# The wisent-terminal-session-recovery extension in VS Code watches for dead
+# OMP processes and restarts them from their transcripts, so killing the
+# processes here is safe: each session resumes with fresh hook state.
+import subprocess as _sp
+_result = _sp.run(
+    ["/bin/ps", "-axo", "pid=,command="],
+    capture_output=True, text=True, timeout=10,
+)
+_killed = []
+for _line in _result.stdout.splitlines():
+    _parts = _line.strip().split(None, 1)
+    if len(_parts) < 2:
+        continue
+    _pid, _cmd = _parts
+    if "/.local/bin/omp" not in _cmd:
+        continue
+    if "__omp_worker" in _cmd or "browser-relay" in _cmd:
+        continue
+    if "--resume" not in _cmd and "--allow-home" not in _cmd:
+        continue
+    try:
+        os.kill(int(_pid), signal.SIGTERM)
+        _killed.append(_pid)
+    except (ProcessLookupError, PermissionError):
+        pass
+if _killed:
+    print(f"Sent SIGTERM to {len(_killed)} OMP agent session(s) for hook state reload: {', '.join(_killed)}")
+
 shutil.rmtree(tama / "vscode-resume", ignore_errors=True)
 shutil.rmtree(
     home / ".vscode/extensions/tama.emergency-resume-1.0.0",
