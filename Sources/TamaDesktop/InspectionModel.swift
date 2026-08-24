@@ -36,6 +36,11 @@ final class InspectionModel: ObservableObject {
             coverageReadAt = Date()
         } catch {
             coverageError = Self.sentence(error)
+            TamaFailureReporting.reportSurfaced(
+                failurePoint: "tama.inspection.coverage",
+                error: error,
+                sentence: coverageError ?? Self.sentence(error)
+            )
         }
         isReadingCoverage = false
     }
@@ -53,6 +58,11 @@ final class InspectionModel: ObservableObject {
             planReadAt = Date()
         } catch {
             planError = Self.sentence(error)
+            TamaFailureReporting.reportSurfaced(
+                failurePoint: "tama.inspection.plan",
+                error: error,
+                sentence: planError ?? Self.sentence(error)
+            )
         }
         isReadingPlan = false
         await loadMCPConfiguration()
@@ -71,6 +81,11 @@ final class InspectionModel: ObservableObject {
             mcpError = nil
         } catch {
             mcpError = Self.sentence(error)
+            TamaFailureReporting.reportSurfaced(
+                failurePoint: "tama.inspection.mcp",
+                error: error,
+                sentence: mcpError ?? Self.sentence(error)
+            )
         }
         isReadingMCP = false
     }

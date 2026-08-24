@@ -80,8 +80,13 @@ final class ViolationsModel: ObservableObject {
             report = try await task.value
             scanState = .done
         } catch {
-            scanState = .failed(
-                (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            let sentence =
+            (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            scanState = .failed(sentence)
+            TamaFailureReporting.reportSurfaced(
+                failurePoint: "tama.violations.scan",
+                error: error,
+                sentence: sentence
             )
         }
         scanTask = nil
@@ -141,8 +146,13 @@ final class ViolationsModel: ObservableObject {
 
         switch outcome {
         case let .failure(error):
-            cleanState = .failed(
+            let sentence =
                 (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            cleanState = .failed(sentence)
+            TamaFailureReporting.reportSurfaced(
+                failurePoint: "tama.violations.clean",
+                error: error,
+                sentence: sentence
             )
         case let .success(summary):
             guard
@@ -150,9 +160,14 @@ final class ViolationsModel: ObservableObject {
                 report.totals.violations == .zero,
                 report.totals.problems == .zero
             else {
-                cleanState = .failed(
+                let sentence =
                     "Cleanup finished but the final scan is not clean. "
-                        + "Review the remaining report and command summary: \(summary)"
+                    + "Review the remaining report and command summary: \(summary)"
+                cleanState = .failed(sentence)
+                TamaFailureReporting.report(
+                    failurePoint: "tama.violations.clean",
+                    code: "unknown",
+                    detail: sentence
                 )
                 return
             }

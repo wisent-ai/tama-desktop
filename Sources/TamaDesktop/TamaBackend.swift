@@ -31,7 +31,17 @@ final class TamaBackend: @unchecked Sendable {
         let task = Task { try await spawn() }
         withLock { inFlight = task }
         defer { withLock { inFlight = nil } }
-        return try await task.value
+        do {
+            return try await task.value
+        } catch {
+            TamaFailureReporting.report(
+                failurePoint: "tama.backend.start",
+                code: TamaFailureReporting.code(for: error),
+                detail: (error as? LocalizedError)?.errorDescription
+                    ?? error.localizedDescription
+            )
+            throw error
+        }
     }
 
     /// NSLock cannot be locked directly from an async context; these critical

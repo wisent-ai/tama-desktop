@@ -10,13 +10,17 @@ let package = Package(
     dependencies: [
         .package(
             url: "https://github.com/wisent-ai/wisent-desktop-auth.git",
-            revision: "ef895bb"
+            revision: "da24ee889479655ca6bb88bead6b9d165bcabdab"
         ),
         .package(url: "https://github.com/wisent-ai/wisent-desktop-update.git", exact: "0.1.0"),
         .package(url: "https://github.com/wisent-ai/echo.git", exact: "0.1.2"),
         .package(
             url: "https://github.com/wisent-ai/wisent-components.git",
             revision: "35d8cc4a528de3e4ab8c67a64e68ce8a9c994ef1"
+        ),
+        .package(
+            url: "https://github.com/wisent-ai/wisent-errors.git",
+            revision: "b01a0c99766b5c6378ecdbf3921108420ba058f1"
         ),
     ],
     targets: [
@@ -27,6 +31,7 @@ let package = Package(
                 .product(name: "WisentDesktopUpdate", package: "wisent-desktop-update"),
                 .product(name: "WisentOnboarding", package: "echo"),
                 .product(name: "WisentDesignSystem", package: "wisent-components"),
+                .product(name: "WisentErrors", package: "wisent-errors"),
             ],
             path: "Sources/TamaDesktop",
             resources: [.process("Resources")]

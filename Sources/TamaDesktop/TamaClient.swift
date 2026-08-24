@@ -170,9 +170,14 @@ struct TamaClient: Sendable {
     /// refusal, surfaced verbatim.
     private static func refusal(data: Data, status: Int) -> TamaBackendError {
         let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        if let message = object?["error"] as? String, !message.isEmpty {
-            return .refused(message)
-        }
-        return .refused("The Tama backend answered with status \(status).")
+        let message =
+            (object?["error"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            ?? "The Tama backend answered with status \(status)."
+        TamaFailureReporting.report(
+            failurePoint: "tama.backend.refusal",
+            code: TamaFailureReporting.code(forRefusalStatus: status),
+            detail: message
+        )
+        return .refused(message)
     }
 }
