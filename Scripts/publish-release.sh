@@ -429,18 +429,19 @@ codesign --verify --strict --deep "$VALIDATION_APP"
 xcrun stapler validate "$VALIDATION_APP"
 spctl --assess --type execute "$VALIDATION_APP"
 NOTES_FILE="$RELEASE_DIR/release-notes.md"
-TAMA_CHANGELOG="$DESKTOP_ROOT/CHANGELOG.md" \
+TAMA_RELEASE_NOTES_SOURCE="$DESKTOP_ROOT/Release/release-notes.json" \
 TAMA_QUALIFICATION_NAME="$(basename "$QUALIFICATION_FILE")" \
 TAMA_RELEASE_NOTES="$NOTES_FILE" \
 TAMA_RELEASE_VERSION="$PRODUCT_VERSION" \
 TAMA_RELEASE_TAG="$TAG" \
 python3 - <<'PY'
+import json
 import os
 from pathlib import Path
 from urllib.parse import quote
 
 version = os.environ["TAMA_RELEASE_VERSION"]
-lines = Path(os.environ["TAMA_CHANGELOG"]).read_text().splitlines()
+document = json.loads(Path(os.environ["TAMA_RELEASE_NOTES_SOURCE"]).read_text())
 qualification_name = os.environ["TAMA_QUALIFICATION_NAME"]
 qualification_url = (
     "https://github.com/wisent-ai/tama-desktop/releases/download/"
@@ -450,70 +451,50 @@ qualification_url = (
 qualification_entry = (
     f"- Immutable qualification record: [{qualification_name}]({qualification_url})"
 )
-selected = []
-release_headings = [
-    line
-    for line in lines
-    if line.startswith(f"## {version} ")
+matches = [
+    release
+    for release in document.get("releases", [])
+    if release.get("version") == version
 ]
 try:
-    release_heading, = release_headings
+    release, = matches
 except ValueError:
-    raise SystemExit(f"Expected exactly one release-notes section for {version}")
-collecting = False
-for line in lines:
-    if line == release_heading:
-        collecting = True
-        continue
-    if collecting and line.startswith("## "):
-        break
-    if collecting:
-        selected.append(line)
-if not selected:
-    raise SystemExit(f"No release notes found for {version}")
+    raise SystemExit(f"Expected exactly one structured release-notes entry for {version}")
 required_headings = [
-    "### Added",
-    "### Changed",
-    "### Fixed",
-    "### Removed or deprecated",
-    "### Security",
-    "### Configuration",
-    "### Data or state migrations",
-    "### Compatibility requirements",
-    "### Operator actions",
-    "### Known limitations",
-    "### Qualification evidence",
+    "Added",
+    "Changed",
+    "Fixed",
+    "Removed or deprecated",
+    "Security",
+    "Configuration",
+    "Data or state migrations",
+    "Compatibility requirements",
+    "Operator actions",
+    "Known limitations",
+    "Qualification evidence",
 ]
-heading_order = []
-sections = {}
-current_heading = None
-for line in selected:
-    if line.startswith("### "):
-        current_heading = line
-        heading_order.append(line)
-        sections.setdefault(line, [])
-    elif current_heading is not None:
-        sections[current_heading].append(line)
+sections = release.get("sections") or []
+heading_order = [section.get("name") for section in sections]
 if heading_order != required_headings:
     raise SystemExit(
         f"Release notes for {version} do not use the required category order"
     )
-for heading in required_headings:
-    if not any(line.strip() for line in sections[heading]):
+for section in sections:
+    if not section.get("items"):
         raise SystemExit(
-            f"Release-notes category {heading.removeprefix('### ')} is empty"
+            f"Release-notes category {section.get('name', '<unnamed>')} is empty"
         )
 rendered = []
-linked_qualification = False
-for line in selected:
-    rendered.append(line)
-    if line == "### Qualification evidence":
-        rendered.append("")
-        rendered.append(qualification_entry)
-        linked_qualification = True
-if not linked_qualification:
-    raise SystemExit(f"Release notes for {version} have no Qualification evidence heading")
-Path(os.environ["TAMA_RELEASE_NOTES"]).write_text("\n".join(rendered).strip() + "\n")
+for section in sections:
+    name = section["name"]
+    rendered.extend([f"### {name}", ""])
+    if name == "Qualification evidence":
+        rendered.extend([qualification_entry, ""])
+    rendered.extend(f"- {item}" for item in section["items"])
+    rendered.append("")
+Path(os.environ["TAMA_RELEASE_NOTES"]).write_text(
+    "\n".join(rendered).strip() + "\n"
+)
 PY
 VERSION_WITHOUT_BUILD=${PRODUCT_VERSION%%+*}
 case "$VERSION_WITHOUT_BUILD" in

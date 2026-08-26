@@ -2,7 +2,7 @@
 # Read-only: live supervised sessions, every installed release verified against
 # its content-addressed directory name, and the second integrity gate an
 # emergency enable would meet.
-# Executed end-to-end with pasted output in docs/walkthrough-runtime-status.md.
+# Executed end-to-end with pasted output at https://tama.wisent.com/docs/walkthrough-runtime-status/.
 set -eu
 
 cd "$(dirname "$0")/../.."

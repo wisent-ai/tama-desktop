@@ -46,14 +46,31 @@ if [ "$(git -C "$DESKTOP_ROOT" rev-parse "$TAG^{}")" != "$(git -C "$DESKTOP_ROOT
     printf '%s\n' "Selected release tag does not resolve to HEAD: $TAG"
     false
 fi
-if ! grep -F "## $PRODUCT_VERSION —" "$DESKTOP_ROOT/CHANGELOG.md" >/dev/null; then
-    printf '%s\n' "CHANGELOG.md has no section for $PRODUCT_VERSION."
-    false
-fi
-if grep -F "## $PRODUCT_VERSION — Unreleased" "$DESKTOP_ROOT/CHANGELOG.md" >/dev/null; then
-    printf '%s\n' "Replace the Unreleased heading before packaging."
-    false
-fi
+RELEASE_NOTES_SOURCE="$DESKTOP_ROOT/Release/release-notes.json"
+TAMA_RELEASE_NOTES_SOURCE="$RELEASE_NOTES_SOURCE" \
+TAMA_RELEASE_VERSION="$PRODUCT_VERSION" \
+python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+
+source = Path(os.environ["TAMA_RELEASE_NOTES_SOURCE"])
+document = json.loads(source.read_text())
+matches = [
+    release
+    for release in document.get("releases", [])
+    if release.get("version") == os.environ["TAMA_RELEASE_VERSION"]
+]
+try:
+    release, = matches
+except ValueError:
+    raise SystemExit(
+        f"Expected exactly one structured release-notes entry for "
+        f"{os.environ['TAMA_RELEASE_VERSION']}"
+    )
+if release.get("status") == "unreleased":
+    raise SystemExit("Mark the structured release-notes entry as published before packaging.")
+PY
 : "${WISENT_CODESIGN_IDENTITY:?Set the dedicated release signing identity.}"
 : "${WISENT_APP_PROVISIONING_PROFILE:?Set the app provisioning profile.}"
 : "${WISENT_NETWORK_FILTER_PROVISIONING_PROFILE:?Set the Network Extension provisioning profile.}"

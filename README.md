@@ -121,29 +121,29 @@ No supported binary has been published yet. The steps below are the contract for
 4. Install the bundled CLI entrypoint with [`examples/getting-started/install-cli.sh`](examples/getting-started/install-cli.sh), then run `tama validate` and `tama sessions`. Validation reports catalog counts and labelled `install drift` lines for the current user's `~/.claude/settings.json` and `~/.codex/hooks.json`; `tama sessions --home <path>` selects a different explicit home.
 5. Open Tama, complete Wisent authentication, then turn enforcement on from **Settings** (**Install local runtime**, **Register privileged backend**, macOS approvals) and verify one matching live session on **Session**. Setup is recorded complete only against that visible evidence.
 
-Full prerequisites, first-success steps, failure recovery, reset, and uninstall instructions are in [`docs/onboarding.md`](docs/onboarding.md).
+Full prerequisites, first-success steps, failure recovery, reset, and uninstall instructions are in the [Tama onboarding guide](https://tama.wisent.com/docs/onboarding/).
 
 ## Primary interfaces
 
 - **SwiftUI application:** canonical human interface for inspection, setup, session control, emergency recovery, and violation scans.
 - **Tama CLI:** public machine interface for catalog validation, hook inspection, live sessions, provider coverage, Git dispatcher installation, repository scans/cleanup, adaptive recovery, and MCP configuration.
-- **Session-control JSON protocol:** machine interface between Tama and supported local agent supervisors. Its schema and ownership rules are defined in [`docs/core-contracts.md`](docs/core-contracts.md).
-- **Release manifests:** machine-readable build and artifact identity described in [`docs/releases.md`](docs/releases.md).
+- **Session-control JSON protocol:** machine interface between Tama and supported local agent supervisors. Its schema and ownership rules are defined in the [core contracts](https://tama.wisent.com/docs/core-contracts/).
+- **Release manifests:** machine-readable build and artifact identity described in the [release documentation](https://tama.wisent.com/docs/releases/).
 - **Command examples:** directly runnable shell commands with inline risk and side-effect comments in [`examples/`](examples/).
 
 ## Operational model
 
 Tama is local-first. It reads its catalog from the signed application, stores managed runtime state under `~/Library/Application Support/Tama`, and stores installed hook entrypoints only in explicitly documented per-user locations. Credentials remain in the macOS Keychain through Wisent Auth; Tama does not serialize access tokens into its own state or logs.
 
-Installation, state ownership, permissions, observability, recovery, and removal are detailed in [`docs/operations.md`](docs/operations.md). Integration credentials and outage behavior are detailed in [`docs/integrations.md`](docs/integrations.md).
+Installation, state ownership, permissions, observability, recovery, and removal are detailed in [operations](https://tama.wisent.com/docs/operations/). Integration credentials and outage behavior are detailed in [integrations](https://tama.wisent.com/docs/integrations/).
 
 ## Project status and support
 
 Status: **development, pre-release (`0.x`)**. No stable or supported binary release is currently published. Until the first preview passes release qualification, the repository is for maintainers and source builds only.
 
 - Canonical release version: the immutable signed Git tag `v<SemVer>` selected by [`Scripts/package-release.sh`](Scripts/package-release.sh)
-- Compatibility, releases, upgrade, and rollback: [`docs/releases.md`](docs/releases.md)
-- Testing and qualification status: [`docs/testing.md`](docs/testing.md)
+- Compatibility, releases, upgrade, and rollback: [release documentation](https://tama.wisent.com/docs/releases/)
+- Testing and qualification status: [testing documentation](https://tama.wisent.com/docs/testing/)
 - Security reports: [private GitHub Security Advisory](https://github.com/wisent-ai/tama-desktop/security/advisories/new)
 - Product issues: [GitHub Issues](https://github.com/wisent-ai/tama-desktop/issues)
 - License: Apache License 2.0; see [`LICENSE`](LICENSE)

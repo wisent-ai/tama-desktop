@@ -1,7 +1,7 @@
 #!/bin/sh
 # Read-only: prove a sealed hook release still digests to its recorded releaseId,
 # and when it does not, name the files written after the seal.
-# Executed end-to-end with pasted output in docs/walkthrough-verify-release.md.
+# Executed end-to-end with pasted output at https://tama.wisent.com/docs/walkthrough-verify-release/.
 set -eu
 
 cd "$(dirname "$0")/../.."

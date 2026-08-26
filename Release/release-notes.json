@@ -1,0 +1,137 @@
+{
+  "schemaVersion": 1,
+  "releases": [
+    {
+      "version": "0.2.0",
+      "status": "unreleased",
+      "sections": [
+        {
+          "name": "Added",
+          "items": [
+            "Product contract, onboarding, operational, core, integration, example, testing, release, security, and support documentation.",
+            "Authenticated guided setup that records completion only after the sealed runtime, enabled privileged backend, and a matching live kernel-gated agent session are all observed.",
+            "Desktop build provenance and immutable release packaging contract.",
+            "Public Tama CLI for catalog listing and validation with opt-in local install-drift checks, exact hook inspection, live session state, registry-declared provider coverage, Git dispatcher installation, repository scans and cleanup, adaptive recovery, MCP configuration, and the loopback desktop backend.",
+            "Runnable `examples/` shell commands with inline risk, required-input, side-effect, and rollback comments; CLI link installation is retry-safe, and prose runbooks plus the Markdown coverage matrix were removed.",
+            "Session destination that renders the capability a supervised session holds — lifetime, expiry, remaining uses and every tool grant — together with the register of semantic decisions that session published.",
+            "Coverage destination for registry-declared provider coverage, and an Install plan destination that states each scope's target paths, the exact commands that write them, and the MCP server snippet.",
+            "Settings destination for local enforcement — runtime installation, privileged backend registration and macOS approvals, and the confirmed deactivation of everything — plus the product and hook-release build identities.",
+            "Documentation corpus: per-screen desktop reference, concept pages, two executed walkthroughs (release seal verification, runtime status), a runbook of exact refusal sentences, a scripts reference, and runnable read-only integrity examples. The canonical copy is published at https://tama.wisent.com/docs/."
+          ]
+        },
+        {
+          "name": "Changed",
+          "items": [
+            "Runtime installation and macOS policy registration require explicit authenticated confirmation instead of running during model initialization.",
+            "Session discovery is read-only when Tama has not been configured.",
+            "Session monitoring starts only while the authenticated control surface is visible.",
+            "Policy controls now require a current recognized Wisent organization role, and mutation-capable models enforce an explicit construction-time authorization boundary.",
+            "Tama opens Wisent session restoration directly; the explicitly selected read-only inspector uses isolated bundled-catalog state, while incomplete authenticated setup resumes until its evidence is complete.",
+            "In-flight repository scans and cleanup can be stopped; scan cancellation is read-only, while cleanup preserves partial edits and performs the final rescan.",
+            "Runtime-drift CLI checks now resolve Claude and Codex adapter configuration from the current or explicitly selected user home instead of maintainer paths embedded in the signed catalog.",
+            "Local setup and emergency commands now drain output concurrently, enforce bounded output and runtime, and terminate their process tree on timeout.",
+            "Leaving the authenticated control surface cancels active repository scan or cleanup process trees and requires inspection plus a new read-only scan after partial cleanup.",
+            "Product and hook-release identities are displayed separately.",
+            "OMP session-control reload actions use the documented v2 identity, persist checksum-bound hook state, and schedule one native runtime reload after the active agent turn settles; the desktop waits for the matching authoritative response and distinguishes a scheduled reload from a stale or failed runtime.",
+            "Per-session controls now expose only policy-permitted enable operations and wait for the live supervisor response; the desktop no longer offers or optimistically reports prohibited hook disablement.",
+            "The interface is organized by operator decision rather than by data container: a grouped sidebar of eight destinations, a 44 pt context bar on every screen instead of a hero header, three-zone data screens with counted facet rails and inspectors, and the repository under repair selected once in the sidebar header.",
+            "Disabling every managed hook, repairing violations with a headless agent, and deactivating local enforcement now open a decision dialog that quotes the exact effect, lists what it touches, and keeps the safe verb as the primary button.",
+            "Mutations report the backend's own sentence in place on the screen that started them, instead of a modal alert that closes without a trace."
+          ]
+        },
+        {
+          "name": "Fixed",
+          "items": [
+            "OMP session records and overrides now use the documented v2 `agentId` identity, allowing the desktop to discover live sessions and exchange validated controls; a legacy-only v1 state now produces an actionable runtime-reinstall diagnostic instead of an unexplained empty session list.",
+            "Session-discovery failures remain visible instead of being represented as an empty successful result.",
+            "Optional violation tooling no longer depends on a hard-coded maintainer directory.",
+            "Nonzero cleanup-agent exits cannot be reported as successful cleanup even when partial edits remove the final violation.",
+            "Hook registration now rejects invalid timeout and registry-path arguments before mutation, reports registry-load, registry-I/O, or mutator-launch failures without an unhandled stack trace, preserves registry permissions across atomic replacement, and retains the primary error if temporary-file cleanup also fails.",
+            "Session control now labels hook-registry load failures explicitly and displays the runtime diagnostic instead of allowing a scheduled or required reload label to hide the error.",
+            "Runtime prerequisites now consistently distinguish local Node.js execution, Python-based installation/restoration, and macOS backend approval across README, onboarding, core, and integration contracts.",
+            "Build, CLI, and runtime installation now reject unsupported Node.js versions; installation validates Node before managed writes, canonicalizes its executable through symlinks, pins that path into installed hook commands and the supervisor launcher, preloads a sealed version guard before every installed target and supervised semantic dispatch, records path and validated version in release provenance, exposes them in Overview, and POSIX-quotes generated shell paths without expansion.",
+            "Release packaging and publication now reject signed `v` tags that are not strict Semantic Versioning, including leading-zero numeric identifiers; publication also verifies the sidecar against the artifact digest, byte size, signed embedded build/hook identities, source revision, dependency pins, channel, and canonical examples before upload.",
+            "Release packaging and publication rejection paths now return failure statuses instead of allowing automation to mistake a printed diagnostic for success.",
+            "Prerelease and build metadata remain in Tama's exact embedded product identity while Apple bundle versions use the required numeric SemVer core; packaging and publication reject drift across the app, Network Extension, tag, manifest, or component build number.",
+            "Channel promotion no longer implies relabeling prerelease bytes as stable: an exact preview remains preview, while a stable SemVer is a distinct signed candidate that must be qualified before one-time publication.",
+            "Packaging and publication accept an explicit `TAMA_RELEASE_TAG` to select one signed release identity when preview and stable candidates share a source commit, reject ambiguous implicit discovery, and reject a selected tag that does not resolve to `HEAD`.",
+            "Publication rejects duplicate ZIP member names, absolute or parent-traversing member paths, and any archive root other than `Tama.app` or optional `__MACOSX` resource-fork metadata before upload.",
+            "Packaging and publication both require the app to pass signature, stapled-ticket, and Gatekeeper assessment; publication repeats those checks from the exact zip before upload.",
+            "Publication now requires an immutable qualification sidecar bound to the exact candidate, complete coverage of each canonical example and required suite kind, repeated identity and cleanup evidence, passed/redacted records, and an asset link injected into release notes.",
+            "Publication requires exactly one matching release-notes section and rejects missing, duplicate, reordered, or empty canonical categories before creating the immutable GitHub release.",
+            "GitHub publication now requires the repository immutable-release policy, creates and retains one stable GitHub release ID, verifies the exact remote signed-tag object, stages exactly the four canonical assets in a private draft, rejects missing or foreign asset names, validates ID, title, tag, notes, draft state, and preview/stable classification, downloads and compares every uploaded byte, rechecks policy immediately before publishing that exact ID with an explicit stable-only `latest` decision, confirms the published metadata and immutable state, redownloads and rechecks the locked asset set, reports the stable ID after failure, and never automatically deletes a GitHub release where draft state cannot be an atomic deletion precondition.",
+            "Remote asset verification now paginates the retained release ID's complete asset collection and downloads every canonical byte stream by its unique release asset ID before and after publication.",
+            "Canonical assets are now uploaded through URLs bound directly to the release ID returned by draft creation; upload and verification no longer resolve a mutable release tag.",
+            "Release publication now classifies preview versus stable from the SemVer prerelease component only, so hyphens inside build metadata cannot suppress a stable release or mark it prerelease.",
+            "App builds now read valid Keychain signing identities once and require an exact certificate-name or case-insensitive hash match, while also rejecting unsupported channel or code-signing timestamp modes and missing app or Network Filter provisioning-profile files before compilation. Build output and optional installation are assembled and signature-checked in private staging directories, then promoted with sibling backups and rollback instead of deleting the previous bundles before fallible work completes.",
+            "Violations command output is retained within explicit bounds and output-limit failures remain visible.",
+            "Cleanup rejects changed HEAD, checked-out branch, or local branch refs and states the remaining external-provider verification boundary.",
+            "Backend status exposes partial installation, and deactivation attempts every privileged component while preserving aggregate failure and restart-required recovery.",
+            "Backend unavailability is reported as a full-width panel carrying the backend's literal sentence and a reproducing command, rather than a dismissable alert or a swallowed read; the catalog, session control, provider coverage, install plan and repository scan each name their own command.",
+            "The session capability document was decoded from every session record and displayed nowhere.",
+            "A privileged backend that is merely not registered, a provider with no declared mapping, and a justification whose evidence is incomplete are no longer coloured as failures.",
+            "A refresh that fails keeps the previous read on screen instead of replacing it with an empty state."
+          ]
+        },
+        {
+          "name": "Removed or deprecated",
+          "items": [
+            "Automatic service registration on application launch.",
+            "Automatic session-controller installation on application launch.",
+            "Supported-runtime dependence on `~/Documents/CodingProjects/Wisent/tama`."
+          ]
+        },
+        {
+          "name": "Security",
+          "items": [
+            "Policy-changing setup is moved behind explicit user intent.",
+            "Read-only catalog inspection remains available during Wisent Auth outages without exposing control actions.",
+            "Distributed builds ignore development hook-root and Node executable overrides; unauthenticated inspection does not load local justification or policy state.",
+            "Release artifacts record source provenance and carry independent SHA-256 verification."
+          ]
+        },
+        {
+          "name": "Configuration",
+          "items": [
+            "Developer-only source overrides remain unsupported for binary releases.",
+            "Writable cleanup state is kept outside immutable release bytes."
+          ]
+        },
+        {
+          "name": "Data or state migrations",
+          "items": [
+            "Installed hook-release state and existing v2 session records remain readable. Legacy v1 session-control records and overrides are deliberately ignored because they lack the v2 `agentId` identity contract; reinstall the bundled runtime, then stop or resume affected sessions so the supervisor publishes fresh v2 records.",
+            "The former `tama.hasSeenWelcome` and `tama.hasSeenTrustScreen` preferences are no longer read. Existing installations retain only independent `tama.hasCompletedSetup` state without changing installed policy."
+          ]
+        },
+        {
+          "name": "Compatibility requirements",
+          "items": [
+            "Apple-silicon macOS 14 or newer.",
+            "Python 3 and Node.js 20 or newer for installed runtime and violations workflows."
+          ]
+        },
+        {
+          "name": "Operator actions",
+          "items": [
+            "Review setup permissions and explicitly install/register components after upgrading.",
+            "Confirm product build identity and loaded hook release before resuming supervised sessions."
+          ]
+        },
+        {
+          "name": "Known limitations",
+          "items": [
+            "No supported preview artifact has been published yet.",
+            "Intel macOS, Linux, and Windows have no supported policy backend."
+          ]
+        },
+        {
+          "name": "Qualification evidence",
+          "items": [
+            "Packaging intentionally creates no qualification claim. Publication augments this source-level notice with a link to the completed immutable qualification sidecar for the exact candidate."
+          ]
+        }
+      ]
+    }
+  ]
+}
