@@ -346,23 +346,6 @@ struct JustificationsView: View {
                     .font(WisentTypeScale.caption())
                     .foregroundStyle(WisentDesign.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Divider()
-                WisentCapabilityList(
-                    title: "This screen can",
-                    items: [
-                        "Read the registries declared by requires_justification hooks",
-                        "Report which records satisfy their contract",
-                    ],
-                    isAvailable: true
-                )
-                WisentCapabilityList(
-                    title: "It never can",
-                    items: [
-                        "Write, extend or delete a justification",
-                        "Read the target file's contents",
-                    ],
-                    isAvailable: false
-                )
             }
         }
     }

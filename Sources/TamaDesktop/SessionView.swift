@@ -455,24 +455,6 @@ struct SessionView: View {
                             : policy.capabilities.joined(separator: ", ")
                     )
                 }
-                Divider()
-                WisentCapabilityList(
-                    title: "This screen can",
-                    items: [
-                        "Enable a hook in one live session",
-                        "Enable every registered hook and reload that session",
-                    ],
-                    isAvailable: true
-                )
-                WisentCapabilityList(
-                    title: "It never can",
-                    items: [
-                        "Disable a hook for one session",
-                        "Issue, extend or revoke a capability",
-                        "Read the agent's transcript or tool arguments",
-                    ],
-                    isAvailable: false
-                )
             }
         } else {
             WisentInspector(eyebrow: "Session", title: "No session selected") {

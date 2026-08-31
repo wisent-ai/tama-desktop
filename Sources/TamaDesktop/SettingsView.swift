@@ -26,8 +26,6 @@ struct SettingsView: View {
             WisentMutationBar(outcome: model.mutation) { model.clearMutation() }
             if model.allowsControl {
                 localEnforcement
-            } else {
-                inspectionOnly
             }
             build
                     }
@@ -137,28 +135,6 @@ struct SettingsView: View {
                         .foregroundStyle(WisentDesign.muted)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-            }
-        }
-    }
-
-    private var inspectionOnly: some View {
-        WisentSectionBox(
-            title: "Inspection mode",
-            detail: "The sealed catalog and declared plan remain available. Install and deactivate controls appear when the managed Tama runtime is available.",
-            trailing: "controls unavailable"
-        ) {
-            WisentPanel {
-                WisentCapabilityList(
-                    title: "Signing in adds",
-                    items: [
-                        "Live session capability, grants and decisions",
-                        "Per-session hook enablement",
-                        "Repository violation scan and repair",
-                        "The local justification registries",
-                        "Runtime installation and the privileged backend",
-                    ],
-                    isAvailable: false
-                )
             }
         }
     }

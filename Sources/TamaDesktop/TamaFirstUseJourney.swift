@@ -187,18 +187,6 @@ struct TamaOnboardingView: View {
                             symbol: "checkmark.shield.fill"
                         )
 
-                        if journey.currentScreen?.screenKind == "promise" {
-                            WisentCapabilityList(
-                                title: "Clear trust boundaries",
-                                items: [
-                                    "Authentication identifies the operator",
-                                    "Setup installs and approves local enforcement",
-                                    "Onboarding explains the product and leads to the first observed policy result",
-                                ],
-                                isAvailable: true
-                            )
-                        }
-
                         Divider()
 
                         HStack(spacing: WisentDesign.Space.x3) {

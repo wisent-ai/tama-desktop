@@ -389,24 +389,6 @@ struct ViolationsView: View {
                     .font(WisentTypeScale.caption())
                     .foregroundStyle(WisentDesign.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Divider()
-                WisentCapabilityList(
-                    title: "This screen can",
-                    items: [
-                        "Enumerate a repository you own",
-                        "Ask one headless agent to edit the working tree",
-                    ],
-                    isAvailable: true
-                )
-                WisentCapabilityList(
-                    title: "It never can",
-                    items: [
-                        "Commit, push, or move a branch ref",
-                        "Touch a repository owned by another user",
-                        "Repair without a final rescan",
-                    ],
-                    isAvailable: false
-                )
             }
         }
     }

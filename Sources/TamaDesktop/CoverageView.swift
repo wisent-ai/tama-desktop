@@ -260,23 +260,6 @@ struct CoverageView: View {
                     .font(WisentTypeScale.caption())
                     .foregroundStyle(WisentDesign.secondary)
                     .fixedSize(horizontal: false, vertical: true)
-                Divider()
-                WisentCapabilityList(
-                    title: "This screen can",
-                    items: [
-                        "List declared event to runtime mappings",
-                        "Name the adapter file each provider reads",
-                    ],
-                    isAvailable: true
-                )
-                WisentCapabilityList(
-                    title: "It never can",
-                    items: [
-                        "Prove a hook ran in that runtime",
-                        "Edit an adapter configuration",
-                    ],
-                    isAvailable: false
-                )
             }
         }
     }
