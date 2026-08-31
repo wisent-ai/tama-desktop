@@ -287,6 +287,11 @@ struct JustificationsView: View {
                 .width(min: 60, ideal: 120)
             }
             .tableStyle(.inset)
+            // A click on this table already means "select this record" and a
+            // drag means "extend that selection", so selectable cell text would
+            // compete with both. Opting out restores exactly the behaviour the
+            // index had before the window turned selection on.
+            .textSelection(.disabled)
         }
     }
 
@@ -371,7 +376,6 @@ struct JustificationsView: View {
             Text(text)
                 .font(WisentTypeScale.caption())
                 .foregroundStyle(WisentDesign.secondary)
-                .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)

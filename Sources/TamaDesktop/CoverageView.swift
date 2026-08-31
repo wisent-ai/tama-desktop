@@ -212,6 +212,11 @@ struct CoverageView: View {
                 .width(min: 60, ideal: 90)
             }
             .tableStyle(.inset)
+            // A click on this table already means "select this mapping" and a
+            // drag means "extend that selection", so selectable cell text would
+            // compete with both. Opting out restores exactly the behaviour the
+            // index had before the window turned selection on.
+            .textSelection(.disabled)
         }
     }
 

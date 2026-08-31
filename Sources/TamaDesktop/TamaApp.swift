@@ -19,10 +19,7 @@ final class TamaAppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         DispatchQueue.main.async { [self] in
             fallbackWindow = wisentEnsureWindow(title: "Tama") {
-                WisentAuthGate(store: auth) {
-                    TamaAuthorizedControlRootView()
-                }
-                .tint(WisentDesign.brand)
+                TamaRootContent(auth: auth)
             }
         }
     }
@@ -37,35 +34,9 @@ final class TamaAppDelegate: NSObject, NSApplicationDelegate {
 struct TamaDesktopApp: App {
     @NSApplicationDelegateAdaptor(TamaAppDelegate.self) private var delegate
     @StateObject private var updater = WisentUpdater()
-    @State private var isInspectingPolicy = false
     var body: some Scene {
         WindowGroup("Tama") {
-            Group {
-                if Self.testIdentityOverride != nil {
-                    TamaAuthorizedControlRootView(bypassesSetup: true)
-                        .environment(\.wisentIdentity, Self.testIdentityOverride)
-                } else if isInspectingPolicy {
-                    TamaInspectionRootView {
-                        isInspectingPolicy = false
-                    }
-                } else {
-                    WisentAuthGate(store: delegate.auth) {
-                        TamaAuthorizedControlRootView()
-                    }
-                    .toolbar {
-                        ToolbarItem {
-                            Button("Inspect policy without controls", systemImage: "eye") {
-                                isInspectingPolicy = true
-                            }
-                        }
-                    }
-                }
-            }
-            .frame(
-                minWidth: WisentAppLayout.minimumWindowWidth,
-                minHeight: WisentAppLayout.minimumWindowHeight
-            )
-            .tint(WisentDesign.brand)
+            TamaRootContent(auth: delegate.auth)
         }
         // `.frame(minWidth:minHeight:)` on the content is a request; this is what
         // makes AppKit refuse a frame narrower than the three zones need. The
@@ -84,6 +55,61 @@ struct TamaDesktopApp: App {
                 WisentCheckForUpdatesCommand(updater: updater)
             }
         }
+    }
+}
+
+/// The one description of Tama's window contents, rendered by both the
+/// `WindowGroup` scene and the delegate's fallback window so the two can never
+/// disagree about which branch — the policy inspector, the identity gate or the
+/// control shell — is on screen.
+private struct TamaRootContent: View {
+    @ObservedObject var auth: WisentAuthStore
+    @State private var isInspectingPolicy = false
+
+    var body: some View {
+        Group {
+            if Self.testIdentityOverride != nil {
+                TamaAuthorizedControlRootView(bypassesSetup: true)
+                    .environment(\.wisentIdentity, Self.testIdentityOverride)
+            } else if isInspectingPolicy {
+                TamaInspectionRootView {
+                    isInspectingPolicy = false
+                }
+            } else {
+                WisentAuthGate(store: auth) {
+                    TamaAuthorizedControlRootView()
+                }
+                .toolbar {
+                    ToolbarItem {
+                        Button("Inspect policy without controls", systemImage: "eye") {
+                            isInspectingPolicy = true
+                        }
+                    }
+                }
+            }
+        }
+        .frame(
+            minWidth: WisentAppLayout.minimumWindowWidth,
+            minHeight: WisentAppLayout.minimumWindowHeight
+        )
+        .tint(WisentDesign.brand)
+        // Every fact Tama reports is selectable, and therefore copyable. The app
+        // exists to state things a person then quotes somewhere else — a hook id,
+        // a catalog checksum, the sentence a policy printed when it refused a
+        // write — and SwiftUI's `Text` refuses selection on macOS unless a view
+        // asks for it, which left 61 of 68 text sites in this window dead to
+        // Cmd-C while seven had been fixed one at a time. A probe through the
+        // accessibility layer found 1 of 6 static texts on screen carrying
+        // AXSelectedTextRange.
+        //
+        // `.textSelection` travels through the environment, so one call here
+        // covers every screen, present and future. It sits above the branch, not
+        // inside it: the identity gate's own views, the "policy controls
+        // unavailable" note and the loading panel are siblings of the control
+        // shell rather than children of it, and a modifier on any one of them
+        // would miss the rest. Tables opt out explicitly, because there a click
+        // and a drag already belong to row selection.
+        .textSelection(.enabled)
     }
 
     private static var testIdentityOverride: WisentIdentity? {

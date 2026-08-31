@@ -390,7 +390,6 @@ struct PostureView: View {
                         Text(warning)
                             .font(WisentTypeScale.body())
                             .foregroundStyle(WisentDesign.secondary)
-                            .textSelection(.enabled)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.horizontal, WisentDesign.Space.x4)
                             .padding(.vertical, WisentDesign.Space.x3)

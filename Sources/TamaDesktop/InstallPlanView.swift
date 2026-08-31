@@ -100,7 +100,6 @@ struct InstallPlanView: View {
                             Text(field.value)
                                 .font(WisentTypeScale.identifierSmall())
                                 .foregroundStyle(WisentDesign.ink)
-                                .textSelection(.enabled)
                                 .fixedSize(horizontal: false, vertical: true)
                             Spacer(minLength: 0)
                         }
@@ -139,7 +138,6 @@ struct InstallPlanView: View {
                     Text(configuration)
                         .font(WisentTypeScale.identifierSmall())
                         .foregroundStyle(WisentDesign.ink)
-                        .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }

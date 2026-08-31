@@ -299,6 +299,11 @@ struct SessionView: View {
                     }
                     .tableStyle(.inset)
                     .frame(height: tableHeight(rows: grants.count))
+                    // Click and drag inside a table belong to the table's own
+                    // row handling, not to the text drawn in the cell. Opting
+                    // out restores exactly the behaviour this grid had before
+                    // the window turned selection on.
+                    .textSelection(.disabled)
                 }
             }
         }
@@ -402,12 +407,16 @@ struct SessionView: View {
                     }
                     .tableStyle(.inset)
                     .frame(height: tableHeight(rows: events.count))
+                    // Click and drag inside a table belong to the table's own
+                    // row handling, not to the text drawn in the cell. The
+                    // blocking reason underneath the grid stays selectable,
+                    // which is the sentence a person actually quotes.
+                    .textSelection(.disabled)
                 }
                 if let reason = events.first(where: \.isBlocking)?.reason {
                     Text(reason)
                         .font(WisentTypeScale.caption())
                         .foregroundStyle(WisentDesign.secondary)
-                        .textSelection(.enabled)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
