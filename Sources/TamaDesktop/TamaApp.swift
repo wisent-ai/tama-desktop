@@ -204,9 +204,13 @@ private struct TamaAuthenticatedRootView: View {
             } else if firstUseJourney.isLoading {
                 ZStack {
                     WisentCanvasBackground()
-                    ProgressView("Loading Tama…")
-                        .controlSize(.large)
-                        .font(WisentTypeScale.bodyStrong())
+                    WisentLoadingPanel(
+                        title: "Reading the Tama first-use journey",
+                        detail: "Asking how far this machine has come through setup before the control surface opens.",
+                        rows: 4
+                    )
+                    .frame(maxWidth: 520)
+                    .padding(WisentDesign.Space.x6)
                 }
             } else {
                 RootView(model: model, violations: violations, continueToSignIn: nil)
