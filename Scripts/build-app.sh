@@ -202,10 +202,36 @@ install -m 0644 "$DESKTOP_ROOT/App/Info.plist" "$CONTENTS/Info.plist"
 plutil -replace CFBundleShortVersionString -string "$BUNDLE_SHORT_VERSION" "$CONTENTS/Info.plist"
 plutil -replace TamaProductVersion -string "$PRODUCT_VERSION" "$CONTENTS/Info.plist"
 plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$CONTENTS/Info.plist"
-if [ -n "${WISENT_UPDATE_FEED_URL:-}" ]; then
-    case "$WISENT_UPDATE_FEED_URL" in https://*) ;; *) printf '%s\n' "WISENT_UPDATE_FEED_URL must use HTTPS" >&2; false ;; esac
-    plutil -replace SUFeedURL -string "$WISENT_UPDATE_FEED_URL" "$CONTENTS/Info.plist"
+# The feed URL already exists in this repository, in
+# .wisent-desktop-release.json - the release manifest wisent-desktop-update
+# reads. Until 2026-08-31 this script stamped SUFeedURL only from
+# WISENT_UPDATE_FEED_URL, so every build that did not export that variable,
+# which includes every local and source build, shipped the empty SUFeedURL that
+# App/Info.plist carries. Sparkle with no feed URL issues no request, so "Check
+# for Updates…" did nothing at all.
+#
+# The manifest is now the default, the environment variable stays an override for
+# a staging feed, and a bundle that would ship without a feed URL fails the build
+# instead of being discovered months later by a user who never got an update.
+RELEASE_MANIFEST="$DESKTOP_ROOT/.wisent-desktop-release.json"
+UPDATE_FEED_URL=${WISENT_UPDATE_FEED_URL:-}
+if [ -z "$UPDATE_FEED_URL" ] && [ -f "$RELEASE_MANIFEST" ]; then
+    command -v jq >/dev/null 2>&1 || {
+        printf '%s\n' "jq is required to read $RELEASE_MANIFEST" >&2
+        exit 1
+    }
+    UPDATE_FEED_URL=$(jq -r '.feed_url // empty' "$RELEASE_MANIFEST")
 fi
+case "$UPDATE_FEED_URL" in
+    https://*) ;;
+    '')
+        printf '%s\n' "no update feed URL: set WISENT_UPDATE_FEED_URL, or .feed_url in $RELEASE_MANIFEST. An app with an empty SUFeedURL can never check for updates." >&2
+        exit 1 ;;
+    *)
+        printf '%s\n' "update feed URL must use HTTPS: $UPDATE_FEED_URL" >&2
+        exit 1 ;;
+esac
+plutil -replace SUFeedURL -string "$UPDATE_FEED_URL" "$CONTENTS/Info.plist"
 install -m 0755 "$BIN_DIR/Tama" "$MACOS/Tama"
 install -m 0644 \
     "$DESKTOP_ROOT/Sources/TamaDesktop/Resources/tama-first-use.json" \
