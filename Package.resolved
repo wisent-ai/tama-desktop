@@ -1,5 +1,5 @@
 {
-  "originHash" : "845125bc1e6c37324a1510563adbf6104b4e3b0d1485b2abe0c2f93cebe3cbca",
+  "originHash" : "beccf3c57f9ff820279797b613511bb5e07a5d1736a71bde195b64adbcf8a1a4",
   "pins" : [
     {
       "identity" : "echo",
@@ -40,8 +40,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/wisent-ai/wisent-desktop-update.git",
       "state" : {
-        "revision" : "04421211d303e48107359df4016ad23bdd1937e1",
-        "version" : "0.1.0"
+        "revision" : "ff387340b475eca7f47bf6202759dd23018b0c3e",
+        "version" : "0.2.0"
       }
     },
     {

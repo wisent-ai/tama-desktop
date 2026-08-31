@@ -53,7 +53,9 @@
     <true/>
     <key>SURequireSignedFeed</key>
     <true/>
-    <key>SUAutomaticallyUpdate</key>
+    <key>SUAllowsAutomaticUpdates</key>
     <true/>
+    <key>SUAutomaticallyUpdate</key>
+    <false/>
 </dict>
 </plist>
