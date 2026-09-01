@@ -33,8 +33,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/wisent-ai/wisent-desktop-auth.git",
       "state" : {
-        "revision" : "08e85f3101178b80c3493cef4e79149ca509fa27",
-        "version" : "0.3.1"
+        "revision" : "095e8a804b12e133aa6603c4bc4b5419c4bc66cd",
+        "version" : "0.4.0"
       }
     },
     {
