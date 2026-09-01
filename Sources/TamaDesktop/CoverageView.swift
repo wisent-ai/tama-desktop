@@ -35,11 +35,7 @@ struct CoverageView: View {
             constrainsWidth: false
         ) {
             HStack(spacing: 0) {
-                WisentFacetRail(
-                    groups: facetGroups,
-                    footerTitle: "Evidence",
-                    footerDetail: "Registry-declared mappings, not live execution"
-                )
+                WisentFacetRail(groups: facetGroups)
                 centre(visible: visible)
                 inspector
             }
@@ -118,22 +114,21 @@ struct CoverageView: View {
             if inspection.coverage.isEmpty {
                 if inspection.isReadingCoverage {
                     WisentLoadingPanel(
-                        title: "Reading declared provider coverage",
-                        detail: "Every registry event mapped onto the runtimes that claim it."
+                        title: "Reading provider coverage",
+                        detail: "Checking covered policies and events."
                     )
                 } else if inspection.coverageError == nil {
                     WisentEmptyPanel(
-                        title: "The registry declares no coverage",
-                        detail: "No runtime in this release claims any catalogued event.",
+                        title: "No provider coverage",
+                        detail: "No providers are covered in this release.",
                         symbol: "point.3.connected.trianglepath.dotted"
                     )
                 }
                 Spacer(minLength: 0)
             } else if visible.isEmpty {
                 WisentEmptyPanel(
-                    title: "\(providerFacet ?? "This provider") maps no hook",
-                    detail: selectedProvider?.note
-                        ?? "The registry lists the provider and declares no event mapping for it, so nothing runs through it.",
+                    title: "No coverage for \(providerFacet ?? "this provider")",
+                    detail: selectedProvider?.note ?? "This provider has no covered events.",
                     symbol: "line.3.horizontal.decrease.circle",
                     action: WisentAction("Show every provider", kind: .secondary) {
                         providerFacet = nil
@@ -158,19 +153,19 @@ struct CoverageView: View {
                 detail: "Declared in this release"
             ),
             WisentCounterRow.Counter(
-                "Mappings",
+                "Assignments",
                 value: coverage.reduce(.zero) { $0 + $1.mappingCount }.formatted(.number),
-                detail: "Event to runtime pairs"
+                detail: "Covered event pairs"
             ),
             WisentCounterRow.Counter(
-                "Hooks covered",
+                "Policies covered",
                 value: Set(coverage.flatMap { $0.mappings.map(\.hookId) }).count.formatted(.number),
-                detail: "Distinct policies reachable"
+                detail: "Distinct covered policies"
             ),
             WisentCounterRow.Counter(
-                "Without mappings",
+                "Without coverage",
                 value: uncovered.formatted(.number),
-                detail: "Providers nothing runs through",
+                detail: "Providers without coverage",
                 tone: uncovered == .zero ? .neutral : .warning
             )
         ])
@@ -179,7 +174,7 @@ struct CoverageView: View {
     private func table(visible: [ProviderCoverageMapping]) -> some View {
         WisentTableFrame {
             Table(visible, selection: $selection) {
-                TableColumn("HOOK") { mapping in
+                TableColumn("POLICY") { mapping in
                     Text(mapping.hookId)
                         .font(WisentTypeScale.identifier())
                         .foregroundStyle(WisentDesign.ink)
@@ -196,7 +191,7 @@ struct CoverageView: View {
                         .lineLimit(1)
                 }
                 .width(min: 80, ideal: 130)
-                TableColumn("RUNTIME EVENT") { mapping in
+                TableColumn("TRIGGER") { mapping in
                     Text(mapping.runtimeEvent)
                         .font(WisentTypeScale.identifierSmall())
                         .foregroundStyle(WisentDesign.secondary)
@@ -231,12 +226,8 @@ struct CoverageView: View {
                 badges: badges(coverage)
             ) {
                 WisentField(label: "Declared mappings", value: coverage.mappingCount.formatted(.number))
-                WisentField(label: "Hooks", value: coverage.hookCount.formatted(.number))
+                WisentField(label: "Policies", value: coverage.hookCount.formatted(.number))
                 WisentField(label: "Events", value: coverage.eventCount.formatted(.number))
-                WisentField(
-                    label: "Adapter path",
-                    value: coverage.adapterPath ?? "No adapter declared"
-                )
                 WisentField(
                     label: "Live coverage required",
                     value: coverage.requiredLiveCoverage.map { $0 ? "yes" : "no" }
@@ -256,7 +247,7 @@ struct CoverageView: View {
             }
         } else {
             WisentInspector(eyebrow: "Coverage", title: "No provider selected") {
-                Text("Choose a provider to read its adapter path, whether the release demands live coverage evidence for it, and what the registry says its coverage is based on.")
+                Text("Select a provider to view its coverage.")
                     .font(WisentTypeScale.caption())
                     .foregroundStyle(WisentDesign.secondary)
                     .fixedSize(horizontal: false, vertical: true)

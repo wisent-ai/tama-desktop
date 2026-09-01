@@ -23,11 +23,7 @@ struct SessionView: View {
             constrainsWidth: false
         ) {
             HStack(spacing: 0) {
-                WisentFacetRail(
-                    groups: [sessionGroup],
-                    footerTitle: "Control channel",
-                    footerDetail: "Application Support/Tama/session-control"
-                )
+                WisentFacetRail(groups: [sessionGroup])
                 centre
                 inspector
             }
@@ -45,7 +41,7 @@ struct SessionView: View {
            !model.areAllHooksEnabled(in: session) {
             actions.append(
                 WisentAction(
-                    "Enable all hooks",
+                    "Enable all policies",
                     symbol: "checkmark.shield.fill",
                     kind: .primary,
                     isEnabled: !model.isPolicyMutationInProgress && !model.hooks.isEmpty
@@ -103,8 +99,10 @@ struct SessionView: View {
                     decisions(session)
                 } else if model.sessionError == nil {
                     WisentEmptyPanel(
-                        title: "No supervised session is running",
-                        detail: "Tama refuses to start an agent unless the platform has a ready kernel-enforcement backend. Open or resume a supported coding-agent session, and it appears here within a second.",
+                        title: "No session is running",
+                        detail: model.systemPolicyServiceStatus == "Enabled"
+                            ? "Open or resume a supported coding session."
+                            : "Enable System protection in Settings before opening or resuming a session.",
                         symbol: "terminal"
                     )
                 }
@@ -128,18 +126,18 @@ struct SessionView: View {
         if let error = session.runtime?.registryLoadError {
             WisentAlertPanel(
                 tone: .danger,
-                title: "Hook registry failed to load",
-                detail: error,
-                            )
+                title: "Session policy unavailable",
+                detail: error
+            )
         }
         if let runtime = session.runtime, runtime.reloadRequired, runtime.reloadPending != true {
             WisentAlertPanel(
                 tone: .warning,
-                title: "The runtime is serving a stale registry",
-                detail: "This session loaded release \(runtime.loadedReleaseId) and the installed release is \(runtime.installedReleaseId ?? "not recorded"). Enabling every hook reloads the registry in place.",
-                                actions: [
+                title: "Policy update available",
+                detail: "This session uses \(runtime.loadedReleaseId) instead of \(runtime.installedReleaseId ?? "the installed release"). Enable all policies to update it.",
+                actions: [
                     WisentAction(
-                        "Enable all hooks",
+                        "Enable all policies",
                         kind: .primary,
                         isEnabled: !model.isPolicyMutationInProgress
                     ) {
@@ -151,9 +149,9 @@ struct SessionView: View {
         if !(session.runtime?.unknownHookIds.isEmpty ?? true) {
             WisentAlertPanel(
                 tone: .warning,
-                title: "The runtime holds overrides for hooks this build does not declare",
-                detail: (session.runtime?.unknownHookIds ?? []).joined(separator: ", "),
-                            )
+                title: "This session includes unavailable policies",
+                detail: (session.runtime?.unknownHookIds ?? []).joined(separator: ", ")
+            )
         }
     }
 
@@ -180,27 +178,27 @@ struct SessionView: View {
             : session.disabledHookIds.count
         return WisentCounterRow(counters: [
             WisentCounterRow.Counter(
-                "Registered",
+                "Available",
                 value: (runtime?.registeredHookCount ?? .zero).formatted(.number),
-                detail: "Hooks the runtime knows"
+                detail: "Policies for this session"
             ),
             WisentCounterRow.Counter(
-                "Loaded",
+                "Enabled",
                 value: (runtime?.loadedHookCount ?? .zero).formatted(.number),
-                detail: "Hooks the runtime can run",
+                detail: "Policies active now",
                 tone: runtime.map { $0.loadedHookCount == $0.registeredHookCount ? .neutral : .warning }
                     ?? .neutral
             ),
             WisentCounterRow.Counter(
                 "Overrides",
                 value: overrides.formatted(.number),
-                detail: session.globallyDisabled ? "Allowlisted in this session" : "Suppressed in this session",
+                detail: session.globallyDisabled ? "Selected for this session" : "Disabled for this session",
                 tone: overrides == .zero ? .neutral : .warning
             ),
             WisentCounterRow.Counter(
                 "Decisions",
                 value: (session.semanticRuntime?.eventSequence ?? .zero).formatted(.number),
-                detail: "Semantic events recorded"
+                detail: "Policy decisions recorded"
             )
         ])
     }
@@ -209,9 +207,9 @@ struct SessionView: View {
     @ViewBuilder
     private func capability(_ session: AgentSessionRecord) -> some View {
         WisentSectionBox(
-            title: "Session capability",
-            detail: "The signed authorisation this session holds for privileged tool use.",
-            trailing: session.capability.map(\.lifetime) ?? "none issued"
+            title: "Session access",
+            detail: "Temporary access for this session.",
+            trailing: session.capability.map(\.lifetime) ?? "none"
         ) {
             WisentPanel {
                 if let capability = session.capability {
@@ -235,20 +233,11 @@ struct SessionView: View {
                         Divider()
                         HStack(alignment: .top, spacing: WisentDesign.Space.x4) {
                             WisentField(label: "Issued by", value: capability.issuedBy)
-                            WisentField(
-                                label: "Schema version",
-                                value: capability.schemaVersion.formatted(.number)
-                            )
-                            WisentField(label: "Nonce", value: capability.nonce)
-                        }
-                        Divider()
-                        HStack(alignment: .top, spacing: WisentDesign.Space.x4) {
                             WisentField(label: "Release", value: capability.releaseId)
-                            WisentField(label: "Catalog checksum", value: capability.catalogChecksum)
                         }
                     }
                 } else {
-                    Text("No capability has been issued to this session. Every privileged tool call is decided by the standing policy alone.")
+                    Text("No extra access has been issued.")
                         .font(WisentTypeScale.body())
                         .foregroundStyle(WisentDesign.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -262,15 +251,13 @@ struct SessionView: View {
     private func grants(_ session: AgentSessionRecord) -> some View {
         let grants = session.capability?.grants ?? []
         WisentSectionBox(
-            title: "Capability grants",
-            detail: "Tools this session may call, and the actions each grant covers.",
+            title: "Tool access",
+            detail: "Allowed tools and actions.",
             trailing: counted(grants.count, "grant")
         ) {
             if grants.isEmpty {
                 WisentPanel {
-                    Text(session.capability == nil
-                        ? "No capability, so no grants."
-                        : "The capability carries no tool grants; it authorises nothing by itself.")
+                    Text("No additional access is granted.")
                         .font(WisentTypeScale.body())
                         .foregroundStyle(WisentDesign.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -311,15 +298,14 @@ struct SessionView: View {
 
     private func runtime(_ session: AgentSessionRecord) -> some View {
         WisentSectionBox(
-            title: "Runtime",
-            detail: "What this session loaded, and how Tama knows it is still alive.",
+            title: "Session status",
             trailing: session.runtime.map(TamaTone.runtimeLabel) ?? "not reported"
         ) {
             WisentPanel {
                 VStack(alignment: .leading, spacing: WisentDesign.Space.x3) {
                     HStack(alignment: .top, spacing: WisentDesign.Space.x4) {
                         WisentField(
-                            label: "Loaded release",
+                            label: "Session release",
                             value: session.runtime?.loadedReleaseId ?? "Not reported"
                         )
                         WisentField(
@@ -327,22 +313,9 @@ struct SessionView: View {
                             value: session.runtime?.installedReleaseId ?? "Not reported"
                         )
                     }
-                    Divider()
-                    HStack(alignment: .top, spacing: WisentDesign.Space.x4) {
-                        WisentField(
-                            label: "Catalog checksum",
-                            value: session.runtime?.catalogChecksum ?? "Not reported"
-                        )
-                        WisentField(
-                            label: "Liveness",
-                            value: session.livenessMode == "heartbeat"
-                                ? "heartbeat, \(session.heartbeatTTLSeconds)s TTL"
-                                : "process \(session.pid)"
-                        )
-                    }
                     if session.globallyDisabled {
                         Divider()
-                        Text("Hooks are globally disabled on this machine. This session runs only the policies in its allowlist.")
+                        Text("Only selected policies are enabled for this session.")
                             .font(WisentTypeScale.caption())
                             .foregroundStyle(WisentDesign.warning)
                             .fixedSize(horizontal: false, vertical: true)
@@ -358,12 +331,12 @@ struct SessionView: View {
         let events = (session.semanticRuntime?.recentEvents ?? []).reversed().map { $0 }
         WisentSectionBox(
             title: "Recent decisions",
-            detail: "Every semantic event the runtime published for this session.",
+            detail: "Latest policy decisions.",
             trailing: counted(events.filter(\.isBlocking).count, "block")
         ) {
             if events.isEmpty {
                 WisentPanel {
-                    Text("This session has published no semantic events yet.")
+                    Text("No decisions yet.")
                         .font(WisentTypeScale.body())
                         .foregroundStyle(WisentDesign.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -386,7 +359,7 @@ struct SessionView: View {
                                 .lineLimit(1)
                         }
                         .width(min: 90, ideal: 130)
-                        TableColumn("HOOK") { event in
+                        TableColumn("POLICY") { event in
                             Text(event.blockedHookId ?? "—")
                                 .font(WisentTypeScale.identifierSmall())
                                 .foregroundStyle(WisentDesign.secondary)
@@ -442,23 +415,15 @@ struct SessionView: View {
                 badges: inspectorBadges(session)
             ) {
                 WisentField(label: "Project", value: session.cwd)
-                WisentField(label: "Control key", value: shortIdentifier(session.controlKey))
                 WisentField(label: "Updated at", value: session.updatedAt)
                 if let policy = session.systemPolicy {
                     Divider()
                     WisentField(label: "Policy mode", value: policy.mode)
-                    WisentField(label: "Policy backend", value: policy.backend ?? "Not reported")
-                    WisentField(
-                        label: "Backend capabilities",
-                        value: policy.capabilities.isEmpty
-                            ? "None reported"
-                            : policy.capabilities.joined(separator: ", ")
-                    )
                 }
             }
         } else {
             WisentInspector(eyebrow: "Session", title: "No session selected") {
-                Text("Session records are written by the supervised runtime into Application Support and removed when the process ends. Tama reads them; it never creates one.")
+                Text("Select a session to view its policy and access.")
                     .font(WisentTypeScale.caption())
                     .foregroundStyle(WisentDesign.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -473,7 +438,7 @@ struct SessionView: View {
     @ViewBuilder
     private var sessionHookSummary: some View {
         if !model.agentSessions.isEmpty {
-            WisentSectionBox(title: "Hook state per session") {
+            WisentSectionBox(title: "Policy state per session") {
                 VStack(alignment: .leading, spacing: WisentDesign.Space.x1) {
                     HStack {
                         Text("SESSION")
@@ -481,17 +446,17 @@ struct SessionView: View {
                             .tracking(0.6)
                             .foregroundStyle(WisentDesign.muted)
                             .frame(width: 220, alignment: .leading)
-                        Text("GLOBAL STATE")
+                        Text("POLICY STATE")
                             .font(WisentTypeScale.eyebrow())
                             .tracking(0.6)
                             .foregroundStyle(WisentDesign.muted)
                             .frame(width: 120, alignment: .leading)
-                        Text("LOADED")
+                        Text("ACTIVE")
                             .font(WisentTypeScale.eyebrow())
                             .tracking(0.6)
                             .foregroundStyle(WisentDesign.muted)
                             .frame(width: 60, alignment: .leading)
-                        Text("ALLOWLIST")
+                        Text("ENABLED POLICIES")
                             .font(WisentTypeScale.eyebrow())
                             .tracking(0.6)
                             .foregroundStyle(WisentDesign.muted)
@@ -505,7 +470,7 @@ struct SessionView: View {
                                 .foregroundStyle(WisentDesign.ink)
                                 .lineLimit(1)
                                 .frame(width: 220, alignment: .leading)
-                            Text(session.globallyDisabled ? "Disabled" : "Enabled")
+                            Text(session.globallyDisabled ? "Limited" : "Enabled")
                                 .font(WisentTypeScale.identifierSmall())
                                 .foregroundStyle(session.globallyDisabled ? WisentDesign.warning : WisentDesign.success)
                                 .frame(width: 120, alignment: .leading)
@@ -516,9 +481,9 @@ struct SessionView: View {
                                 .frame(width: 60, alignment: .leading)
                             Text(session.globallyDisabled
                                 ? session.enabledHookIds.isEmpty
-                                    ? "empty"
+                                    ? "None"
                                     : session.enabledHookIds.joined(separator: ", ")
-                                : "all (\(session.disabledHookIds.isEmpty ? "no overrides" : "\(session.disabledHookIds.count) disabled"))")
+                                : session.disabledHookIds.isEmpty ? "All" : "\(session.disabledHookIds.count) disabled")
                                 .font(WisentTypeScale.identifierSmall())
                                 .foregroundStyle(WisentDesign.secondary)
                                 .lineLimit(2)
@@ -537,8 +502,8 @@ struct SessionView: View {
         if let policy = session.systemPolicy {
             badges.append(
                 policy.ready && policy.mode == "kernel-gated"
-                    ? ("Kernel-gated", .success)
-                    : (policy.configured ? ("Backend not ready", .warning) : ("Not configured", .neutral))
+                    ? ("Protected", .success)
+                    : (policy.configured ? ("Protection unavailable", .warning) : ("Protection not set up", .neutral))
             )
         }
         if let capability = session.capability {

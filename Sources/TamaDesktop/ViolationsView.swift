@@ -191,7 +191,7 @@ struct ViolationsView: View {
             if case let .failed(message) = model.cleanState {
                 WisentAlertPanel(
                     tone: .danger,
-                    title: "Repair did not finish clean",
+                    title: "Repair failed",
                     detail: message,
                                     )
             }
@@ -212,17 +212,17 @@ struct ViolationsView: View {
             EmptyView()
         case .running:
             WisentMutationBar(
-                outcome: .working("A headless agent is editing the working tree in \(model.repoPath)."),
+                outcome: .working("Repairing the working tree."),
                 clear: {}
             )
         case .cancelling:
             WisentMutationBar(
-                outcome: .working("Stopping the repair. Partial edits are preserved and rescanned."),
+                outcome: .working("Stopping repair. Completed edits will remain."),
                 clear: {}
             )
         case .rescanning:
             WisentMutationBar(
-                outcome: .working("Rescanning the working tree before reporting the result."),
+                outcome: .working("Checking the repaired files."),
                 clear: {}
             )
         case let .done(summary):
@@ -274,21 +274,21 @@ struct ViolationsView: View {
     private func content(visible: [ViolationRecord]) -> some View {
         if !hasScope {
             WisentEmptyPanel(
-                title: "No repository is in view",
-                detail: "Choose a Git repository you own in the sidebar. Tama enumerates it with the approved pre-write rules and reads nothing outside it.",
+                title: "No repository selected",
+                detail: "Choose a repository to scan.",
                 symbol: "folder.badge.questionmark"
             )
             Spacer(minLength: 0)
         } else if model.scanState == .scanning {
             WisentLoadingPanel(
-                title: "Scanning \(model.repoPath)",
-                detail: "Every tracked file is checked against the pre-write rules this build declares. Nothing is written."
+                title: "Scanning \(URL(fileURLWithPath: model.repoPath).lastPathComponent)",
+                detail: "Checking tracked files."
             )
             Spacer(minLength: 0)
         } else if model.report == nil {
             WisentEmptyPanel(
                 title: "This repository has not been scanned",
-                detail: "Scan the repository to list refused, skipped, and unreadable files before choosing a clean operation.",
+                detail: "Scan to find blocked, skipped, or unreadable files.",
                 symbol: "magnifyingglass",
                 action: WisentAction("Scan", kind: .primary, isEnabled: model.canScan) {
                     Task { await model.scan() }
@@ -297,15 +297,15 @@ struct ViolationsView: View {
             Spacer(minLength: 0)
         } else if !model.hasViolations {
             WisentEmptyPanel(
-                title: "No violation in this working tree",
-                detail: "Every scanned file satisfies the pre-write rules this build declares.",
+                title: "No violations found",
+                detail: "No scanned file violates a policy.",
                 symbol: "checkmark.seal"
             )
             Spacer(minLength: 0)
         } else if visible.isEmpty {
             WisentEmptyPanel(
                 title: "No finding matches this selection",
-                detail: "The scan reported \(counted(model.report?.totals.violations ?? .zero, "violation")). The facets in force exclude every one of them.",
+                detail: "\(counted(model.report?.totals.violations ?? .zero, "finding")) available. Clear the filters to see all findings.",
                 symbol: "line.3.horizontal.decrease.circle",
                 action: WisentAction("Clear filters", kind: .secondary) {
                     ruleFacet = nil
@@ -339,7 +339,7 @@ struct ViolationsView: View {
                         .help(violation.rule)
                 }
                 .width(min: 90, ideal: 160)
-                TableColumn("HOOK") { violation in
+                TableColumn("POLICY") { violation in
                     Text(violation.hook)
                         .font(WisentTypeScale.identifierSmall())
                         .foregroundStyle(WisentDesign.muted)
@@ -377,7 +377,7 @@ struct ViolationsView: View {
                     .foregroundStyle(WisentDesign.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Divider()
-                WisentField(label: "Hook", value: violation.hook)
+                WisentField(label: "Policy", value: violation.hook)
                 WisentField(label: "Repository", value: model.repoPath)
             }
         } else {
@@ -385,7 +385,7 @@ struct ViolationsView: View {
                 eyebrow: "Finding",
                 title: model.report == nil ? "Nothing scanned yet" : "No finding selected"
             ) {
-                Text("Choose a row to read the sentence the hook would print when it refuses the write.")
+                Text("Select a finding to view why it was blocked.")
                     .font(WisentTypeScale.caption())
                     .foregroundStyle(WisentDesign.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -402,25 +402,22 @@ struct ViolationsView: View {
         let paths = Set((report?.allViolations ?? []).map(\.path)).sorted()
         return WisentDecisionDialog(
             tone: .danger,
-            title: "Let a headless agent edit \(counted(paths.count, "file")) in this working tree",
+            title: "Repair findings in the selected repository",
             lines: [
-                "One external model agent per repository edits \(model.repoPath) until the findings are gone or its bounded rounds are spent. The provider is external to Tama.",
-                "Tama requests working-tree edits only. It rejects a changed HEAD, a changed checked-out branch and changed local branch refs, and it never commits or pushes.",
-                "A final rescan always runs, and the reported result is that rescan rather than the agent's own claim.",
-                "Review git status, branch refs, remote state and the final diff afterwards."
+                "An external agent may edit, move, or create files throughout the selected repository.",
+                "Tama will not commit or push the changes.",
+                "Review the changes after the final scan.",
             ],
-            reasonCode: model.report.map { "\($0.totals.violations) violations in \($0.totals.repositories) repositories" },
             listing: paths,
-            footnote: "the agent runs with Codex; Tama refuses to start the repair when Codex is absent",
             actions: [
                 WisentAction("Cancel", kind: .plain) { isDecidingRepair = false },
-                WisentAction("Repair with a headless agent", kind: .destructive) {
+                WisentAction("Repair", kind: .destructive) {
                     isDecidingRepair = false
                     Task { await model.clean() }
                 },
                 WisentAction("Read the findings first", kind: .primary) {
                     isDecidingRepair = false
-                }
+                },
             ]
         )
     }

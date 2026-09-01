@@ -52,39 +52,29 @@ struct SettingsView: View {
 
     private var localEnforcement: some View {
         WisentSectionBox(
-            title: "Local enforcement",
-            detail: "The verified runtime under Application Support, and the privileged macOS components that gate processes and network traffic.",
-            trailing: model.areHooksDisabled ? "bypassed" : "active"
+            title: "Local protection",
+            trailing: model.areHooksDisabled ? "off" : "on"
         ) {
             WisentPanel {
                 VStack(alignment: .leading, spacing: WisentDesign.Space.x4) {
                     HStack(alignment: .top, spacing: WisentDesign.Space.x4) {
                         WisentField(
-                            label: "Installed release",
+                            label: "Installed policy",
                             value: model.installedHookReleaseID ?? "Not installed by Tama",
                             tone: model.installedHookReleaseID == nil ? .neutral : .success
                         )
                         WisentField(
-                            label: "Privileged backend",
+                            label: "System protection",
                             value: model.systemPolicyServiceStatus,
                             tone: TamaTone.systemPolicy(model.systemPolicyServiceStatus)
                         )
-                    }
-                    if let node = model.installedNodeVersion {
-                        HStack(alignment: .top, spacing: WisentDesign.Space.x4) {
-                            WisentField(label: "Node version", value: node)
-                            WisentField(
-                                label: "Node executable",
-                                value: model.installedNodeExecutable ?? "Not recorded"
-                            )
-                        }
                     }
                     Divider()
                     HStack(spacing: WisentDesign.Space.x2) {
                         if model.installedHookReleaseID == nil {
                             WisentActionButton(
                                 action: WisentAction(
-                                    "Install local runtime",
+                                    "Install local protection",
                                     symbol: "shippingbox",
                                     kind: .primary,
                                     isEnabled: model.snapshot?.validation.ok == true
@@ -97,7 +87,7 @@ struct SettingsView: View {
                         if !backendReady {
                             WisentActionButton(
                                 action: WisentAction(
-                                    "Register privileged backend",
+                                    "Enable system protection",
                                     symbol: "lock.shield",
                                     kind: .primary,
                                     isEnabled: !model.isPolicyMutationInProgress
@@ -130,10 +120,6 @@ struct SettingsView: View {
                             )
                         }
                     }
-                    Text("macOS asks for approval of Tama's daemon, System Extension, network filter and Full Disk Access where each is required. Registration is per machine and survives updates.")
-                        .font(WisentTypeScale.caption())
-                        .foregroundStyle(WisentDesign.muted)
-                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         }
@@ -144,7 +130,6 @@ struct SettingsView: View {
     private var build: some View {
         WisentSectionBox(
             title: "Build",
-            detail: "What this application is, and which hook release it carries.",
             trailing: buildIdentity.channel
         ) {
             WisentPanel {
@@ -156,11 +141,11 @@ struct SettingsView: View {
                     Divider()
                     HStack(alignment: .top, spacing: WisentDesign.Space.x4) {
                         WisentField(
-                            label: "Bundled hook release",
+                            label: "Policy release",
                             value: buildIdentity.hookRelease?.releaseId ?? "Not recorded"
                         )
                         WisentField(
-                            label: "Hook source revision",
+                            label: "Policy revision",
                             value: buildIdentity.hookRelease.map { release in
                                 release.sourceDirty
                                     ? "\(release.sourceRevision) (dirty source)"
@@ -191,26 +176,18 @@ struct SettingsView: View {
     private var deactivationDecision: some View {
         WisentDecisionDialog(
             tone: .danger,
-            title: "Deactivate local policy enforcement on this machine",
+            title: "Turn off policy protection on this machine",
             lines: [
-                "Every managed hook dispatcher is disabled, so \(counted(model.hooks.filter(\.isBlocking).count, "blocking policy")) stops refusing unsafe work.",
-                "Tama unregisters its privileged daemon, System Extension and network filter. macOS may require a restart to finish removal.",
-                "Supervised sessions that are running keep running without enforcement. Stop them first if that matters.",
+                "Unsafe actions will no longer be blocked.",
+                "Current sessions will keep running without policy checks.",
+                "macOS may require a restart.",
             ],
-            reasonCode: "hook-emergency-state.v1 disabled=true; SMAppService unregister",
-            listing: [
-                "~/Library/Application Support/Tama/hook-emergency-state.json",
-                "~/Library/Application Support/Tama/emergency-backup/manifest.json",
-                "ai.wisent.tama.system-policy",
-                "ai.wisent.tama.network-filter",
-            ],
-            footnote: "recovery files are preserved; reinstalling verifies the bundled release before restoring dispatchers",
             actions: [
-                WisentAction("Deactivate everything", kind: .destructive) {
+                WisentAction("Turn off protection", kind: .destructive) {
                     isDecidingDeactivation = false
                     model.deactivateLocalSetup()
                 },
-                WisentAction("Keep enforcement", kind: .primary) {
+                WisentAction("Keep protection", kind: .primary) {
                     isDecidingDeactivation = false
                 },
             ]

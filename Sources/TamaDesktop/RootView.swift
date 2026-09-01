@@ -176,7 +176,7 @@ struct RootView: View {
         panel.canChooseFiles = false
         panel.allowsMultipleSelection = false
         panel.prompt = "Use repository"
-        panel.message = "Choose a Git repository you own. Tama can inspect it and run the canonical clean operation."
+        panel.message = "Choose a Git repository owned by your account."
         if !violations.repoPath.isEmpty {
             panel.directoryURL = URL(fileURLWithPath: violations.repoPath, isDirectory: true)
         }
@@ -250,7 +250,7 @@ struct RootView: View {
             Image(systemName: "exclamationmark.octagon.fill")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundStyle(WisentDesign.danger)
-                .accessibilityLabel("All hooks disabled")
+                .accessibilityLabel("Policy protection off")
         default:
             EmptyView()
         }
@@ -294,23 +294,8 @@ struct RootView: View {
                 .help("Sign in to monitor sessions and change local policy")
                 .padding(.horizontal, WisentDesign.Space.x4)
             }
-            HStack(spacing: WisentDesign.Space.x2) {
-                Image(systemName: "hand.raised.fill")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(WisentDesign.brand)
-                    .accessibilityHidden(true)
-                Text("Bundled snapshot only")
-                    .font(WisentTypography.bodyMedium(11))
-                    .foregroundStyle(WisentDesign.secondary)
-            }
-            .padding(.horizontal, WisentDesign.Space.x4)
-            Text("Tama reads the catalog snapshot sealed into this build. The app does not import logs, credentials, settings, or caches.")
-                .font(WisentTypography.body(10))
-                .foregroundStyle(WisentDesign.muted)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, WisentDesign.Space.x4)
-                .padding(.bottom, WisentDesign.Space.x4)
         }
+        .padding(.bottom, WisentDesign.Space.x4)
         .accessibilityElement(children: .contain)
     }
 
@@ -351,7 +336,7 @@ struct RootView: View {
             }
             .disabled(model.isRefreshing)
             .keyboardShortcut("r", modifiers: .command)
-            .help("Re-read the bundled catalog and the local justification registries")
+            .help("Refresh policy and justifications")
         }
     }
 }

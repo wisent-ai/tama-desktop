@@ -46,12 +46,12 @@ struct InstallPlanView: View {
             } else if inspection.isReadingPlan {
                 WisentLoadingPanel(
                     title: "Reading the install plan",
-                    detail: "Scopes, the files each one would write, and the commands that write them."
+                    detail: "Preparing the planned changes."
                 )
             } else if inspection.planError == nil {
                 WisentEmptyPanel(
                     title: "No plan has been read yet",
-                    detail: "The plan is derived from the bundled release and your home directory. Nothing is written to read it.",
+                    detail: "Read the plan before installation.",
                     symbol: "shippingbox",
                     action: WisentAction("Read the plan", kind: .primary) {
                         Task { await inspection.loadPlan(force: true) }
@@ -72,11 +72,10 @@ struct InstallPlanView: View {
     /// strip is enough, and it is the healthy state.
     private func signals(_ plan: InstallPlan) -> some View {
         WisentSignalStrip(signals: [
-            WisentSignal("Archive root", value: plan.archiveRoot, tone: .success),
             WisentSignal("Scopes", value: counted(plan.levels.count, "scope")),
             WisentSignal(
-                "Active by archive alone",
-                value: plan.levels.contains(where: \.activeByArchiveAlone) ? "Some" : "None",
+                "Additional setup",
+                value: plan.levels.allSatisfy(\.activeByArchiveAlone) ? "None" : "Required",
                 tone: .neutral
             )
         ])
@@ -85,8 +84,8 @@ struct InstallPlanView: View {
     private func level(_ level: InstallPlanLevel) -> some View {
         WisentSectionBox(
             title: level.level,
-            detail: level.notes.first,
-            trailing: level.activeByArchiveAlone ? "active" : "needs a runtime"
+            detail: setupGuidance(for: level).first,
+            trailing: level.activeByArchiveAlone ? "ready" : "setup required"
         ) {
             WisentPanel(padding: 0) {
                 VStack(spacing: 0) {
@@ -108,8 +107,8 @@ struct InstallPlanView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         Divider()
                     }
-                    ForEach(level.notes.dropFirst(), id: \.self) { note in
-                        Text(note)
+                    ForEach(setupGuidance(for: level).dropFirst(), id: \.self) { guidance in
+                        Text(guidance)
                             .font(WisentTypeScale.caption())
                             .foregroundStyle(WisentDesign.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -121,16 +120,32 @@ struct InstallPlanView: View {
         }
     }
 
+    private func setupGuidance(for level: InstallPlanLevel) -> [String] {
+        if level.key == "os-level" {
+            return [
+                "After installation, open System Settings and enable Tama’s whole-computer protection. The installer cannot enable it for you."
+            ]
+        }
+        if !level.notes.isEmpty {
+            return level.notes
+        }
+        return [
+            level.activeByArchiveAlone
+                ? "Included in the installation."
+                : "Finish the remaining setup shown below before protection is active."
+        ]
+    }
+
     @ViewBuilder
     private var mcpSection: some View {
         WisentSectionBox(
-            title: "MCP server",
-            detail: "Paste this into a client configuration to expose the bundled Tama tools.",
-                    ) {
+            title: "Tool connection",
+            detail: "Use this configuration in your client."
+        ) {
             if let mcpError = inspection.mcpError {
                 WisentAlertPanel(
                     tone: .warning,
-                    title: "MCP snippet could not be read",
+                    title: "Configuration could not be read",
                     detail: mcpError,
                                     )
             } else if let configuration = inspection.mcpConfiguration {
@@ -143,8 +158,8 @@ struct InstallPlanView: View {
                 }
             } else if inspection.isReadingMCP {
                 WisentLoadingPanel(
-                    title: "Reading the MCP snippet",
-                    detail: "The server command and arguments for this release."
+                    title: "Reading configuration",
+                    detail: "Preparing the connection details."
                 )
             }
         }

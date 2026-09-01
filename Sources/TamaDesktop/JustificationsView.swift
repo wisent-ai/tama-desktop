@@ -40,23 +40,21 @@ struct JustificationsView: View {
 
         return WisentScreen(
             title: "Justifications",
-            scope: collection?.requirement.kind,
+            scope: collection?.requirement.title,
             freshness: counted(entries.count, "record"),
             scrolls: false,
             constrainsWidth: false
         ) {
             HStack(spacing: 0) {
                 WisentFacetRail(
-                    groups: facetGroups(collection: collection, entries: entries),
-                    footerTitle: "Registry",
-                    footerDetail: collection?.requirement.registryPath ?? "No registry declared"
+                    groups: facetGroups(collection: collection, entries: entries)
                 )
                 centre(collection: collection, entries: entries, visible: visible)
                 inspector(collection: collection)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .searchable(text: $query, placement: .toolbar, prompt: "Search path or justification")
+        .searchable(text: $query, placement: .toolbar, prompt: "Search target or justification")
         .onAppear {
             if registryID == nil { registryID = collections.first?.id }
         }
@@ -76,7 +74,7 @@ struct JustificationsView: View {
         if collections.count > Int("1")! {
             groups.append(
                 WisentFacetGroup(
-                    "Registry",
+                    "Policy",
                     facets: collections.map { candidate in
                         WisentFacet(
                             id: "registry.\(candidate.id)",
@@ -149,11 +147,11 @@ struct JustificationsView: View {
         visible: [JustificationEntry]
     ) -> some View {
         VStack(alignment: .leading, spacing: WisentDesign.Space.x4) {
-            if let collection, let loadError = collection.loadError {
+            if let collection, collection.loadError != nil {
                 WisentAlertPanel(
                     tone: .danger,
-                    title: "Registry unreadable",
-                                        detail: "\(loadError) Registry: \(collection.requirement.registryPath)"
+                    title: "Justifications unavailable",
+                    detail: "Reasons could not be loaded."
                 )
             }
             if let collection { contract(collection) }
@@ -172,12 +170,12 @@ struct JustificationsView: View {
             WisentCounterRow.Counter(
                 "Records",
                 value: collection.entries.count.formatted(.number),
-                detail: "Entries in this registry"
+                detail: "Recorded justifications"
             ),
             WisentCounterRow.Counter(
-                "Holding",
+                "Valid",
                 value: holding.formatted(.number),
-                detail: "Satisfy the contract",
+                detail: "Meet the policy",
                 tone: .success
             ),
             WisentCounterRow.Counter(
@@ -189,7 +187,7 @@ struct JustificationsView: View {
             WisentCounterRow.Counter(
                 "Minimum words",
                 value: requirement.minimumWords.formatted(.number),
-                detail: "Required in \(requirement.field)"
+                detail: "Required length"
             )
         ])
     }
@@ -203,30 +201,30 @@ struct JustificationsView: View {
         if collections.isEmpty {
             if isRefreshing {
                 WisentLoadingPanel(
-                    title: "Reading the justification registries",
-                    detail: "Each requires_justification hook declares one registry path under your home directory."
+                    title: "Reading justifications",
+                    detail: "Checking recorded exceptions."
                 )
             } else {
                 WisentEmptyPanel(
-                    title: "This build declares no justification hooks",
-                    detail: "No catalogued policy has type requires_justification, so there is no registry to read.",
+                    title: "No justification policy",
+                    detail: "No justifications are required.",
                     symbol: "text.badge.checkmark"
                 )
             }
             Spacer(minLength: 0)
         } else if entries.isEmpty {
             WisentEmptyPanel(
-                title: "This registry holds no records",
+                title: "No justifications recorded",
                 detail: collection?.loadError == nil
-                    ? "The registry exists and records no exception yet. Entries appear as hooks write them."
-                    : "Tama could not read the registry, so it can list nothing from it.",
+                    ? "No records yet."
+                    : "Justifications could not be read.",
                 symbol: "tray"
             )
             Spacer(minLength: 0)
         } else if visible.isEmpty {
             WisentEmptyPanel(
                 title: "No record matches this selection",
-                detail: "The registry holds \(counted(entries.count, "record")). The verdict facet and the search term in force exclude every one of them.",
+                detail: "\(counted(entries.count, "record")) available. Change or clear the filters.",
                 symbol: "line.3.horizontal.decrease.circle",
                 action: WisentAction("Clear filters", kind: .secondary) {
                     verdictFacet = .all
@@ -310,12 +308,10 @@ struct JustificationsView: View {
             ) {
                 WisentField(label: "Target", value: entry.registryKey)
                 WisentField(
-                    label: "Target file",
-                    value: entry.targetExists ? "Present on disk" : "Missing on disk",
+                    label: "Status",
+                    value: entry.targetExists ? "Present" : "Missing",
                     tone: entry.targetExists ? .neutral : .warning
                 )
-                WisentField(label: "Kind", value: requirement.kind)
-                WisentField(label: "Field", value: requirement.field)
                 if let expiresAt = entry.expiresAt {
                     WisentField(
                         label: entry.isExpired ? "Expired" : "Expires",
@@ -325,24 +321,24 @@ struct JustificationsView: View {
                 }
                 Divider()
                 prose(
-                    requirement.field.uppercased(),
+                    "JUSTIFICATION",
                     entry.justification.isEmpty
-                        ? "No value recorded for \(requirement.field)."
+                        ? "No justification recorded."
                         : entry.justification
                 )
-                if let quoteField = requirement.directUserQuoteField {
+                if requirement.directUserQuoteField != nil {
                     prose(
                         "DIRECT USER REQUEST",
-                        recordedQuote(entry) ?? "No value recorded for \(quoteField)."
+                        recordedQuote(entry) ?? "No user request recorded."
                     )
                 }
             }
         } else {
             WisentInspector(
                 eyebrow: "Justification",
-                title: collections.isEmpty ? "No registry declared" : "No record selected"
+                title: collections.isEmpty ? "No justification policy" : "No record selected"
             ) {
-                Text("Choose a record to read the justification exactly as it was written, and the direct user request it must quote.")
+                Text("Select a record to view its justification and user request.")
                     .font(WisentTypeScale.caption())
                     .foregroundStyle(WisentDesign.secondary)
                     .fixedSize(horizontal: false, vertical: true)

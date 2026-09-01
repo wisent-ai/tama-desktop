@@ -205,8 +205,8 @@ private struct TamaAuthenticatedRootView: View {
                 ZStack {
                     WisentCanvasBackground()
                     WisentLoadingPanel(
-                        title: "Reading the Tama first-use journey",
-                        detail: "Asking how far this machine has come through setup before the control surface opens.",
+                        title: "Loading setup",
+                        detail: "Checking your progress.",
                         rows: 4
                     )
                     .frame(maxWidth: 520)

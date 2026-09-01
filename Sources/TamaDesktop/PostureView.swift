@@ -20,7 +20,7 @@ struct PostureView: View {
     var body: some View {
         WisentScreen(
             title: "Posture",
-            scope: model.snapshot.map { counted($0.catalog.hooks.count, "hook") },
+            scope: model.snapshot.map { counted($0.catalog.hooks.count, "policy") },
             freshness: freshness,
             actions: actions
         ) {
@@ -28,7 +28,7 @@ struct PostureView: View {
             if let snapshot = model.snapshot {
                 if let catalogError = model.catalogError {
                     WisentErrorBanner(
-                        title: "Catalog re-read failed",
+                        title: "Policy refresh failed",
                         detail: catalogError,
                         action: WisentAction("Retry", symbol: "arrow.clockwise", kind: .secondary) {
                             Task { await model.refresh() }
@@ -46,7 +46,7 @@ struct PostureView: View {
             } else if let catalogError = model.catalogError {
                 WisentAlertPanel(
                     tone: .danger,
-                    title: "Catalog unavailable",
+                    title: "Policy unavailable",
                     detail: catalogError,
                                         actions: [
                         WisentAction("Retry", symbol: "arrow.clockwise", kind: .primary) {
@@ -56,8 +56,8 @@ struct PostureView: View {
                 )
             } else {
                 WisentLoadingPanel(
-                    title: "Reading the sealed Tama catalog",
-                    detail: "Hook definitions, structural validation and the local justification registries."
+                    title: "Reading policy",
+                    detail: "Checking policies, warnings, and justifications."
                 )
             }
         }
@@ -86,7 +86,7 @@ struct PostureView: View {
             },
             model.areHooksDisabled
                 ? WisentAction(
-                    "Re-enable all hooks",
+                    "Re-enable all policies",
                     symbol: "power.circle.fill",
                     kind: .primary,
                     isEnabled: !model.isPolicyMutationInProgress
@@ -94,7 +94,7 @@ struct PostureView: View {
                     model.setHooksDisabled(false)
                 }
                 : WisentAction(
-                    "Disable all hooks",
+                    "Disable all policies",
                     symbol: "exclamationmark.octagon.fill",
                     kind: .secondary,
                     isEnabled: !model.isPolicyMutationInProgress
@@ -110,11 +110,11 @@ struct PostureView: View {
         if model.areHooksDisabled {
             WisentAlertPanel(
                 tone: .danger,
-                title: "All hooks are disabled",
-                detail: "Agent, editor and Git dispatchers bypass every Tama policy on this machine until the approved release is reinstalled. Blocking hooks cannot stop unsafe work while this is true.",
-                                actions: [
+                title: "Policy protection is off",
+                detail: "Unsafe actions will not be blocked until protection is restored.",
+                actions: [
                     WisentAction(
-                        "Re-enable all hooks",
+                        "Re-enable all policies",
                         kind: .primary,
                         isEnabled: !model.isPolicyMutationInProgress
                     ) {
@@ -129,7 +129,7 @@ struct PostureView: View {
         ForEach(validation.errors, id: \.self) { error in
             WisentAlertPanel(
                 tone: .danger,
-                title: "Catalog validation failed",
+                title: "Policy validation failed",
                 detail: error,
                             )
         }
@@ -161,7 +161,7 @@ struct PostureView: View {
             if let error = session.runtime?.registryLoadError {
                 WisentAlertPanel(
                     tone: .danger,
-                    title: "Hook registry failed to load in \(session.agentDisplayName) session",
+                    title: "Session policy unavailable in \(session.agentDisplayName)",
                     detail: error,
                                     )
             }
@@ -179,7 +179,7 @@ struct PostureView: View {
                 tone: .warning,
                 title: blockingTitle(decision.event),
                 detail: decision.event.reason
-                    ?? "The runtime recorded the decision without a reason string.",
+                    ?? "No reason was recorded.",
                                 actions: [
                     WisentAction("Open Session", symbol: "person.badge.key", kind: .secondary) {
                         onNavigate(.session)
@@ -190,8 +190,8 @@ struct PostureView: View {
     }
 
     private func blockingTitle(_ event: SemanticEventSummary) -> String {
-        let hook = event.blockedHookId ?? "A hook"
-        return "\(hook) returned \(event.decision) on \(event.event) at \(event.timestamp)"
+        let hook = event.blockedHookId ?? "A policy"
+        return "\(hook) blocked \(event.event) at \(event.timestamp)"
     }
 
     // MARK: - Healthy signals
@@ -199,11 +199,20 @@ struct PostureView: View {
     private func signals(_ snapshot: CatalogSnapshot) -> [WisentSignal] {
         var signals = [
             WisentSignal(
-                "Catalog",
-                value: snapshot.validation.ok ? "Structurally valid" : "Invalid",
+                "Policy",
+                value: snapshot.validation.ok ? "Valid" : "Invalid",
                 tone: snapshot.validation.ok ? .success : .danger
             )
         ]
+        if !snapshot.catalog.orphanSources.isEmpty {
+            signals.append(
+                WisentSignal(
+                    "Rules without a policy",
+                    value: snapshot.catalog.orphanSources.count.formatted(.number),
+                    tone: .warning
+                )
+            )
+        }
         guard model.allowsControl else {
             signals.append(
                 WisentSignal("Local enforcement", value: "Not inspected", tone: .neutral)
@@ -220,14 +229,14 @@ struct PostureView: View {
         }
         signals.append(
             WisentSignal(
-                "Managed dispatchers",
-                value: model.areHooksDisabled ? "Bypassed" : "Active",
+                "Policy protection",
+                value: model.areHooksDisabled ? "Off" : "On",
                 tone: model.areHooksDisabled ? .danger : .success
             )
         )
         signals.append(
             WisentSignal(
-                "Local runtime",
+                "Installed policy",
                 value: model.installedHookReleaseID.map(shortIdentifier) ?? "Not installed",
                 tone: model.installedHookReleaseID == nil ? .neutral : .success
             )
@@ -236,7 +245,7 @@ struct PostureView: View {
         // neutral; only a registration that failed earns red.
         signals.append(
             WisentSignal(
-                "Privileged backend",
+                "System protection",
                 value: model.systemPolicyServiceStatus,
                 tone: TamaTone.systemPolicy(model.systemPolicyServiceStatus)
             )
@@ -253,7 +262,7 @@ struct PostureView: View {
         if let runtime = model.selectedAgentSession?.runtime {
             signals.append(
                 WisentSignal(
-                    "Hook runtime",
+                    "Session policy",
                     value: TamaTone.runtimeLabel(runtime),
                     tone: TamaTone.runtime(runtime)
                 )
@@ -267,9 +276,9 @@ struct PostureView: View {
         let blocking = hooks.lazy.filter(\.isBlocking).count
         return WisentCounterRow(counters: [
             WisentCounterRow.Counter(
-                "Catalog hooks",
+                "Policies",
                 value: hooks.count.formatted(.number),
-                detail: "Approved policies in this build"
+                detail: "Available in this release"
             ),
             WisentCounterRow.Counter(
                 "Blocking",
@@ -280,13 +289,13 @@ struct PostureView: View {
             WisentCounterRow.Counter(
                 "Categories",
                 value: Set(hooks.map(\.category)).count.formatted(.number),
-                detail: "Policy domains"
+                detail: "Policy groups"
             ),
             WisentCounterRow.Counter(
-                "Orphan sources",
-                value: snapshot.catalog.orphanSources.count.formatted(.number),
-                detail: "Scripts with no catalog entry",
-                tone: snapshot.catalog.orphanSources.isEmpty ? .neutral : .warning
+                "Warnings",
+                value: snapshot.validation.warnings.count.formatted(.number),
+                detail: "Policy checks",
+                tone: snapshot.validation.warnings.isEmpty ? .neutral : .warning
             )
         ])
     }
@@ -300,8 +309,7 @@ struct PostureView: View {
     private func releaseIdentity(_ snapshot: CatalogSnapshot) -> some View {
         let runtime = model.selectedAgentSession?.runtime
         return WisentSectionBox(
-            title: "Release identity",
-            detail: "The build, the release it carries, and the release the live runtime loaded.",
+            title: "Versions",
             trailing: buildIdentity.channel
         ) {
             WisentPanel {
@@ -317,7 +325,7 @@ struct PostureView: View {
                     Divider()
                     HStack(alignment: .top, spacing: WisentDesign.Space.x4) {
                         WisentField(
-                            label: "Bundled release",
+                            label: "Bundled policy",
                             value: buildIdentity.hookRelease?.releaseId ?? "Not recorded"
                         )
                         // Read-only inspection monitors nothing local, so the
@@ -331,7 +339,7 @@ struct PostureView: View {
                             tone: driftTone
                         )
                         WisentField(
-                            label: "Loaded release",
+                            label: "Session policy",
                             value: model.allowsControl
                                 ? (runtime?.loadedReleaseId ?? "No live session")
                                 : "Not inspected",
@@ -340,25 +348,7 @@ struct PostureView: View {
                     }
                     Divider()
                     HStack(alignment: .top, spacing: WisentDesign.Space.x4) {
-                        WisentField(
-                            label: "Catalog checksum",
-                            value: runtime?.catalogChecksum ?? "Not reported by a live session"
-                        )
-                        WisentField(
-                            label: "Generated at",
-                            value: snapshot.catalog.generatedAt
-                        )
                         WisentField(label: "Built", value: buildIdentity.builtAt)
-                    }
-                    if let node = model.installedNodeVersion {
-                        Divider()
-                        HStack(alignment: .top, spacing: WisentDesign.Space.x4) {
-                            WisentField(label: "Node version", value: node)
-                            WisentField(
-                                label: "Node executable",
-                                value: model.installedNodeExecutable ?? "Not recorded"
-                            )
-                        }
                     }
                 }
             }
@@ -379,8 +369,7 @@ struct PostureView: View {
 
     private func validationNotes(_ validation: ValidationResult) -> some View {
         WisentSectionBox(
-            title: "Structural validation",
-            detail: "What the bundled snapshot check does and does not cover.",
+            title: "Warnings",
             trailing: counted(validation.warnings.count, "warning")
         ) {
             WisentPanel(padding: 0) {
@@ -396,7 +385,7 @@ struct PostureView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     if validation.warnings.isEmpty {
-                        Text("The bundled snapshot reported no warnings.")
+                        Text("No warnings.")
                             .font(WisentTypeScale.body())
                             .foregroundStyle(WisentDesign.secondary)
                             .padding(WisentDesign.Space.x4)
@@ -415,15 +404,13 @@ struct PostureView: View {
     private var bypassDecision: some View {
         WisentDecisionDialog(
             tone: .danger,
-            title: "Disable every Tama hook on this machine",
+            title: "Disable all policies on this machine",
             lines: [
-                "Agent, editor and Git dispatchers will bypass all \(counted(model.hooks.count, "policy")) until the approved release is verified and reinstalled.",
-                "\(counted(model.hooks.filter(\.isBlocking).count, "blocking hook")) will stop refusing unsafe work, including in sessions that are running right now.",
-                "Supervised sessions keep running. Their per-session overrides survive, and Tama restores them when the release is reinstalled."
+                "Unsafe actions will no longer be blocked.",
+                "Current sessions will keep running.",
+                "Re-enable the policies to restore protection.",
             ],
-            reasonCode: "hook-emergency-state.v1 disabled=true",
             listing: model.hooks.filter(\.isBlocking).map(\.id),
-            footnote: "recovery files are preserved under Application Support/Tama/emergency-backup",
             actions: bypassActions
         )
     }
@@ -441,7 +428,7 @@ struct PostureView: View {
             )
         }
         actions.append(
-            WisentAction("Disable all hooks", kind: .destructive) {
+            WisentAction("Disable all policies", kind: .destructive) {
                 isDecidingBypass = false
                 model.setHooksDisabled(true)
             }

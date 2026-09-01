@@ -25,7 +25,7 @@ struct HooksView: View {
 
         var label: String {
             switch self {
-            case .all: "All hooks"
+            case .all: "All policies"
             case .blocking: "Blocking"
             case .advisory: "Non-blocking"
             }
@@ -59,7 +59,7 @@ struct HooksView: View {
         let visible = filtered(scoped)
 
         return WisentScreen(
-            title: "Hooks",
+            title: "Policies",
             scope: session.map { "session \($0.sessionId.prefix(8))" },
             freshness: counted(model.hooks.count, "policy"),
             actions: [
@@ -89,7 +89,7 @@ struct HooksView: View {
         .searchable(
             text: $query,
             placement: .toolbar,
-            prompt: "Search hook id, category, event or description"
+            prompt: "Search policy, category, event or description"
         )
     }
 
@@ -215,7 +215,7 @@ struct HooksView: View {
         VStack(alignment: .leading, spacing: WisentDesign.Space.x4) {
             if let catalogError = model.catalogError, model.snapshot != nil {
                 WisentErrorBanner(
-                    title: "Catalog re-read failed",
+                    title: "Policy refresh failed",
                     detail: catalogError,
                     action: WisentAction("Retry", symbol: "arrow.clockwise", kind: .secondary) {
                         Task { await model.refresh() }
@@ -227,7 +227,7 @@ struct HooksView: View {
                 if let catalogError = model.catalogError {
                     WisentAlertPanel(
                         tone: .danger,
-                        title: "Catalog unavailable",
+                        title: "Policy unavailable",
                         detail: catalogError,
                                                 actions: [
                             WisentAction("Retry", symbol: "arrow.clockwise", kind: .primary) {
@@ -237,22 +237,22 @@ struct HooksView: View {
                     )
                 } else {
                     WisentLoadingPanel(
-                        title: "Reading the approved hook catalog",
-                        detail: "Hook identifiers, categories, events and blocking behaviour."
+                        title: "Reading policies",
+                        detail: "Checking policy status and events."
                     )
                 }
                 Spacer(minLength: 0)
             } else if model.hooks.isEmpty {
                 WisentEmptyPanel(
-                    title: "This build carries no hooks",
-                    detail: "The sealed catalog declares no policies. Rebuild Tama against a tama release that does.",
+                    title: "No policies in this release",
+                    detail: "No policies are available.",
                     symbol: "tray"
                 )
                 Spacer(minLength: 0)
             } else if visible.isEmpty {
                 WisentEmptyPanel(
-                    title: "No hook matches this selection",
-                    detail: "The catalog holds \(counted(model.hooks.count, "policy")). The facets and the search term in force exclude every one of them.",
+                    title: "No policy matches this selection",
+                    detail: "\(counted(model.hooks.count, "policy")) available. Change or clear the filters.",
                     symbol: "line.3.horizontal.decrease.circle",
                     action: WisentAction("Clear filters", kind: .secondary) { clearFilters() }
                 )
@@ -276,7 +276,7 @@ struct HooksView: View {
     private func table(visible: [HookRecord]) -> some View {
         WisentTableFrame {
             Table(visible, selection: $selection) {
-                TableColumn("HOOK") { hook in
+                TableColumn("POLICY") { hook in
                     Text(hook.id)
                         .font(WisentTypeScale.identifier())
                         .foregroundStyle(WisentDesign.ink)
@@ -350,8 +350,8 @@ struct HooksView: View {
                 sessionControl(hook)
             }
         } else {
-            WisentInspector(eyebrow: "Hook", title: "No hook selected") {
-                Text("Choose a policy to read what it does, why it exists, which events it runs on, and whether the live session has it enabled.")
+            WisentInspector(eyebrow: "Policy", title: "No policy selected") {
+                Text("Select a policy to view its details and session status.")
                     .font(WisentTypeScale.caption())
                     .foregroundStyle(WisentDesign.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -434,12 +434,6 @@ struct HooksView: View {
                         model.enableHook(hook.id, in: session)
                     }
                 )
-                Text(session.globallyDisabled
-                    ? "All hooks are globally disabled. Enabling writes an allowlist entry for this agent session only."
-                    : "The override is stored for this agent session and restored when the same session is resumed.")
-                    .font(WisentTypeScale.caption())
-                    .foregroundStyle(WisentDesign.muted)
-                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
