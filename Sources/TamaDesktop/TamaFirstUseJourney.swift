@@ -79,17 +79,14 @@ final class TamaFirstUseJourney: ObservableObject {
     }
 
     private static func makeClient() throws -> JourneyClient {
-        guard let url = Bundle.main.url(
-            forResource: "tama-first-use",
-            withExtension: "json"
-        ) ?? Bundle.module.url(
-            forResource: "tama-first-use",
-            withExtension: "json"
-        ) else {
-            throw JourneyClientError.storage
-        }
         let fallback = try JourneyRouter.makeBundle(
-            canonicalDefinition: String(contentsOf: url, encoding: .utf8),
+            canonicalDefinition: String(
+                decoding: try JourneyResource.definitionData(
+                    resource: "tama-first-use",
+                    bundleName: "TamaDesktop_TamaDesktop.bundle"
+                ),
+                as: UTF8.self
+            ),
             journeyVersionId: UUID(uuidString: "11000000-0000-4000-8000-000000000003")!
         )
         return try JourneyClient(

@@ -16,7 +16,7 @@ let package = Package(
             exact: "0.3.1"
         ),
         .package(url: "https://github.com/wisent-ai/wisent-desktop-update.git", exact: "0.2.0"),
-        .package(url: "https://github.com/wisent-ai/echo.git", exact: "0.1.2"),
+        .package(url: "https://github.com/wisent-ai/echo.git", exact: "0.3.0"),
         // By version: `wisent-components` 0.8.1 declares no dependencies, so a
         // version requirement is legal, and every consumer in one resolution —
         // this file and `wisent-desktop-auth` — has to name the same one.
