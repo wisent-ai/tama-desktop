@@ -8,15 +8,21 @@ let package = Package(
         .executable(name: "Tama", targets: ["TamaDesktop"]),
     ],
     dependencies: [
+        // Pinned by commit because it still names `wisent-errors` by revision;
+        // the `wisent-components` requirement it carries is `exact: "0.7.0"`,
+        // the same one this file names below.
         .package(
             url: "https://github.com/wisent-ai/wisent-desktop-auth.git",
-            revision: "b47177c97fe93b44ec72c74dedde23f3e1abb090"
+            revision: "de393f399b86140c0bd0121695d2f489d52d3720"
         ),
         .package(url: "https://github.com/wisent-ai/wisent-desktop-update.git", exact: "0.2.0"),
         .package(url: "https://github.com/wisent-ai/echo.git", exact: "0.1.2"),
+        // By version: `wisent-components` 0.7.0 declares no dependencies, so a
+        // version requirement is legal, and every consumer in one resolution —
+        // this file and `wisent-desktop-auth` — has to name the same one.
         .package(
             url: "https://github.com/wisent-ai/wisent-components.git",
-            revision: "e52cdda9036b8d44c7ebf51626fcde606e6859b6"
+            exact: "0.7.0"
         ),
         .package(
             url: "https://github.com/wisent-ai/wisent-errors.git",
