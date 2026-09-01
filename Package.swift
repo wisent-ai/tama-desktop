@@ -9,20 +9,20 @@ let package = Package(
     ],
     dependencies: [
         // Pinned by commit because it still names `wisent-errors` by revision;
-        // the `wisent-components` requirement it carries is `exact: "0.7.0"`,
+        // the `wisent-components` requirement it carries is `exact: "0.7.1"`,
         // the same one this file names below.
         .package(
             url: "https://github.com/wisent-ai/wisent-desktop-auth.git",
-            revision: "de393f399b86140c0bd0121695d2f489d52d3720"
+            revision: "2ea0e92e1b48e6efb8d6668fc8f468fbe8f4fad4"
         ),
         .package(url: "https://github.com/wisent-ai/wisent-desktop-update.git", exact: "0.2.0"),
         .package(url: "https://github.com/wisent-ai/echo.git", exact: "0.1.2"),
-        // By version: `wisent-components` 0.7.0 declares no dependencies, so a
+        // By version: `wisent-components` 0.7.1 declares no dependencies, so a
         // version requirement is legal, and every consumer in one resolution —
         // this file and `wisent-desktop-auth` — has to name the same one.
         .package(
             url: "https://github.com/wisent-ai/wisent-components.git",
-            exact: "0.7.0"
+            exact: "0.7.1"
         ),
         .package(
             url: "https://github.com/wisent-ai/wisent-errors.git",
