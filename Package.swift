@@ -8,12 +8,12 @@ let package = Package(
         .executable(name: "Tama", targets: ["TamaDesktop"]),
     ],
     dependencies: [
-        // Pinned by commit because it still names `wisent-errors` by revision;
-        // the `wisent-components` requirement it carries is `exact: "0.8.1"`,
-        // the same one this file names below.
+        // By version now that its own dependencies are tagged: 0.2.3 names
+        // `wisent-errors` as `exact: "1.0.0"` and `wisent-components` as
+        // `exact: "0.8.1"`, the same two requirements this file names below.
         .package(
             url: "https://github.com/wisent-ai/wisent-desktop-auth.git",
-            revision: "a8aed6d2f9e3e2ea22799ee0cfe8bae2358a70ad"
+            exact: "0.2.3"
         ),
         .package(url: "https://github.com/wisent-ai/wisent-desktop-update.git", exact: "0.2.0"),
         .package(url: "https://github.com/wisent-ai/echo.git", exact: "0.1.2"),
@@ -24,9 +24,12 @@ let package = Package(
             url: "https://github.com/wisent-ai/wisent-components.git",
             exact: "0.8.1"
         ),
+        // Tag 1.0.0 is the tree this file pinned by commit before
+        // `wisent-errors` was taggable; it declares no dependencies, so an
+        // exact version requirement is legal for every consumer.
         .package(
             url: "https://github.com/wisent-ai/wisent-errors.git",
-            revision: "b01a0c99766b5c6378ecdbf3921108420ba058f1"
+            exact: "1.0.0"
         ),
     ],
     targets: [
