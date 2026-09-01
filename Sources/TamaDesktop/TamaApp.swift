@@ -135,12 +135,14 @@ private struct TamaRootContent: View {
 private struct TamaInspectionRootView: View {
     @StateObject private var model = AppModel(inspectionOnly: true)
     @StateObject private var violations = ViolationsModel()
+    @StateObject private var firstUseJourney = TamaFirstUseJourney()
     let continueToSignIn: () -> Void
 
     var body: some View {
         RootView(
             model: model,
             violations: violations,
+            journey: firstUseJourney,
             continueToSignIn: continueToSignIn
         )
     }
@@ -195,7 +197,12 @@ private struct TamaAuthenticatedRootView: View {
     var body: some View {
         Group {
             if bypassesSetup || hasCompletedSetup {
-                RootView(model: model, violations: violations, continueToSignIn: nil)
+                RootView(
+                    model: model,
+                    violations: violations,
+                    journey: firstUseJourney,
+                    continueToSignIn: nil
+                )
                     .overlay(alignment: .bottom) {
                         if firstUseJourney.isAwaitingFirstSession {
                             firstSessionHint
@@ -213,7 +220,12 @@ private struct TamaAuthenticatedRootView: View {
                     .padding(WisentDesign.Space.x6)
                 }
             } else {
-                RootView(model: model, violations: violations, continueToSignIn: nil)
+                RootView(
+                    model: model,
+                    violations: violations,
+                    journey: firstUseJourney,
+                    continueToSignIn: nil
+                )
                     .task {
                         guard await firstUseJourney.completeSetup() else { return }
                         hasCompletedSetup = true

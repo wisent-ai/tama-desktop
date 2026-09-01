@@ -9,9 +9,18 @@ import WisentDesignSystem
 /// they go looking for it.
 struct SettingsView: View {
     @ObservedObject var model: AppModel
+    @ObservedObject var journey: TamaFirstUseJourney
     let continueToSignIn: (() -> Void)?
 
     @State private var isDecidingDeactivation = false
+    @State private var walkthroughOutcome: WalkthroughOutcome?
+    @State private var isReopeningWalkthrough = false
+
+    /// What the last press of "Show it again" did, said where it was pressed.
+    private enum WalkthroughOutcome {
+        case started
+        case failed(String)
+    }
 
     private var buildIdentity: BuildIdentity { .current }
     private var backendReady: Bool { model.systemPolicyServiceStatus == "Enabled" }
@@ -28,7 +37,8 @@ struct SettingsView: View {
                 localEnforcement
             }
             build
-                    }
+            walkthrough
+        }
         .sheet(isPresented: $isDecidingDeactivation) { deactivationDecision }
     }
 
@@ -167,6 +177,58 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - First-run walkthrough
+
+    /// The first run is gated on `tama.hasCompletedSetup`, and nothing ever
+    /// turned that back off, so the walkthrough was readable once per machine
+    /// and then gone. Asking to read it again is a setting, not a reinstall.
+    private var walkthrough: some View {
+        WisentSectionBox(
+            title: "First-run walkthrough",
+            detail: "See the walkthrough this product shows on a first run."
+        ) {
+            WisentPanel {
+                VStack(alignment: .leading, spacing: WisentDesign.Space.x3) {
+                    WisentActionButton(
+                        action: WisentAction(
+                            "Show it again",
+                            symbol: "arrow.counterclockwise",
+                            kind: .secondary,
+                            isEnabled: !isReopeningWalkthrough
+                        ) {
+                            reopenWalkthrough()
+                        }
+                    )
+                    switch walkthroughOutcome {
+                    case .none:
+                        EmptyView()
+                    case .started:
+                        Text("The walkthrough is on screen.")
+                            .font(WisentTypeScale.caption())
+                            .foregroundStyle(WisentDesign.success)
+                    case let .failed(reason):
+                        Text(reason)
+                            .font(WisentTypeScale.caption())
+                            .foregroundStyle(WisentDesign.danger)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+            }
+        }
+    }
+
+    private func reopenWalkthrough() {
+        isReopeningWalkthrough = true
+        Task {
+            do {
+                try await journey.showWalkthroughAgain()
+                walkthroughOutcome = .started
+            } catch {
+                walkthroughOutcome = .failed(error.localizedDescription)
+            }
+            isReopeningWalkthrough = false
+        }
+    }
 
     // MARK: - The decision
 

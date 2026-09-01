@@ -9,13 +9,24 @@ final class TamaFirstUseJourney: ObservableObject {
     @Published private(set) var status: JourneyProgressStatus = .inProgress
     @Published private(set) var isLoading = true
     @Published private(set) var errorMessage: String?
+    @Published private(set) var isReplaying = false
 
     private var client: JourneyClient?
+    private var hasStarted = false
     private let evidenceRevision = "tama-first-use-2026-08-04"
 
     var isAtSetup: Bool { currentScreen?.screenKind == "setup_handoff" }
     var isCompleted: Bool { status == .completed }
     var isAwaitingFirstSession: Bool { currentScreen?.screenKind == "first_success" && !isCompleted }
+
+    /// The walkthrough owns the screens ahead of the setup handoff — the ones a
+    /// first run put on screen before it handed over to the shell — so it closes
+    /// by itself once the journey moves past them, exactly as the first-run gate
+    /// used to drop it.
+    var isPresentingWalkthrough: Bool {
+        isReplaying && !isAtSetup && currentScreen?.transitions.isEmpty == false
+    }
+
     var currentTitle: String {
         currentScreen?.presentation.text("title") ?? currentScreen?.titleKey ?? "Observe one supervised session"
     }
@@ -26,36 +37,10 @@ final class TamaFirstUseJourney: ObservableObject {
     func start() async {
         guard client == nil else { return }
         do {
-            guard let url = Bundle.main.url(
-                forResource: "tama-first-use",
-                withExtension: "json"
-            ) ?? Bundle.module.url(
-                forResource: "tama-first-use",
-                withExtension: "json"
-            ) else {
-                throw JourneyClientError.storage
-            }
-            let fallback = try JourneyRouter.makeBundle(
-                canonicalDefinition: String(contentsOf: url, encoding: .utf8),
-                journeyVersionId: UUID(uuidString: "11000000-0000-4000-8000-000000000003")!
-            )
-            let client = try JourneyClient(
-                productId: "tama",
-                journeyId: "first-use",
-                subjectHash: JourneySubject.scoped([
-                    NSUserName(),
-                    Host.current().localizedName ?? "unknown-host",
-                    "tama-first-use",
-                ]),
-                scope: .device,
-                transport: EnvironmentJourneyTransport(
-                    tokenEnvironmentKey: "TAMA_STADO_INTEGRATION_TOKEN"
-                ),
-                storage: UserDefaultsJourneyStorage(namespace: "tama.onboarding.v1"),
-                fallback: fallback
-            )
+            let client = try Self.makeClient()
             self.client = client
             let (_, progress) = try await client.start(evidenceRevision: evidenceRevision)
+            hasStarted = true
             currentScreen = await client.currentScreen
             status = progress.status
             try? await client.flush()
@@ -63,6 +48,65 @@ final class TamaFirstUseJourney: ObservableObject {
             errorMessage = "Tama could not load its signed first-use journey. \(error.localizedDescription)"
         }
         isLoading = false
+    }
+
+    /// Settings asking for the first-use journey a second time.
+    ///
+    /// Tama gates its first run on `tama.hasCompletedSetup`, and nothing ever
+    /// turned that back off, so the walkthrough was readable exactly once per
+    /// machine. The attempt is reset through the same client that recorded it —
+    /// Echo sees one `onboarding_reset` for this subject, not a second parallel
+    /// attempt — and the walkthrough goes back on screen in this session rather
+    /// than waiting for a launch that would not show it either. The failure is
+    /// thrown instead of being folded into `errorMessage`, because the settings
+    /// row states it where the operator pressed.
+    func showWalkthroughAgain() async throws {
+        let client: JourneyClient
+        if let existing = self.client {
+            client = existing
+        } else {
+            client = try Self.makeClient()
+            self.client = client
+        }
+        if !hasStarted {
+            _ = try await client.start(evidenceRevision: evidenceRevision)
+            hasStarted = true
+        }
+        try await client.reset(evidenceRevision: evidenceRevision)
+        errorMessage = nil
+        isReplaying = true
+        await refresh()
+    }
+
+    private static func makeClient() throws -> JourneyClient {
+        guard let url = Bundle.main.url(
+            forResource: "tama-first-use",
+            withExtension: "json"
+        ) ?? Bundle.module.url(
+            forResource: "tama-first-use",
+            withExtension: "json"
+        ) else {
+            throw JourneyClientError.storage
+        }
+        let fallback = try JourneyRouter.makeBundle(
+            canonicalDefinition: String(contentsOf: url, encoding: .utf8),
+            journeyVersionId: UUID(uuidString: "11000000-0000-4000-8000-000000000003")!
+        )
+        return try JourneyClient(
+            productId: "tama",
+            journeyId: "first-use",
+            subjectHash: JourneySubject.scoped([
+                NSUserName(),
+                Host.current().localizedName ?? "unknown-host",
+                "tama-first-use",
+            ]),
+            scope: .device,
+            transport: EnvironmentJourneyTransport(
+                tokenEnvironmentKey: "TAMA_STADO_INTEGRATION_TOKEN"
+            ),
+            storage: UserDefaultsJourneyStorage(namespace: "tama.onboarding.v1"),
+            fallback: fallback
+        )
     }
 
     func dismissError() {

@@ -12,6 +12,7 @@ import WisentDesignSystem
 struct RootView: View {
     @ObservedObject var model: AppModel
     @ObservedObject var violations: ViolationsModel
+    @ObservedObject var journey: TamaFirstUseJourney
     let continueToSignIn: (() -> Void)?
 
     @StateObject private var inspection = InspectionModel()
@@ -30,6 +31,11 @@ struct RootView: View {
             minHeight: WisentAppLayout.minimumWindowHeight
         )
         .tint(WisentDesign.brand)
+        .overlay {
+            if journey.isPresentingWalkthrough {
+                TamaOnboardingView(journey: journey)
+            }
+        }
         .onAppear { model.startControlMonitoring() }
         .onDisappear {
             model.stopControlMonitoring()
@@ -322,7 +328,11 @@ struct RootView: View {
         case .installPlan:
             InstallPlanView(inspection: inspection)
         case .settings:
-            SettingsView(model: model, continueToSignIn: continueToSignIn)
+            SettingsView(
+                model: model,
+                journey: journey,
+                continueToSignIn: continueToSignIn
+            )
         }
     }
 
