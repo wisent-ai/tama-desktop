@@ -8,12 +8,12 @@ let package = Package(
         .executable(name: "Tama", targets: ["TamaDesktop"]),
     ],
     dependencies: [
-        // By version now that its own dependencies are tagged: 0.3.5 names
+        // By version now that its own dependencies are tagged: 0.3.6 names
         // `wisent-errors` as `exact: "1.0.0"` and `wisent-components` as
         // `exact: "0.9.1"`, the same two requirements this file names below.
         .package(
             url: "https://github.com/wisent-ai/wisent-desktop-auth.git",
-            exact: "0.3.5"
+            exact: "0.3.6"
         ),
         .package(url: "https://github.com/wisent-ai/wisent-desktop-update.git", exact: "0.2.0"),
         .package(url: "https://github.com/wisent-ai/echo.git", exact: "0.3.0"),
