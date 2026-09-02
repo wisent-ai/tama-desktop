@@ -236,9 +236,11 @@ struct HooksView: View {
                         ]
                     )
                 } else {
-                    WisentLoadingPanel(
-                        title: "Reading policies",
-                        detail: "Checking policy status and events."
+                    WisentSkeletonTable(
+                        rows: 6,
+                        columns: 4,
+                        header: true,
+                        label: "Reading policies"
                     )
                 }
                 Spacer(minLength: 0)

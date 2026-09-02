@@ -200,9 +200,11 @@ struct JustificationsView: View {
     ) -> some View {
         if collections.isEmpty {
             if isRefreshing {
-                WisentLoadingPanel(
-                    title: "Reading justifications",
-                    detail: "Checking recorded exceptions."
+                WisentSkeletonTable(
+                    rows: 6,
+                    columns: 4,
+                    header: true,
+                    label: "Reading justifications"
                 )
             } else {
                 WisentEmptyPanel(

@@ -44,10 +44,18 @@ struct InstallPlanView: View {
                 ForEach(plan.levels) { level($0) }
                 mcpSection
             } else if inspection.isReadingPlan {
-                WisentLoadingPanel(
-                    title: "Reading the install plan",
-                    detail: "Preparing the planned changes."
-                )
+                WisentSkeletonGroup(
+                    label: "Reading the install plan",
+                    spacing: WisentDesign.Space.x4
+                ) {
+                    // The signal strip, then a section box per scope: a title
+                    // and the block of label/value rows underneath it.
+                    WisentSkeleton(.block, height: 56)
+                    ForEach(0 ..< 2, id: \.self) { _ in
+                        WisentSkeleton(.heading, width: 180)
+                        WisentSkeleton(.block, height: 132)
+                    }
+                }
             } else if inspection.planError == nil {
                 WisentEmptyPanel(
                     title: "No plan has been read yet",
@@ -157,10 +165,7 @@ struct InstallPlanView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             } else if inspection.isReadingMCP {
-                WisentLoadingPanel(
-                    title: "Reading configuration",
-                    detail: "Preparing the connection details."
-                )
+                WisentSkeletonText(lines: 6, label: "Reading configuration")
             }
         }
     }
