@@ -8,21 +8,21 @@ let package = Package(
         .executable(name: "Tama", targets: ["TamaDesktop"]),
     ],
     dependencies: [
-        // By version now that its own dependencies are tagged: 0.3.3 names
+        // By version now that its own dependencies are tagged: 0.3.4 names
         // `wisent-errors` as `exact: "1.0.0"` and `wisent-components` as
-        // `exact: "0.8.1"`, the same two requirements this file names below.
+        // `exact: "0.9.0"`, the same two requirements this file names below.
         .package(
             url: "https://github.com/wisent-ai/wisent-desktop-auth.git",
-            exact: "0.3.3"
+            exact: "0.3.4"
         ),
         .package(url: "https://github.com/wisent-ai/wisent-desktop-update.git", exact: "0.2.0"),
         .package(url: "https://github.com/wisent-ai/echo.git", exact: "0.3.0"),
-        // By version: `wisent-components` 0.8.1 declares no dependencies, so a
+        // By version: `wisent-components` 0.9.0 declares no dependencies, so a
         // version requirement is legal, and every consumer in one resolution —
         // this file and `wisent-desktop-auth` — has to name the same one.
         .package(
             url: "https://github.com/wisent-ai/wisent-components.git",
-            exact: "0.8.1"
+            exact: "0.9.0"
         ),
         // Tag 1.0.0 is the tree this file pinned by commit before
         // `wisent-errors` was taggable; it declares no dependencies, so an

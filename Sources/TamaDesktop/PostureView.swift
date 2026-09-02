@@ -55,10 +55,23 @@ struct PostureView: View {
                     ]
                 )
             } else {
-                WisentLoadingPanel(
-                    title: "Reading policy",
-                    detail: "Checking policies, warnings, and justifications."
-                )
+                WisentSkeletonGroup(
+                    label: "Reading policy",
+                    spacing: WisentDesign.Space.x4
+                ) {
+                    // The signal strip, the four counters, then the two
+                    // section boxes the snapshot fills below them.
+                    WisentSkeleton(.block, height: 56)
+                    HStack(spacing: WisentDesign.Space.x3) {
+                        ForEach(0 ..< 4, id: \.self) { _ in
+                            WisentSkeleton(.block, height: 76)
+                        }
+                    }
+                    WisentSkeleton(.heading, width: 140)
+                    WisentSkeleton(.block, height: 120)
+                    WisentSkeleton(.heading, width: 140)
+                    WisentSkeleton(.block, height: 88)
+                }
             }
         }
         .sheet(isPresented: $isDecidingBypass) { bypassDecision }
