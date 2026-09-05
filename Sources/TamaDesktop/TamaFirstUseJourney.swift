@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import SwiftUI
 import WisentDesignSystem
@@ -13,7 +14,7 @@ final class TamaFirstUseJourney: ObservableObject {
 
     private var client: JourneyClient?
     private var hasStarted = false
-    private let evidenceRevision = "tama-first-use-2026-08-04"
+    private let evidenceRevision = "tama-first-use-2026-09-03.2"
 
     var isAtSetup: Bool { currentScreen?.screenKind == "setup_handoff" }
     var isCompleted: Bool { status == .completed }
@@ -22,9 +23,8 @@ final class TamaFirstUseJourney: ObservableObject {
     /// The walkthrough owns the screens ahead of the setup handoff — the ones a
     /// first run put on screen before it handed over to the shell — so it closes
     /// by itself once the journey moves past them, exactly as the first-run gate
-    /// used to drop it.
     var isPresentingWalkthrough: Bool {
-        isReplaying && !isAtSetup && currentScreen?.transitions.isEmpty == false
+        !isAtSetup && currentScreen?.transitions.isEmpty == false && !isCompleted
     }
 
     var currentTitle: String {
@@ -87,7 +87,7 @@ final class TamaFirstUseJourney: ObservableObject {
                 ),
                 as: UTF8.self
             ),
-            journeyVersionId: UUID(uuidString: "11000000-0000-4000-8000-000000000003")!
+            journeyVersionId: UUID(uuidString: "4A073148-580E-4E15-8B9A-A9B9CDE5F3AC")!
         )
         return try JourneyClient(
             productId: "tama",
@@ -114,11 +114,11 @@ final class TamaFirstUseJourney: ObservableObject {
         try? await client?.expose(evidenceRevision: evidenceRevision)
     }
 
-    func advance() async {
+    func advance(evidence: [String: JSONValue] = [:]) async {
         guard let client else { return }
         do {
             guard try await client.advance(
-                evidence: [:],
+                evidence: evidence,
                 evidenceRevision: evidenceRevision
             ) != nil else { return }
             await refresh()
@@ -169,6 +169,7 @@ final class TamaFirstUseJourney: ObservableObject {
 
     @discardableResult
     func completeSetup() async -> Bool {
+        guard isAtSetup else { return false }
         guard let client else { return false }
         do {
             let advanced = try await client.advance(
@@ -205,16 +206,23 @@ final class TamaFirstUseJourney: ObservableObject {
 
 struct TamaOnboardingView: View {
     @ObservedObject var journey: TamaFirstUseJourney
+    @ObservedObject var model: AppModel
 
     static let maximumWidth: CGFloat = 820
+
+    private var isPolicyImport: Bool {
+        journey.currentScreen?.screenId == "import_policy_bundle"
+    }
+
+    private var hasAcceptedPolicyImport: Bool {
+        model.policyBundleImport?.accepted == true
+    }
 
     var body: some View {
         ZStack {
             WisentCanvasBackground()
 
             VStack(alignment: .leading, spacing: WisentDesign.Space.x5) {
-                // Onboarding is the second of the two places a hero header is
-                // allowed: the operator has nothing else on screen to read.
                 WisentPanel(padding: WisentDesign.Space.x8) {
                     VStack(alignment: .leading, spacing: WisentDesign.Space.x6) {
                         WisentPageHeader(
@@ -228,33 +236,59 @@ struct TamaOnboardingView: View {
                             symbol: "checkmark.shield.fill"
                         )
 
+                        if isPolicyImport {
+                            policyImportResult
+                        }
+
                         Divider()
 
                         HStack(spacing: WisentDesign.Space.x3) {
-                            Button("Skip Explanation") {
-                                Task { await journey.skipExplanation() }
+                            if !isPolicyImport || !hasAcceptedPolicyImport {
+                                Button(isPolicyImport ? "Skip" : "Skip Explanation") {
+                                    Task {
+                                        if isPolicyImport {
+                                            await journey.advance()
+                                        } else {
+                                            await journey.skipExplanation()
+                                        }
+                                    }
+                                }
+                                .buttonStyle(WisentSecondaryButtonStyle())
                             }
-                            .buttonStyle(WisentSecondaryButtonStyle())
 
                             Spacer()
 
-                            Button("Continue") {
-                                Task { await journey.advance() }
+                            Button(
+                                isPolicyImport
+                                    ? (hasAcceptedPolicyImport ? "Continue" : "Choose bundle")
+                                    : "Continue"
+                            ) {
+                                if isPolicyImport {
+                                    if hasAcceptedPolicyImport {
+                                        Task {
+                                            await journey.advance(
+                                                evidence: ["policy_bundle_imported": .boolean(true)]
+                                            )
+                                        }
+                                    } else {
+                                        choosePolicyBundle()
+                                    }
+                                } else {
+                                    Task { await journey.advance() }
+                                }
                             }
                             .buttonStyle(WisentPrimaryButtonStyle())
+                            .disabled(isPolicyImport && (!model.allowsControl || model.isImportingPolicyBundle))
                             .keyboardShortcut(.defaultAction)
                         }
                     }
                 }
-                // A journey that will not load is a failure of this screen, so
-                // it is stated on it rather than in a modal that leaves nothing
-                // behind.
                 if let errorMessage = journey.errorMessage {
                     WisentAlertPanel(
                         tone: .danger,
                         title: "Onboarding is unavailable",
                         detail: errorMessage,
-                                                actions: [
+                        actions: [
                             WisentAction("Dismiss", kind: .secondary) {
                                 journey.dismissError()
                             }
@@ -267,6 +301,70 @@ struct TamaOnboardingView: View {
         }
         .task(id: journey.currentScreen?.screenId) {
             await journey.expose()
+        }
+    }
+
+    @ViewBuilder
+    private var policyImportResult: some View {
+        if !model.allowsControl {
+            Text("Sign in with a control role to import. Skipping remains available.")
+                .font(WisentTypeScale.caption())
+                .foregroundStyle(WisentDesign.secondary)
+        }
+        if model.policyBundleMutation != .idle {
+            WisentMutationBar(outcome: model.policyBundleMutation) {
+                model.clearPolicyBundleMutation()
+            }
+        }
+        if let result = model.policyBundleImport {
+            if !result.conflicts.isEmpty {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: WisentDesign.Space.x1) {
+                        ForEach(result.conflicts) { conflict in
+                            Text("\(conflict.path) — \(conflict.reason)")
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(WisentDesign.secondary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
+                .frame(maxHeight: 120)
+                Button("Replace these reviewed bundle files") {
+                    Task {
+                        _ = await model.importPolicyBundle(
+                            from: URL(fileURLWithPath: result.sourcePath, isDirectory: true),
+                            replace: true
+                        )
+                    }
+                }
+                .buttonStyle(WisentSecondaryButtonStyle())
+                .disabled(model.isImportingPolicyBundle)
+            }
+            ForEach(result.rejections, id: \.self) { rejection in
+                Text("Rejected — \(rejection)")
+                    .font(WisentTypeScale.caption())
+                    .foregroundStyle(WisentDesign.danger)
+            }
+            ForEach(result.ignoredPaths, id: \.self) { ignored in
+                Text("Not a policy definition — \(ignored)")
+                    .font(WisentTypeScale.caption())
+                    .foregroundStyle(WisentDesign.secondary)
+            }
+        }
+    }
+
+    private func choosePolicyBundle() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose a Tama policy bundle"
+        panel.message = "Choose a self-contained policy bundle or sealed release containing shared-hooks/registry.json. Import installs and enables zero hooks."
+        panel.prompt = "Import"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        if panel.runModal() == .OK, let source = panel.url {
+            Task {
+                _ = await model.importPolicyBundle(from: source)
+            }
         }
     }
 }

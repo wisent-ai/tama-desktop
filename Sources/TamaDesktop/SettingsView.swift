@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import WisentDesignSystem
 
@@ -34,12 +35,14 @@ struct SettingsView: View {
         ) {
             WisentMutationBar(outcome: model.mutation) { model.clearMutation() }
             if model.allowsControl {
+                policyBundles
                 localEnforcement
             }
             build
             walkthrough
         }
         .sheet(isPresented: $isDecidingDeactivation) { deactivationDecision }
+        .task { await model.refreshPolicyBundles() }
     }
 
     private var actions: [WisentAction] {
@@ -132,6 +135,90 @@ struct SettingsView: View {
                     }
                 }
             }
+        }
+    }
+
+    // MARK: - Policy bundles
+
+    private var policyBundles: some View {
+        WisentSectionBox(
+            title: "Policy bundles",
+            detail: "Adopt an existing self-contained Tama policy bundle or sealed release without installing or enabling it.",
+            trailing: "\(model.policyBundles?.bundles.count ?? 0) inactive"
+        ) {
+            WisentPanel {
+                VStack(alignment: .leading, spacing: WisentDesign.Space.x3) {
+                    Button("Import policy bundle") { choosePolicyBundle() }
+                        .buttonStyle(WisentPrimaryButtonStyle())
+                        .disabled(model.isImportingPolicyBundle)
+                    if model.policyBundleMutation != .idle {
+                        WisentMutationBar(outcome: model.policyBundleMutation) {
+                            model.clearPolicyBundleMutation()
+                        }
+                    }
+                    if let result = model.policyBundleImport {
+                        if !result.conflicts.isEmpty {
+                            Text("No files changed. Review every conflict:")
+                                .font(WisentTypeScale.bodyStrong())
+                            ForEach(result.conflicts) { conflict in
+                                Text("\(conflict.path) — \(conflict.reason)")
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundStyle(WisentDesign.secondary)
+                            }
+                            Button("Replace these reviewed bundle files") {
+                                Task {
+                                    _ = await model.importPolicyBundle(
+                                        from: URL(fileURLWithPath: result.sourcePath, isDirectory: true),
+                                        replace: true
+                                    )
+                                }
+                            }
+                            .buttonStyle(WisentSecondaryButtonStyle())
+                            .disabled(model.isImportingPolicyBundle)
+                        }
+                        ForEach(result.rejections, id: \.self) { rejection in
+                            Text("Rejected — \(rejection)")
+                                .font(WisentTypeScale.caption())
+                                .foregroundStyle(WisentDesign.danger)
+                        }
+                        ForEach(result.ignoredPaths, id: \.self) { ignored in
+                            Text("Not a policy definition — \(ignored)")
+                                .font(WisentTypeScale.caption())
+                                .foregroundStyle(WisentDesign.secondary)
+                        }
+                    }
+                    Divider()
+                    if let bundles = model.policyBundles?.bundles, !bundles.isEmpty {
+                        ForEach(bundles) { bundle in
+                            VStack(alignment: .leading, spacing: WisentDesign.Space.x1) {
+                                Text(bundle.sourcePath)
+                                    .font(.system(size: 11, design: .monospaced))
+                                Text("\(bundle.hookCount) hooks · \(bundle.fileCount) files · SHA-256 \(bundle.sourceDigest.prefix(12))… · inactive")
+                                    .font(WisentTypeScale.caption())
+                                    .foregroundStyle(WisentDesign.secondary)
+                            }
+                        }
+                    } else {
+                        Text("No policy bundle imported. Tama remains empty and usable; the bundled release is unchanged.")
+                            .font(WisentTypeScale.caption())
+                            .foregroundStyle(WisentDesign.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    private func choosePolicyBundle() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose a Tama policy bundle"
+        panel.message = "Choose a self-contained Tama policy bundle or sealed release containing shared-hooks/registry.json. Import does not install or enable hooks."
+        panel.prompt = "Import"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        if panel.runModal() == .OK, let source = panel.url {
+            Task { _ = await model.importPolicyBundle(from: source) }
         }
     }
 

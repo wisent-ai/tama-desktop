@@ -33,7 +33,7 @@ struct RootView: View {
         .tint(WisentDesign.brand)
         .overlay {
             if journey.isPresentingWalkthrough {
-                TamaOnboardingView(journey: journey)
+                TamaOnboardingView(journey: journey, model: model)
             }
         }
         .onAppear { model.startControlMonitoring() }

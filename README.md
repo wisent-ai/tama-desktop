@@ -53,10 +53,13 @@ Tama currently includes:
 - explicit installation of the local session runtime and macOS policy backend;
 - an emergency, confirmed disable/re-enable operation for Tama-managed hooks;
 - read-only repository violation scans and an explicitly confirmed agent-assisted cleanup workflow.
+- first-use and Settings actions that adopt an existing Tama policy bundle into
+  the editable application-data store without activating it;
 
 Explicit non-goals:
 
-- authoring or approving new hooks;
+- authoring or approving new hooks; import only adopts an existing supported
+  bundle and leaves it inactive;
 - remote fleet management;
 - silently installing policy, credentials, or system services;
 - committing or pushing repository changes;
@@ -70,6 +73,15 @@ Supported environment: Apple-silicon macOS 14 or newer. The current release does
 ### Inspect approved policy
 
 An unauthenticated developer opens Tama with no local policy installation and chooses the read-only inspector. Tama displays the bundled catalog, its checksum and release identity without starting session monitoring, modifying hook configuration, or registering services.
+
+### Adopt existing policies without activation
+
+An authorized operator chooses **Choose bundle** on first use or
+**Settings → Policy bundles → Import policy bundle** later. Tama sends the
+selected directory to its loopback backend, which uses the same core
+transaction as `tama policy import`. The operation reports imported, unchanged,
+removed, conflicting, rejected, and ignored paths; it never installs or enables
+a hook. **Skip** leaves Tama empty and usable.
 
 ### Prepare local enforcement
 
@@ -118,8 +130,8 @@ No supported binary has been published yet. The steps below are the contract for
 
    Expected output ends with `OK`.
 3. Expand the archive and move `Tama.app` to `~/Applications`.
-4. Install the bundled CLI entrypoint with [`examples/getting-started/install-cli.sh`](examples/getting-started/install-cli.sh), then run `tama validate` and `tama sessions`. Validation reports catalog counts and labelled `install drift` lines for the current user's `~/.claude/settings.json` and `~/.codex/hooks.json`; `tama sessions --home <path>` selects a different explicit home.
-5. Open Tama, complete Wisent authentication, then turn enforcement on from **Settings** (**Install local runtime**, **Register privileged backend**, macOS approvals) and verify one matching live session on **Session**. Setup is recorded complete only against that visible evidence.
+4. Install the bundled CLI entrypoint with [`examples/getting-started/install-cli.sh`](examples/getting-started/install-cli.sh). To start with an existing bundle, run `tama onboarding --policy-bundle /absolute/path/to/bundle`; the reusable command is `tama policy import --source /absolute/path/to/bundle`, and `tama policy list` shows retained inactive source identities. Import never enables hooks. Then run `tama validate` and `tama sessions`.
+5. Open Tama, complete Wisent authentication, optionally choose an existing policy bundle on the first screen, then turn enforcement on separately from **Settings** (**Install local runtime**, **Register privileged backend**, macOS approvals) and verify one matching live session on **Session**. Setup is recorded complete only against that visible evidence.
 
 Full prerequisites, first-success steps, failure recovery, reset, and uninstall instructions are in the [Tama onboarding guide](https://tama.wisent.com/docs/onboarding/).
 
@@ -130,6 +142,32 @@ Full prerequisites, first-success steps, failure recovery, reset, and uninstall 
 - **Session-control JSON protocol:** machine interface between Tama and supported local agent supervisors. Its schema and ownership rules are defined in the [core contracts](https://tama.wisent.com/docs/core-contracts/).
 - **Release manifests:** machine-readable build and artifact identity described in the [release documentation](https://tama.wisent.com/docs/releases/).
 - **Command examples:** directly runnable shell commands with inline risk and side-effect comments in [`examples/`](examples/).
+
+### Policy-bundle import
+
+The accepted source is a self-contained Tama policy bundle or sealed release
+directory containing a regular `shared-hooks/registry.json`. Tama imports
+`shared-hooks/`, `claude-hooks/`, `codex-hooks/`, `repo-githooks/`,
+`adaptive/`, `external-hooks/`, and `bin/`, plus supported root metadata such
+as `release.json` and `external-sources.json`. Other top-level paths are listed
+as ignored rather than silently dropped.
+
+Core validates the exact registry and every registered source before creating a
+destination. A sealed release must also match its `release.json` tree identity.
+Invalid JSON, missing definitions, seal mismatch, symlink, or special
+filesystem entry rejects the entire selection with no partial write. Accepted
+bundles are recorded under the platform Tama application-data directory with
+source path, source digest, imported timestamp, hook and file counts, modes, and
+per-file hashes. An identical repeat is unchanged. Differing content produces a
+complete conflict list and no writes by default. Explicit replacement still
+refuses untracked or locally changed stored files.
+
+Tama Desktop uses `GET /v1/policy-bundles` and
+`POST /v1/policy-bundles/import` on the existing ephemeral loopback backend.
+The native app does not parse or copy policy files and does not shell out to an
+import command. Successful import remains `inactive` with zero hooks installed
+or enabled; runtime installation and session enablement retain their existing
+separate confirmation boundaries.
 
 ## Operational model
 

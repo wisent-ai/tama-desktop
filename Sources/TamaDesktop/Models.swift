@@ -150,3 +150,67 @@ struct ValidationResult: Decodable, Sendable {
     let hookCount: Int
     let orphanSourceCount: Int
 }
+
+struct PolicyBundleConflict: Decodable, Identifiable, Sendable {
+    let path: String
+    let reason: String
+    let existingSha256: String?
+    let incomingSha256: String?
+
+    var id: String { path }
+}
+
+struct PolicyBundleImportResult: Decodable, Sendable {
+    let status: String
+    let sourcePath: String
+    let sourceDigest: String?
+    let storePath: String
+    let bundlePath: String?
+    let hookCount: Int
+    let imported: Int
+    let unchanged: Int
+    let removed: Int
+    let conflicting: Int
+    let rejected: Int
+    let conflicts: [PolicyBundleConflict]
+    let rejections: [String]
+    let ignoredPaths: [String]
+    let activation: String
+    let installedHooks: Int
+    let enabledHooks: Int
+
+    var accepted: Bool { status != "conflict" && status != "rejected" }
+
+    var summary: String {
+        switch status {
+        case "unchanged":
+            "Already current: \(unchanged) files unchanged. The bundle remains inactive."
+        case "replaced":
+            "Updated: \(imported) imported, \(unchanged) unchanged, \(removed) removed. Installed and enabled zero hooks."
+        case "imported":
+            "Imported: \(imported) files and \(hookCount) hooks. Installed and enabled zero hooks."
+        case "rejected":
+            "Rejected \(rejected) issue(s). No files changed and no hooks were enabled."
+        default:
+            "Found \(conflicting) conflict(s). No files changed and no hooks were enabled."
+        }
+    }
+}
+
+struct PolicyBundleSummary: Decodable, Identifiable, Sendable {
+    let sourceKey: String
+    let sourcePath: String
+    let sourceDigest: String
+    let bundlePath: String
+    let importedAtUnix: UInt64
+    let hookCount: Int
+    let fileCount: Int
+    let activation: String
+
+    var id: String { sourceKey }
+}
+
+struct PolicyBundleList: Decodable, Sendable {
+    let storePath: String
+    let bundles: [PolicyBundleSummary]
+}

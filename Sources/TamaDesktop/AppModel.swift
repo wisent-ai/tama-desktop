@@ -34,6 +34,10 @@ final class AppModel: ObservableObject {
     @Published private(set) var catalogError: String?
     @Published private(set) var mutation: WisentMutationOutcome = .idle
     @Published private(set) var sessionError: String?
+    @Published private(set) var policyBundleMutation: WisentMutationOutcome = .idle
+    @Published private(set) var policyBundleImport: PolicyBundleImportResult?
+    @Published private(set) var policyBundles: PolicyBundleList?
+    @Published private(set) var isImportingPolicyBundle = false
 
     @Published private(set) var areHooksDisabled = false
     @Published private(set) var installedHookReleaseID: String?
@@ -191,6 +195,57 @@ final class AppModel: ObservableObject {
             selectedAgentSessionID = nil
             sessionError = Self.sentence(error)
         }
+    }
+
+    // MARK: - Existing policy bundles
+
+    @discardableResult
+    func importPolicyBundle(from source: URL, replace: Bool = false) async -> Bool {
+        guard allowsControlAccess, !isImportingPolicyBundle else { return false }
+        isImportingPolicyBundle = true
+        policyBundleImport = nil
+        policyBundleMutation = .working("Validating the complete policy bundle before writing…")
+        defer { isImportingPolicyBundle = false }
+        do {
+            let endpoint = try await TamaBackend.shared.endpoint()
+            let result = try await TamaClient(baseURL: endpoint).post(
+                "policy-bundles/import",
+                body: [
+                    "sourcePath": source.standardizedFileURL.path,
+                    "replace": replace,
+                ],
+                as: PolicyBundleImportResult.self,
+                operation: "import policy bundle"
+            )
+            policyBundleImport = result
+            if result.accepted {
+                policyBundleMutation = .succeeded(result.summary)
+                await refreshPolicyBundles()
+                return true
+            }
+            policyBundleMutation = .failed(result.summary)
+            return false
+        } catch {
+            policyBundleMutation = .failed(Self.sentence(error))
+            return false
+        }
+    }
+
+    func refreshPolicyBundles() async {
+        do {
+            let endpoint = try await TamaBackend.shared.endpoint()
+            policyBundles = try await TamaClient(baseURL: endpoint).get(
+                "policy-bundles",
+                as: PolicyBundleList.self,
+                operation: "list policy bundles"
+            )
+        } catch {
+            policyBundles = nil
+        }
+    }
+
+    func clearPolicyBundleMutation() {
+        policyBundleMutation = .idle
     }
 
     // MARK: - Local setup

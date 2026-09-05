@@ -226,8 +226,9 @@ private struct TamaAuthenticatedRootView: View {
                     journey: firstUseJourney,
                     continueToSignIn: nil
                 )
-                    .task {
-                        guard await firstUseJourney.completeSetup() else { return }
+                    .task(id: firstUseJourney.currentScreen?.screenId) {
+                        guard firstUseJourney.isAtSetup,
+                              await firstUseJourney.completeSetup() else { return }
                         hasCompletedSetup = true
                     }
                     .overlay(alignment: .bottom) {

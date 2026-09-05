@@ -70,6 +70,37 @@ struct TamaClient: Sendable {
         return text
     }
 
+    /// Ordinary JSON POST for bounded mutations such as policy-bundle import.
+    /// The backend returns the same result document as the CLI; no command
+    /// string or parser exists in the native app.
+    func post<Value: Decodable>(
+        _ path: String,
+        body: [String: Any],
+        as type: Value.Type,
+        operation: String
+    ) async throws -> Value {
+        var request = URLRequest(url: endpoint(path))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        let data: Data
+        let response: URLResponse
+        do {
+            (data, response) = try await URLSession.shared.data(for: request)
+        } catch is CancellationError {
+            throw TamaBackendError.cancelled(operation)
+        }
+        guard let http = response as? HTTPURLResponse else { throw TamaBackendError.notHTTP }
+        guard (200...299).contains(http.statusCode) else {
+            throw Self.refusal(data: data, status: http.statusCode)
+        }
+        do {
+            return try JSONDecoder().decode(Value.self, from: data)
+        } catch {
+            throw TamaBackendError.unreadableOutput(operation, error.localizedDescription)
+        }
+    }
+
     // MARK: - Jobs
 
     /// POST streaming NDJSON: a non-2xx before the stream starts is the
