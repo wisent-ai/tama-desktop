@@ -113,9 +113,11 @@ struct CoverageView: View {
             if !inspection.coverage.isEmpty { counters }
             if inspection.coverage.isEmpty {
                 if inspection.isReadingCoverage {
-                    WisentLoadingPanel(
-                        title: "Reading provider coverage",
-                        detail: "Checking covered policies and events."
+                    WisentSkeletonTable(
+                        rows: 6,
+                        columns: 4,
+                        header: true,
+                        label: "Reading provider coverage"
                     )
                 } else if inspection.coverageError == nil {
                     WisentEmptyPanel(

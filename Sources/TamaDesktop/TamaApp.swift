@@ -211,11 +211,25 @@ private struct TamaAuthenticatedRootView: View {
             } else if firstUseJourney.isLoading {
                 ZStack {
                     WisentCanvasBackground()
-                    WisentLoadingPanel(
-                        title: "Loading setup",
-                        detail: "Checking your progress.",
-                        rows: 4
-                    )
+                    // The onboarding card that lands here: eyebrow, title, two
+                    // lines of detail, then the skip and continue buttons.
+                    WisentSkeletonGroup(
+                        label: "Loading setup",
+                        spacing: WisentDesign.Space.x4
+                    ) {
+                        WisentSkeleton(.pill, width: 96)
+                        WisentSkeleton(.heading, width: 340)
+                        WisentSkeleton(.line)
+                        WisentSkeleton(.line, width: 420)
+                        HStack(spacing: WisentDesign.Space.x3) {
+                            WisentSkeleton(.pill, width: 150)
+                            Spacer(minLength: 0)
+                            WisentSkeleton(.pill, width: 110)
+                        }
+                    }
+                    // The canvas is the design system's own ramp, the same
+                    // surface every other screen puts skeletons on, so the
+                    // automatic tone already tracks light and dark here.
                     .frame(maxWidth: 520)
                     .padding(WisentDesign.Space.x6)
                 }

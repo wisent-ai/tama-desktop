@@ -280,7 +280,7 @@ struct ViolationsView: View {
             )
             Spacer(minLength: 0)
         } else if model.scanState == .scanning {
-            WisentLoadingPanel(
+            WisentProgressPanel(
                 title: "Scanning \(URL(fileURLWithPath: model.repoPath).lastPathComponent)",
                 detail: "Checking tracked files."
             )
