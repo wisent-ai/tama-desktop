@@ -56,12 +56,6 @@
       "mount": "wisent-desktop-update.tar.gz",
       "extract": false
     },
-    "tama": {
-      "uri": "stado://sources/tama/sha256/415d6b9824d6fc47a7ebdc4395ed94cb18113c2553251cad50e1f9000d5ab326/source.tar.gz",
-      "sha256": "415d6b9824d6fc47a7ebdc4395ed94cb18113c2553251cad50e1f9000d5ab326",
-      "mount": "tama.tar.gz",
-      "extract": false
-    },
     "swiftpm-cache": {
       "uri": "stado://sources/tama-swiftpm-cache/sha256/69afd7557e507caa16f64ac96a723c5daa74091bbe3417e423409634b670ada3/source.tar.gz",
       "sha256": "69afd7557e507caa16f64ac96a723c5daa74091bbe3417e423409634b670ada3",

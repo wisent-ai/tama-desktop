@@ -2,7 +2,7 @@
 set -euo pipefail
 
 UPDATER_SHA256="1f3c919e7e15ef6736a7c9c841ca185cb487e502c0da39be68aa1aa8b487af47"
-HOOKS_SHA256="415d6b9824d6fc47a7ebdc4395ed94cb18113c2553251cad50e1f9000d5ab326"
+TAMA_SOURCE_SHA256="23a1d7a768b204b8636f87fde8cf63b7f7345a0373ca1f3c75ed41285faa0499"
 SWIFTPM_SHA256="69afd7557e507caa16f64ac96a723c5daa74091bbe3417e423409634b670ada3"
 PRODUCT="Tama"
 PRODUCT_SLUG="tama-desktop"
@@ -23,13 +23,14 @@ verify_input() {
 }
 
 prepare_source() {
+  source="$WISENT_SOURCE_DIR"
+  tama_revision="$(cat "$source/Release/tama-revision")"
   updater="$WISENT_INPUTS_DIR/wisent-desktop-update.tar.gz"
-  hooks="$WISENT_INPUTS_DIR/tama.tar.gz"
+  hooks="$source/Release/vendor/tama/$tama_revision/source.tar.gz"
   swiftpm="$WISENT_INPUTS_DIR/swiftpm-cache.tar.gz"
   verify_input "$updater" "$UPDATER_SHA256"
-  verify_input "$hooks" "$HOOKS_SHA256"
+  verify_input "$hooks" "$TAMA_SOURCE_SHA256"
   verify_input "$swiftpm" "$SWIFTPM_SHA256"
-  source="$WISENT_SOURCE_DIR"
   work="$WISENT_OUTPUT_DIR/work"
   rm -rf "$work"
   mkdir -p "$work"
@@ -123,7 +124,7 @@ build_release() {
   archive_sha="$(shasum -a 256 "$archive" | awk '{print $1}')"
   appcast_sha="$(shasum -a 256 "$release/appcast.xml" | awk '{print $1}')"
   signature_sha="$(shasum -a 256 "$archive.sparkle-signature" | awk '{print $1}')"
-  printf '{"schema_version":1,"product":"%s","version":"%s","platform":"%s","archive_sha256":"%s","appcast_sha256":"%s","signature_sha256":"%s","updater_source_sha256":"%s","hooks_source_sha256":"%s","swiftpm_cache_sha256":"%s","notarized":true}\n' "$PRODUCT_SLUG" "$WISENT_VERSION" "$WISENT_PLATFORM" "$archive_sha" "$appcast_sha" "$signature_sha" "$UPDATER_SHA256" "$HOOKS_SHA256" "$SWIFTPM_SHA256" > "$evidence/release.json"
+  printf '{"schema_version":1,"product":"%s","version":"%s","platform":"%s","archive_sha256":"%s","appcast_sha256":"%s","signature_sha256":"%s","updater_source_sha256":"%s","hooks_source_sha256":"%s","swiftpm_cache_sha256":"%s","notarized":true}\n' "$PRODUCT_SLUG" "$WISENT_VERSION" "$WISENT_PLATFORM" "$archive_sha" "$appcast_sha" "$signature_sha" "$UPDATER_SHA256" "$TAMA_SOURCE_SHA256" "$SWIFTPM_SHA256" > "$evidence/release.json"
   shasum -a 256 "$archive" "$archive.sparkle-signature" "$release/appcast.xml" > "$evidence/DIGESTS"
 }
 
