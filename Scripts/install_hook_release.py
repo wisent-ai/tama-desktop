@@ -14,6 +14,8 @@ import sys
 
 SCHEMA = "ai.wisent.tama.hook-release.v1"
 INSTALLED_SCHEMA = "ai.wisent.tama.installed-hook-release.v1"
+NATIVE_MANIFEST_SCHEMA = "ai.wisent.tama.native-hook-binaries.v1"
+
 MINIMUM_NODE_MAJOR = int("20")
 
 
@@ -391,6 +393,106 @@ def pin_node_commands(registry: dict, node: Path, preflight: Path) -> None:
             ):
                 hook["command"] = node_command + command[len("node"):]
 
+def command_arguments(command: str) -> list[str]:
+    try:
+        arguments = shlex.split(command)
+    except ValueError as error:
+        raise RuntimeError(f"Invalid hook command {command!r}: {error}") from error
+    if not arguments:
+        raise RuntimeError("Hook command cannot be empty")
+    return arguments
+
+
+def native_command_names(value: object) -> set[str]:
+    names: set[str] = set()
+    if isinstance(value, dict):
+        command = value.get("command")
+        source = value.get("source")
+        if isinstance(command, str):
+            name = Path(command_arguments(command)[0]).name
+            if name.startswith("tama-") or (
+                isinstance(source, str) and source.endswith(".rs")
+            ):
+                names.add(name)
+        for nested in value.values():
+            names.update(native_command_names(nested))
+    elif isinstance(value, list):
+        for nested in value:
+            names.update(native_command_names(nested))
+    return names
+
+
+
+
+def declared_native_binaries(
+    release_root: Path,
+    registry: dict,
+) -> set[str]:
+    manifest_path = release_root / "native-hook-binaries.json"
+    manifest = load_json(manifest_path)
+    if manifest.get("schema") != NATIVE_MANIFEST_SCHEMA:
+        raise RuntimeError("Unsupported native hook binary manifest")
+
+    groups: dict[str, set[str]] = {}
+    all_names: set[str] = set()
+    for field in ("hooks", "additionalExecutables"):
+        entries = manifest.get(field)
+        if not isinstance(entries, list):
+            raise RuntimeError(f"Native hook binary manifest is missing {field}")
+        names: set[str] = set()
+        for entry in entries:
+            if not isinstance(entry, dict) or not isinstance(entry.get("name"), str):
+                raise RuntimeError(f"Native hook binary manifest has an invalid {field} entry")
+            name = entry["name"]
+            package = entry.get("package")
+            source = entry.get("source")
+            if not isinstance(package, str) or not isinstance(source, str):
+                raise RuntimeError(
+                    f"Native hook binary manifest lacks build identity for {name}"
+                )
+            if field == "hooks" and not source.endswith(".rs"):
+                raise RuntimeError(f"Native hook source is not Rust: {name}: {source}")
+            if Path(name).name != name or not name.startswith("tama-"):
+                raise RuntimeError(f"Invalid declared native binary name: {name}")
+            if name in all_names:
+                raise RuntimeError(f"Duplicate declared native binary: {name}")
+            binary = release_root / "bin" / name
+            if not binary.is_file() or not (binary.stat().st_mode & 0o111):
+                raise RuntimeError(f"Declared native binary is missing or not executable: {name}")
+            names.add(name)
+            all_names.add(name)
+        groups[field] = names
+
+    undeclared = sorted(native_command_names(registry) - groups["hooks"])
+    if undeclared:
+        raise RuntimeError(
+            "Registry native hook commands lack packaged binaries: "
+            + ", ".join(undeclared)
+        )
+    return groups["hooks"]
+
+
+def pin_native_commands(
+    value: object,
+    native_hooks: set[str],
+    stable_runtime: Path,
+    seen: set[str],
+) -> None:
+    if isinstance(value, dict):
+        command = value.get("command")
+        if isinstance(command, str):
+            arguments = command_arguments(command)
+            name = Path(arguments[0]).name
+            if name in native_hooks:
+                arguments[0] = str(stable_runtime / "bin" / name)
+                value["command"] = shlex.join(arguments)
+                seen.add(name)
+        for nested in value.values():
+            pin_native_commands(nested, native_hooks, stable_runtime, seen)
+    elif isinstance(value, list):
+        for nested in value:
+            pin_native_commands(nested, native_hooks, stable_runtime, seen)
+
 
 def install_release(
     release_root: Path,
@@ -421,6 +523,10 @@ def install_release(
     tama_root = home / "Library/Application Support/Tama"
     runtime_root = tama_root / "hooks-runtime"
     stable_runtime = runtime_root / "current"
+    native_hooks = declared_native_binaries(
+        release_root,
+        registry_raw,
+    )
     external_sources = load_json(release_root / "external-sources.json")
     if external_sources.get("schema") != "ai.wisent.tama.external-hook-sources.v1":
         raise RuntimeError("Unsupported external hook source manifest")
@@ -469,6 +575,19 @@ def install_release(
         raise RuntimeError("Approved hook release is missing the Node.js runtime preflight")
     registry = transformed(registry_raw, replacements)
     pin_node_commands(registry, node_executable, node_preflight)
+    pinned_native_hooks: set[str] = set()
+    pin_native_commands(
+        registry,
+        native_hooks,
+        stable_runtime,
+        pinned_native_hooks,
+    )
+    unreferenced_native_hooks = sorted(native_hooks - pinned_native_hooks)
+    if unreferenced_native_hooks:
+        raise RuntimeError(
+            "Packaged native hook binaries are not referenced by the registry: "
+            + ", ".join(unreferenced_native_hooks)
+        )
     registry["releaseId"] = release["releaseId"]
     registry["catalog"].pop("ompAdapters", None)
     registry.pop("adapters", None)

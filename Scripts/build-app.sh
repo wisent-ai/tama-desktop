@@ -336,30 +336,19 @@ codesign \
     --entitlements "$SYSTEM_POLICY_SOURCE/TamaNetworkFilter.entitlements" \
     "$SYSTEM_EXTENSION"
 codesign --verify --strict "$SYSTEM_EXTENSION"
-# The desktop spawns the sealed Rust CLI once as its loopback backend, and
-# the MCP snippet names the server next to it. Both ship inside the release
-# so the binary the app runs is the one this build sealed.
-"$CARGO_BIN" build \
-    --release \
-    --manifest-path "$HOOKS_ROOT/rust/Cargo.toml" \
-    -p tama-cli \
-    -p tama-mcp-server
-mkdir -p "$HOOK_RELEASE/bin"
-install -m 0755 \
-    "$HOOKS_ROOT/rust/target/release/tama-cli" \
-    "$HOOK_RELEASE/bin/tama-cli"
-install -m 0755 \
-    "$HOOKS_ROOT/rust/target/release/tama-mcp-server" \
-    "$HOOK_RELEASE/bin/tama-mcp-server"
-for executable in "$HOOK_RELEASE/bin/tama-cli" "$HOOK_RELEASE/bin/tama-mcp-server"; do
-    codesign \
-        --force \
-        --sign "$CODESIGN_IDENTITY" \
-        --options runtime \
-        $CODESIGN_TIMESTAMP \
-        "$executable"
-    codesign --verify --strict "$executable"
-done
+# Package every native hook command declared by the registry together with the
+# desktop's Rust CLI and MCP server. The shared packager resolves Cargo targets
+# and artifact paths from cargo metadata, signs every executable, and records
+# the exact packaged set before the release is sealed.
+python3 "$SCRIPT_DIR/stage_live_hook_release.py" \
+    --source-root "$HOOKS_ROOT" \
+    --release-root "$HOOK_RELEASE" \
+    --cargo "$CARGO_BIN" \
+    --include-bin tama-cli \
+    --include-bin tama-mcp-server \
+    --codesign-identity "$CODESIGN_IDENTITY" \
+    --codesign-timestamp="$CODESIGN_TIMESTAMP" \
+    >/dev/null
 TAMA_HOOK_SOURCE_DIRTY="$HOOK_SOURCE_DIRTY" \
 TAMA_HOOK_SOURCE_REVISION="$HOOK_SOURCE_REVISION" \
 python3 "$SCRIPT_DIR/seal_hook_release.py" "$HOOK_RELEASE" >/dev/null
