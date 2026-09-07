@@ -9,12 +9,13 @@ import WisentDesignSystem
 /// policies reads identifiers, not paragraphs.
 struct HooksView: View {
     @ObservedObject var model: AppModel
+    @StateObject var machineSelection = EnforcementSelectionModel()
 
-    @State private var query = ""
-    @State private var enforcement: EnforcementFacet = .all
-    @State private var categoryFacet: String?
-    @State private var sessionFacet: SessionFacet?
-    @State private var selection: HookRecord.ID?
+    @State var query = ""
+    @State var enforcement: EnforcementFacet = .all
+    @State var categoryFacet: String?
+    @State var sessionFacet: SessionFacet?
+    @State var selection: HookRecord.ID?
 
     enum EnforcementFacet: String, CaseIterable, Identifiable {
         case all
@@ -59,7 +60,7 @@ struct HooksView: View {
         let visible = filtered(scoped)
 
         return WisentScreen(
-            title: "Policies",
+            title: "Hooks",
             scope: session.map { "session \($0.sessionId.prefix(8))" },
             freshness: counted(model.hooks.count, "policy"),
             actions: [
@@ -86,6 +87,7 @@ struct HooksView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
+        .task { await machineSelection.refresh() }
         .searchable(
             text: $query,
             placement: .toolbar,
@@ -95,7 +97,7 @@ struct HooksView: View {
 
     // MARK: - Facets
 
-    private var session: AgentSessionRecord? { model.selectedAgentSession }
+    var session: AgentSessionRecord? { model.selectedAgentSession }
 
     private func facetGroups(scope: [HookRecord]) -> [WisentFacetGroup] {
         var groups = [enforcementGroup]
@@ -201,242 +203,11 @@ struct HooksView: View {
         }
     }
 
-    private func clearFilters() {
+    func clearFilters() {
         enforcement = .all
         categoryFacet = nil
         sessionFacet = nil
         query = ""
     }
 
-    // MARK: - Centre
-
-    @ViewBuilder
-    private func centre(visible: [HookRecord]) -> some View {
-        VStack(alignment: .leading, spacing: WisentDesign.Space.x4) {
-            if let catalogError = model.catalogError, model.snapshot != nil {
-                WisentErrorBanner(
-                    title: "Policy refresh failed",
-                    detail: catalogError,
-                    action: WisentAction("Retry", symbol: "arrow.clockwise", kind: .secondary) {
-                        Task { await model.refresh() }
-                    }
-                )
-            }
-            WisentMutationBar(outcome: model.mutation) { model.clearMutation() }
-            if model.snapshot == nil {
-                if let catalogError = model.catalogError {
-                    WisentAlertPanel(
-                        tone: .danger,
-                        title: "Policy unavailable",
-                        detail: catalogError,
-                                                actions: [
-                            WisentAction("Retry", symbol: "arrow.clockwise", kind: .primary) {
-                                Task { await model.refresh() }
-                            }
-                        ]
-                    )
-                } else {
-                    WisentSkeletonTable(
-                        rows: 6,
-                        columns: 4,
-                        header: true,
-                        label: "Reading policies"
-                    )
-                }
-                Spacer(minLength: 0)
-            } else if model.hooks.isEmpty {
-                WisentEmptyPanel(
-                    title: "No policies in this release",
-                    detail: "No policies are available.",
-                    symbol: "tray"
-                )
-                Spacer(minLength: 0)
-            } else if visible.isEmpty {
-                WisentEmptyPanel(
-                    title: "No policy matches this selection",
-                    detail: "\(counted(model.hooks.count, "policy")) available. Change or clear the filters.",
-                    symbol: "line.3.horizontal.decrease.circle",
-                    action: WisentAction("Clear filters", kind: .secondary) { clearFilters() }
-                )
-                Spacer(minLength: 0)
-            } else {
-                table(visible: visible)
-            }
-        }
-        .padding(WisentDesign.Space.x5)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    /// The chip marks the minority. When most of the catalog blocks, the pill
-    /// moves to the advisory rows, and the majority count stays in the rail.
-    private var chipsBlocking: Bool {
-        let hooks = model.hooks
-        let blocking = hooks.lazy.filter(\.isBlocking).count
-        return blocking * Int("2")! <= hooks.count
-    }
-
-    private func table(visible: [HookRecord]) -> some View {
-        WisentTableFrame {
-            Table(visible, selection: $selection) {
-                TableColumn("POLICY") { hook in
-                    Text(hook.id)
-                        .font(WisentTypeScale.identifier())
-                        .foregroundStyle(WisentDesign.ink)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .help(hook.id)
-                        .frame(height: WisentAppLayout.tableRowHeight, alignment: .leading)
-                }
-                .width(min: 130, ideal: 220)
-                TableColumn("CATEGORY") { hook in
-                    Text(hook.category)
-                        .font(WisentTypeScale.body())
-                        .foregroundStyle(WisentDesign.secondary)
-                        .lineLimit(1)
-                }
-                .width(min: 70, ideal: 110)
-                TableColumn("EVENTS") { hook in
-                    Text(hook.events.count.formatted(.number))
-                        .font(WisentTypeScale.identifierSmall())
-                        .foregroundStyle(WisentDesign.secondary)
-                        .monospacedDigit()
-                }
-                .width(min: 44, ideal: 60)
-                TableColumn("FLAG") { hook in
-                    if hook.isBlocking == chipsBlocking {
-                        WisentStatusChip(
-                            text: hook.isBlocking ? "Blocking" : "Advisory",
-                            tone: hook.isBlocking ? .warning : .neutral
-                        )
-                    }
-                }
-                .width(min: 40, ideal: 72)
-            }
-            .tableStyle(.inset)
-            .font(WisentTypeScale.body())
-            // A click on this table already means "select this hook" and a drag
-            // means "extend that selection", so selectable cell text would
-            // compete with both. Opting out restores exactly the behaviour the
-            // index had before the window turned selection on.
-            .textSelection(.disabled)
-        }
-    }
-
-    // MARK: - Inspector
-
-    private var selectedHook: HookRecord? {
-        guard let selection else { return nil }
-        return model.hooks.first { $0.id == selection }
-    }
-
-    @ViewBuilder
-    private var inspector: some View {
-        if let hook = selectedHook {
-            WisentInspector(
-                eyebrow: hook.category,
-                title: hook.id,
-                badges: badges(hook)
-            ) {
-                if let description = hook.description {
-                    prose("What it does", description)
-                }
-                if let why = hook.why {
-                    prose("Why it exists", why)
-                }
-                if let sideEffects = hook.sideEffects {
-                    prose("Side effects", sideEffects)
-                }
-                events(hook)
-                WisentField(label: "Source", value: hook.sourcePath ?? "No archived source path")
-                WisentField(label: "Command", value: hook.command)
-                sessionControl(hook)
-            }
-        } else {
-            WisentInspector(eyebrow: "Policy", title: "No policy selected") {
-                Text("Select a policy to view its details and session status.")
-                    .font(WisentTypeScale.caption())
-                    .foregroundStyle(WisentDesign.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    private func badges(_ hook: HookRecord) -> [(String, WisentTone)] {
-        var badges: [(String, WisentTone)] = [
-            (hook.status.capitalized, hook.status == "active" ? .success : .warning)
-        ]
-        if hook.isBlocking {
-            badges.append(("Blocking", .warning))
-        }
-        return badges
-    }
-
-    private func prose(_ label: String, _ text: String) -> some View {
-        VStack(alignment: .leading, spacing: WisentDesign.Space.x1) {
-            Text(label.uppercased())
-                .font(WisentTypeScale.eyebrow())
-                .tracking(0.6)
-                .foregroundStyle(WisentDesign.muted)
-            Text(text)
-                .font(WisentTypeScale.caption())
-                .foregroundStyle(WisentDesign.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    private func events(_ hook: HookRecord) -> some View {
-        VStack(alignment: .leading, spacing: WisentDesign.Space.x2) {
-            Text("EVENTS")
-                .font(WisentTypeScale.eyebrow())
-                .tracking(0.6)
-                .foregroundStyle(WisentDesign.muted)
-            ForEach(hook.events) { event in
-                HStack(spacing: WisentDesign.Space.x2) {
-                    Text(event.event)
-                        .font(WisentTypeScale.identifierSmall())
-                        .foregroundStyle(WisentDesign.ink)
-                        .lineLimit(1)
-                    Spacer(minLength: WisentDesign.Space.x2)
-                    if event.blocking {
-                        WisentStatusChip(text: "Blocking", tone: .warning)
-                    }
-                    Text("\(event.timeout)s")
-                        .font(WisentTypeScale.identifierSmall())
-                        .foregroundStyle(WisentDesign.muted)
-                        .monospacedDigit()
-                }
-                .frame(height: WisentAppLayout.tableRowHeight)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    /// The one decision this screen owns: is this policy live in the session in
-    /// front of the operator. Enabling restores policy, so it needs no dialog;
-    /// the disabling direction does not exist per hook by design.
-    @ViewBuilder
-    private func sessionControl(_ hook: HookRecord) -> some View {
-        if let session {
-            Divider()
-            let isEnabled = session.isHookEnabled(hook.id)
-            WisentField(
-                label: "In \(session.agentDisplayName) session",
-                value: isEnabled ? "Enabled" : "Not enabled",
-                tone: isEnabled ? .success : .warning
-            )
-            if !isEnabled {
-                WisentActionButton(
-                    action: WisentAction(
-                        "Enable in this session",
-                        symbol: "checkmark.shield",
-                        kind: .primary,
-                        isEnabled: !model.isPolicyMutationInProgress
-                    ) {
-                        model.enableHook(hook.id, in: session)
-                    }
-                )
-            }
-        }
-    }
 }
