@@ -36,6 +36,9 @@ prepare_source() {
   mkdir -p "$work"
   tar -xzf "$hooks" -C "$work"
   tar -xzf "$swiftpm" -C "$source"
+  # Swift module caches contain absolute paths from the archive's producer.
+  # Keep downloaded dependencies, but compile artifacts in this source checkout.
+  swift package --package-path "$source" clean
   hooks_root="$work/tama"
   [ -f "$hooks_root/package.json" ] || { printf 'immutable hook source is incomplete\n' >&2; exit 1; }
 }
