@@ -147,40 +147,53 @@ def base_config(
     return load_json(source)
 
 
-def without_tama_agent_hooks(config: dict) -> dict:
-    hooks = config.get("hooks")
-    if not isinstance(hooks, dict):
-        return config
-    cleaned_events = {}
-    for event, groups in hooks.items():
-        if not isinstance(groups, list):
-            cleaned_events[event] = groups
-            continue
-        cleaned_groups = []
-        for group in groups:
-            if not isinstance(group, dict) or not isinstance(group.get("hooks"), list):
-                cleaned_groups.append(group)
-                continue
-            retained = [
-                hook
-                for hook in group["hooks"]
-                if not (
-                    isinstance(hook, dict)
-                    and ".shared-hooks/run-hook.mjs" in str(hook.get("command") or "")
-                )
-            ]
-            if retained:
-                cleaned_group = dict(group)
-                cleaned_group["hooks"] = retained
-                cleaned_groups.append(cleaned_group)
-        if cleaned_groups:
-            cleaned_events[event] = cleaned_groups
-    cleaned = dict(config)
-    if cleaned_events:
-        cleaned["hooks"] = cleaned_events
-    else:
-        cleaned.pop("hooks", None)
-    return cleaned
+def provider_hook_block(
+    release_root: Path,
+    registry: dict,
+    provider: str,
+    dispatcher: str,
+) -> dict:
+    """The wiring `~/.claude/settings.json` and `~/.codex/hooks.json` carry.
+
+    The sealed CLI owns the event/matcher table and the command shape, so a
+    release cannot install a provider config that disagrees with the registry
+    it installed beside it. It refuses rather than return an empty block, and
+    an empty block is what left both providers enforcing nothing.
+    """
+    cli = release_root / "bin/tama-cli"
+    if not cli.is_file() or not os.access(cli, os.X_OK):
+        raise RuntimeError("Approved hook release is missing the sealed Tama CLI")
+    result = subprocess.run(
+        [
+            str(cli),
+            "provider-config",
+            "--provider",
+            provider,
+            "--dispatcher",
+            dispatcher,
+            "--json",
+        ],
+        input=json.dumps(registry).encode(),
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != os.EX_OK:
+        detail = (result.stderr or b"").decode(errors="replace").strip().splitlines()
+        raise RuntimeError(
+            f"Provider config generation failed for {provider}: "
+            + (detail.pop() if detail else "no diagnostic")
+        )
+    try:
+        block = json.loads(result.stdout.decode())
+    except ValueError as error:
+        raise RuntimeError(
+            f"Provider config generation failed for {provider}: unreadable block: {error}"
+        ) from error
+    if not isinstance(block, dict) or not block:
+        raise RuntimeError(
+            f"Provider config generation failed for {provider}: empty hook block"
+        )
+    return block
 
 
 
@@ -658,20 +671,36 @@ def install_release(
         home / ".local/bin/tama-omp",
         home / ".local/bin/tama-agent-supervisor",
     }
+    dispatcher_target = home / ".shared-hooks/run-hook.mjs"
+    if dispatcher_target not in writes:
+        raise RuntimeError("Approved hook release is missing the Tama hook dispatcher")
     claude_target = home / ".claude/settings.json"
     codex_target = home / ".codex/hooks.json"
-    claude_config = without_tama_agent_hooks(base_config(
+    # The same pinned Node the registry commands carry, running the installed
+    # dispatcher: a provider event reaches exactly the runtime this install
+    # wrote, and `tama validate` can see that it does.
+    dispatcher = (
+        f"{shlex.quote(str(node_executable))} --require {shlex.quote(str(node_preflight))} "
+        + shlex.quote(str(dispatcher_target))
+    )
+    claude_config = base_config(
         claude_target,
         "claude-settings.json",
         emergency_manifest,
         backup_root,
-    ))
-    codex_config = without_tama_agent_hooks(base_config(
+    )
+    codex_config = base_config(
         codex_target,
         "codex-hooks.json",
         emergency_manifest,
         backup_root,
-    ))
+    )
+    claude_config["hooks"] = provider_hook_block(
+        release_root, registry, "claude", dispatcher
+    )
+    codex_config["hooks"] = provider_hook_block(
+        release_root, registry, "codex", dispatcher
+    )
     writes[claude_target] = (
         (json.dumps(claude_config, indent=2, sort_keys=True) + "\n").encode(),
         0o600,
