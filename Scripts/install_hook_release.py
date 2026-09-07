@@ -494,6 +494,30 @@ def pin_native_commands(
             pin_native_commands(nested, native_hooks, stable_runtime, seen)
 
 
+MANAGED_DISPATCHER_MARKER = "tama managed"
+
+
+def entrypoint_kind(path: Path) -> str:
+    """What an active entrypoint is, in the terms an operator decides in.
+
+    A Tama-managed dispatcher at that path is something the product wrote and
+    this installer would rewrite anyway; anything else is a person's file and
+    the decision is theirs. `Scripts/entrypoints/report_conflicts.py` answers
+    the same two ways, so the refusal and the report agree. Only the header is
+    read: the marker is on the dispatcher's own comment line.
+    """
+    try:
+        with path.open(errors="replace") as handle:
+            head = "".join(handle.readline() for _ in MANAGED_DISPATCHER_MARKER)
+    except OSError as error:
+        return f"unreadable: {error}"
+    return (
+        "tama-managed dispatcher"
+        if MANAGED_DISPATCHER_MARKER in head
+        else "not Tama-managed"
+    )
+
+
 def install_release(
     release_root: Path,
     home: Path,
@@ -662,6 +686,29 @@ def install_release(
         for item in emergency_manifest.get("moved", [])
     ]
     moved_by_source = {source: disabled for source, disabled in moved}
+
+    # Every conflict, in one refusal. `Transaction.move` fails on the first
+    # pair whose active file and `.tama-disabled` sibling both exist, so an
+    # operator restoring policy after something rewrote an entrypoint during
+    # the bypass learned about them one failed run at a time. Reading them all
+    # here costs one pass and tells the whole truth; the fail-closed behaviour
+    # below is unchanged, and nothing is installed either way.
+    if not session_control_only:
+        conflicts = [
+            (source, disabled)
+            for source, disabled in moved
+            if (source.exists() or source.is_symlink())
+            and (disabled.exists() or disabled.is_symlink())
+        ]
+        if conflicts:
+            lines = [
+                f"{len(conflicts)} hook entrypoint(s) exist both active and disabled; "
+                "resolve each one before restoring policy:"
+            ]
+            for source, disabled in conflicts:
+                lines.append(f"  {source} ({entrypoint_kind(source)})")
+                lines.append(f"    disabled copy: {disabled}")
+            raise RuntimeError("\n".join(lines))
 
     if not session_control_only:
         hooks_path = global_hooks_path(home)
