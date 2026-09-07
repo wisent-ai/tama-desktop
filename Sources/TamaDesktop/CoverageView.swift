@@ -148,6 +148,7 @@ struct CoverageView: View {
     private var counters: some View {
         let coverage = inspection.coverage
         let uncovered = coverage.lazy.filter(\.isUncovered).count
+        let partlyWired = coverage.lazy.filter(\.isPartlyWired).count
         return WisentCounterRow(counters: [
             WisentCounterRow.Counter(
                 "Providers",
@@ -169,6 +170,13 @@ struct CoverageView: View {
                 value: uncovered.formatted(.number),
                 detail: "Providers without coverage",
                 tone: uncovered == .zero ? .neutral : .warning
+            )
+            ,
+            WisentCounterRow.Counter(
+                "Not installed",
+                value: partlyWired.formatted(.number),
+                detail: "Configs missing declared mappings",
+                tone: partlyWired == .zero ? .neutral : .warning
             )
         ])
     }
@@ -231,6 +239,14 @@ struct CoverageView: View {
                 WisentField(label: "Policies", value: coverage.hookCount.formatted(.number))
                 WisentField(label: "Events", value: coverage.eventCount.formatted(.number))
                 WisentField(
+                    label: "Installed in its config",
+                    value: coverage.wiringSummary ?? "no config Tama writes"
+                )
+                WisentField(
+                    label: "Adapter path",
+                    value: coverage.adapterPath ?? "No adapter declared"
+                )
+                WisentField(
                     label: "Live coverage required",
                     value: coverage.requiredLiveCoverage.map { $0 ? "yes" : "no" }
                         ?? "not declared"
@@ -268,6 +284,9 @@ struct CoverageView: View {
         var badges: [(String, WisentTone)] = [(coverage.coverageKind, .brand)]
         if coverage.isUncovered {
             badges.append(("No mappings", .warning))
+        }
+        if coverage.isPartlyWired {
+            badges.append(("Not installed", .warning))
         }
         return badges
     }

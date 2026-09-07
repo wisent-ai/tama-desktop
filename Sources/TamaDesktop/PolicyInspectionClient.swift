@@ -16,6 +16,9 @@ struct ProviderCoverage: Decodable, Identifiable, Sendable {
     let hookCount: Int
     let eventCount: Int
     let adapterPath: String?
+    /// How many declared mappings the provider's own config really installs.
+    /// `nil` for providers whose config Tama does not write.
+    let installedMappingCount: Int?
     let requiredLiveCoverage: Bool?
     let evidence: String
     let note: String?
@@ -26,6 +29,19 @@ struct ProviderCoverage: Decodable, Identifiable, Sendable {
     /// A provider the registry declares but maps to nothing is the minority
     /// state on this screen, and the only one that earns a chip.
     var isUncovered: Bool { mappingCount == .zero }
+
+    /// The registry claims mappings this provider's config does not install:
+    /// declared policy that never runs, which the declared counts alone
+    /// cannot show.
+    var isPartlyWired: Bool {
+        guard let installedMappingCount else { return false }
+        return installedMappingCount < mappingCount
+    }
+
+    var wiringSummary: String? {
+        guard let installedMappingCount else { return nil }
+        return "\(installedMappingCount.formatted(.number)) of \(mappingCount.formatted(.number)) installed"
+    }
 }
 
 struct InstallPlanField: Identifiable, Sendable {
