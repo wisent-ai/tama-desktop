@@ -114,6 +114,73 @@ def tree_digest(root: Path) -> str:
     return digest.hexdigest()
 
 
+def registry_checksum(registry: dict) -> str:
+    """The checksum `seal-registry.mjs` and the installer both compute."""
+    value = {key: item for key, item in registry.items() if key != "catalogChecksum"}
+    encoded = json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def deployable_sources(value: object, prefix: str) -> object:
+    """Every relative `source` restated under `prefix`, at any depth."""
+    if isinstance(value, dict):
+        result: dict[str, object] = {}
+        for key, item in value.items():
+            relative = (
+                key == "source"
+                and isinstance(item, str)
+                and bool(item)
+                and not item.startswith(("/", "$", "~"))
+            )
+            result[key] = f"{prefix}/{item}" if relative else deployable_sources(item, prefix)
+        return result
+    if isinstance(value, list):
+        return [deployable_sources(item, prefix) for item in value]
+    return value
+
+
+def state_the_deployable_root(root: Path, source_root: Path) -> str:
+    """Restate the release registry's checkout paths with `$HOME`.
+
+    The repository keeps `catalog.maintainedIn` and every `source`
+    repository-relative, which is what makes the tracked registry free of one
+    operator's machine. `install_hook_release.py` reads that one field twice
+    and needs opposite things from it. Its rewrite table takes
+    `maintained_in.parent.parent`, so a relative field collapses the root to
+    `.` and the table gains the bare token `shared-hooks` — which matches
+    inside every `$HOME/.shared-hooks/...` command. Installing release
+    9448e04f on 2026-09-08 therefore wrote 39 hook commands as
+    `$HOME/./Users/<name>/.shared-hooks/...`: paths that do not exist, so
+    those hooks stop running and nothing says so. Its source check wants the
+    opposite, a root spelled exactly like the `source` values beside it.
+
+    A release is deployable state rather than a tracked document, so it names
+    its checkout with the `$HOME` placeholder both runners already expand, and
+    it names sources the same way. The rewrite table then holds
+    `$HOME/<checkout>/shared-hooks`, which appears in no command; the `$HOME`
+    pair expands commands exactly once; and each source resolves into the
+    release tree.
+    """
+    registry_path = root / "shared-hooks/registry.json"
+    registry = json.loads(registry_path.read_text())
+    home = Path.home()
+    checkout = source_root.resolve()
+    if checkout == home or home not in checkout.parents:
+        prefix = checkout.as_posix()
+    else:
+        prefix = f"$HOME/{checkout.relative_to(home).as_posix()}"
+    registry = deployable_sources(registry, prefix)
+    registry.setdefault("catalog", {})["maintainedIn"] = f"{prefix}/shared-hooks/registry.json"
+    registry["catalogChecksum"] = registry_checksum(registry)
+    registry_path.write_text(json.dumps(registry, indent=2) + "\n")
+    return prefix
+
+
 def main() -> int:
     if "--digest-file" in sys.argv:
         artifact = Path(next(reversed(sys.argv))).resolve()
@@ -136,6 +203,9 @@ def main() -> int:
     root = Path(arguments[0]).resolve()
     prune_ignored(root)
     package = json.loads((root / "package.json").read_text())
+    # The registry is restated first, so the external source manifest is keyed
+    # by the same spelling the installer reads back out of it.
+    state_the_deployable_root(root, source_root)
     registry = json.loads((root / "shared-hooks/registry.json").read_text())
     package_external_sources(root, registry, source_root)
     prune_ignored(root)
