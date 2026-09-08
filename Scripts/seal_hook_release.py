@@ -18,11 +18,20 @@ def prune_ignored(root: Path) -> None:
         path.unlink(missing_ok=True)
 
 
-def package_external_sources(root: Path, registry: dict) -> None:
+def package_external_sources(root: Path, registry: dict, source_root: Path) -> None:
+    """Copy every hook source living outside the managed hook directories.
+
+    `source_root` is the checkout the registry was sealed from. It has to be
+    stated: since the registry became portable, `catalog.maintainedIn` reads
+    `shared-hooks/registry.json`, so the root derived from it is whatever
+    directory the sealer happened to run in. That made a release sealable from
+    one directory and impossible from any other, and the message said only
+    that a source file was missing.
+    """
     catalog = registry.get("catalog", {})
-    maintained_in = Path(catalog.get("maintainedIn", ""))
-    codex_path = Path(registry.get("adapters", {}).get("codex", {}).get("path", ""))
-    source_root = maintained_in.parent.parent
+    codex_path = Path(
+        os.path.expandvars(registry.get("adapters", {}).get("codex", {}).get("path", ""))
+    ).expanduser()
     source_home = codex_path.parent.parent
     managed_roots = (
         source_root / "shared-hooks",
@@ -37,11 +46,19 @@ def package_external_sources(root: Path, registry: dict) -> None:
         raw_source = hook.get("source")
         if not raw_source:
             continue
-        source = Path(raw_source)
+        source = Path(os.path.expandvars(raw_source)).expanduser()
+        if not source.is_absolute():
+            source = source_root / source
         if any(source.is_relative_to(managed) for managed in managed_roots):
             continue
         if not source.is_file():
-            raise RuntimeError(f"External hook source is missing: {source}")
+            raise RuntimeError(
+                f"External hook source is missing: {source}\n"
+                f"  declared as: {raw_source}\n"
+                f"  resolved against source root: {source_root}\n"
+                "Pass --source-root <checkout> if that is the wrong checkout, or "
+                "run tama-reconcile-registry-sources on the registry if the source moved."
+            )
         if source.parent.name == "hooks" and source.parent.parent.name == "scripts":
             external_root = source.parent.parent
             destination = root / "external-hooks" / external_root.parent.name / "scripts"
@@ -53,14 +70,17 @@ def package_external_sources(root: Path, registry: dict) -> None:
                         destination / directory_name,
                         dirs_exist_ok=True,
                     )
-            mappings[str(external_root)] = str(
-                destination.relative_to(root)
-            )
+            mappings[str(external_root)] = str(destination.relative_to(root))
         else:
             destination = root / "external-hooks" / hook["id"] / source.name
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, destination)
-            mappings[str(source)] = str(destination.relative_to(root))
+            # Keyed by the value the registry declares, not by the path it
+            # resolved to here: the installer matches this prefix against that
+            # declared value, and since the registry became portable the
+            # declared value is repository relative while the resolution is
+            # this checkout's absolute path.
+            mappings[raw_source] = str(destination.relative_to(root))
     (root / "external-sources.json").write_text(
         json.dumps(
             {
@@ -101,13 +121,23 @@ def main() -> int:
             raise SystemExit(f"artifact not found: {artifact}")
         print(tree_digest(artifact))
         return len(())
-    if len(sys.argv) != 2:
-        raise SystemExit("usage: seal_hook_release.py <release-root>")
-    root = Path(sys.argv[1]).resolve()
+    arguments = sys.argv[1:]
+    source_root = Path.cwd()
+    if "--source-root" in arguments:
+        index = arguments.index("--source-root")
+        if index + 1 >= len(arguments):
+            raise SystemExit("--source-root needs a path")
+        source_root = Path(arguments[index + 1]).resolve()
+        del arguments[index : index + 2]
+    if len(arguments) != 1:
+        raise SystemExit(
+            "usage: seal_hook_release.py [--source-root <checkout>] <release-root>"
+        )
+    root = Path(arguments[0]).resolve()
     prune_ignored(root)
     package = json.loads((root / "package.json").read_text())
     registry = json.loads((root / "shared-hooks/registry.json").read_text())
-    package_external_sources(root, registry)
+    package_external_sources(root, registry, source_root)
     prune_ignored(root)
     catalog = registry.get("catalog", {})
     release = {
