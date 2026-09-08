@@ -8,14 +8,25 @@ import WisentDesignSystem
 /// these files successfully, and an entry whose quote was never filled in is
 /// incomplete evidence, not an outage. Red is kept for a registry Tama cannot
 /// read at all.
+///
+/// The screen also records a justification, because the CLI can and the two
+/// surfaces carry the same capability. The centre pane lives in
+/// `Justifications/Records.swift` and the evidence pane in
+/// `Justifications/Inspector.swift`, so this file stays inside the length limit
+/// the operator's own gate enforces.
 struct JustificationsView: View {
     let collections: [JustificationCollection]
     let isRefreshing: Bool
+    /// Called with the path that was just recorded, for a caller that wants to
+    /// re-read the registries immediately.
+    var onRecorded: (String) -> Void = { _ in }
 
     @State private var registryID: JustificationCollection.ID?
-    @State private var verdictFacet: VerdictFacet = .all
-    @State private var selection: JustificationEntry.ID?
-    @State private var query = ""
+    @State var verdictFacet: VerdictFacet = .all
+    @State var selection: JustificationEntry.ID?
+    @State var query = ""
+    @State private var isRecordingSheetOpen = false
+    @State private var lastRecorded: String?
 
     enum VerdictFacet: String, CaseIterable, Identifiable {
         case all
@@ -45,7 +56,7 @@ struct JustificationsView: View {
             scrolls: false,
             constrainsWidth: false
         ) {
-            HStack(spacing: 0) {
+            HStack(spacing: .zero) {
                 WisentFacetRail(
                     groups: facetGroups(collection: collection, entries: entries)
                 )
@@ -55,6 +66,22 @@ struct JustificationsView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .searchable(text: $query, placement: .toolbar, prompt: "Search target or justification")
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    isRecordingSheetOpen = true
+                } label: {
+                    Label("Record justification", systemImage: "square.and.pencil")
+                }
+                .help("Record a justification for a new file or a new test")
+            }
+        }
+        .sheet(isPresented: $isRecordingSheetOpen) {
+            JustificationRecorder(collections: collections) { path in
+                lastRecorded = path
+                onRecorded(path)
+            }
+        }
         .onAppear {
             if registryID == nil { registryID = collections.first?.id }
         }
@@ -62,7 +89,7 @@ struct JustificationsView: View {
 
     // MARK: - Facets
 
-    private var selectedCollection: JustificationCollection? {
+    var selectedCollection: JustificationCollection? {
         collections.first { $0.id == registryID } ?? collections.first
     }
 
@@ -154,252 +181,17 @@ struct JustificationsView: View {
                     detail: "Reasons could not be loaded."
                 )
             }
+            if let lastRecorded {
+                WisentAlertPanel(
+                    tone: .info,
+                    title: "Recorded",
+                    detail: "\(lastRecorded) — the table shows it after the next read of the registries."
+                )
+            }
             if let collection { contract(collection) }
             content(collection: collection, entries: entries, visible: visible)
         }
         .padding(WisentDesign.Space.x5)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private func contract(_ collection: JustificationCollection) -> some View {
-        let requirement = collection.requirement
-        let holding = collection.entries.lazy
-            .filter { verdict($0, requirement: requirement).holds }
-            .count
-        return WisentCounterRow(counters: [
-            WisentCounterRow.Counter(
-                "Records",
-                value: collection.entries.count.formatted(.number),
-                detail: "Recorded justifications"
-            ),
-            WisentCounterRow.Counter(
-                "Valid",
-                value: holding.formatted(.number),
-                detail: "Meet the policy",
-                tone: .success
-            ),
-            WisentCounterRow.Counter(
-                "Incomplete",
-                value: (collection.entries.count - holding).formatted(.number),
-                detail: "Missing evidence or expired",
-                tone: holding == collection.entries.count ? .neutral : .warning
-            ),
-            WisentCounterRow.Counter(
-                "Minimum words",
-                value: requirement.minimumWords.formatted(.number),
-                detail: "Required length"
-            )
-        ])
-    }
-
-    @ViewBuilder
-    private func content(
-        collection: JustificationCollection?,
-        entries: [JustificationEntry],
-        visible: [JustificationEntry]
-    ) -> some View {
-        if collections.isEmpty {
-            if isRefreshing {
-                WisentSkeletonTable(
-                    rows: 6,
-                    columns: 4,
-                    header: true,
-                    label: "Reading justifications"
-                )
-            } else {
-                WisentEmptyPanel(
-                    title: "No justification policy",
-                    detail: "No justifications are required.",
-                    symbol: "text.badge.checkmark"
-                )
-            }
-            Spacer(minLength: 0)
-        } else if entries.isEmpty {
-            WisentEmptyPanel(
-                title: "No justifications recorded",
-                detail: collection?.loadError == nil
-                    ? "No records yet."
-                    : "Justifications could not be read.",
-                symbol: "tray"
-            )
-            Spacer(minLength: 0)
-        } else if visible.isEmpty {
-            WisentEmptyPanel(
-                title: "No record matches this selection",
-                detail: "\(counted(entries.count, "record")) available. Change or clear the filters.",
-                symbol: "line.3.horizontal.decrease.circle",
-                action: WisentAction("Clear filters", kind: .secondary) {
-                    verdictFacet = .all
-                    query = ""
-                }
-            )
-            Spacer(minLength: 0)
-        } else if let requirement = collection?.requirement {
-            table(visible: visible, entries: entries, requirement: requirement)
-        }
-    }
-
-    /// The chip marks the minority verdict. A registry where every record holds
-    /// gets no chips at all, and the count stays in the rail.
-    private func table(
-        visible: [JustificationEntry],
-        entries: [JustificationEntry],
-        requirement: JustificationRequirement
-    ) -> some View {
-        let holding = entries.lazy.filter { verdict($0, requirement: requirement).holds }.count
-        let chipsOnHolding = holding * Int("2")! <= entries.count
-        return WisentTableFrame {
-            Table(visible, selection: $selection) {
-                TableColumn("TARGET") { entry in
-                    Text(entry.registryKey)
-                        .font(WisentTypeScale.identifier())
-                        .foregroundStyle(WisentDesign.ink)
-                        .lineLimit(1)
-                        .truncationMode(.head)
-                        .help(entry.registryKey)
-                        .frame(height: WisentAppLayout.tableRowHeight, alignment: .leading)
-                }
-                .width(min: 130, ideal: 220)
-                TableColumn("WORDS") { entry in
-                    Text("\(entry.wordCount.formatted(.number))/\(requirement.minimumWords.formatted(.number))")
-                        .font(WisentTypeScale.identifierSmall())
-                        .foregroundStyle(
-                            entry.wordCount >= requirement.minimumWords
-                                ? WisentDesign.secondary
-                                : WisentDesign.warning
-                        )
-                        .monospacedDigit()
-                }
-                .width(min: 54, ideal: 70)
-                TableColumn("EXPIRES") { entry in
-                    Text(entry.expiresAt.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—")
-                        .font(WisentTypeScale.identifierSmall())
-                        .foregroundStyle(entry.isExpired ? WisentDesign.warning : WisentDesign.secondary)
-                        .monospacedDigit()
-                }
-                .width(min: 66, ideal: 86)
-                TableColumn("VERDICT") { entry in
-                    let verdict = verdict(entry, requirement: requirement)
-                    if verdict.holds == chipsOnHolding {
-                        WisentStatusChip(text: verdict.label, tone: verdict.tone)
-                    }
-                }
-                .width(min: 60, ideal: 120)
-            }
-            .tableStyle(.inset)
-            // A click on this table already means "select this record" and a
-            // drag means "extend that selection", so selectable cell text would
-            // compete with both. Opting out restores exactly the behaviour the
-            // index had before the window turned selection on.
-            .textSelection(.disabled)
-        }
-    }
-
-    // MARK: - Inspector
-
-    @ViewBuilder
-    private func inspector(collection: JustificationCollection?) -> some View {
-        if let collection,
-           let entry = collection.entries.first(where: { $0.id == selection }) {
-            let requirement = collection.requirement
-            let verdict = verdict(entry, requirement: requirement)
-            WisentInspector(
-                eyebrow: requirement.title,
-                title: URL(fileURLWithPath: entry.registryKey).lastPathComponent,
-                badges: [(verdict.label, verdict.tone)]
-            ) {
-                WisentField(label: "Target", value: entry.registryKey)
-                WisentField(
-                    label: "Status",
-                    value: entry.targetExists ? "Present" : "Missing",
-                    tone: entry.targetExists ? .neutral : .warning
-                )
-                if let expiresAt = entry.expiresAt {
-                    WisentField(
-                        label: entry.isExpired ? "Expired" : "Expires",
-                        value: expiresAt.formatted(date: .abbreviated, time: .shortened),
-                        tone: entry.isExpired ? .warning : .neutral
-                    )
-                }
-                Divider()
-                prose(
-                    "JUSTIFICATION",
-                    entry.justification.isEmpty
-                        ? "No justification recorded."
-                        : entry.justification
-                )
-                if requirement.directUserQuoteField != nil {
-                    prose(
-                        "DIRECT USER REQUEST",
-                        recordedQuote(entry) ?? "No user request recorded."
-                    )
-                }
-            }
-        } else {
-            WisentInspector(
-                eyebrow: "Justification",
-                title: collections.isEmpty ? "No justification policy" : "No record selected"
-            ) {
-                Text("Select a record to view its justification and user request.")
-                    .font(WisentTypeScale.caption())
-                    .foregroundStyle(WisentDesign.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    private func prose(_ label: String, _ text: String) -> some View {
-        VStack(alignment: .leading, spacing: WisentDesign.Space.x1) {
-            Text(label)
-                .font(WisentTypeScale.eyebrow())
-                .tracking(0.6)
-                .foregroundStyle(WisentDesign.muted)
-            Text(text)
-                .font(WisentTypeScale.caption())
-                .foregroundStyle(WisentDesign.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    // MARK: - Verdicts
-
-    struct Verdict {
-        let label: String
-        let tone: WisentTone
-        let holds: Bool
-    }
-
-    /// A record that is merely incomplete is amber, never red: the operator has
-    /// evidence to finish, not an outage to fix.
-    private func verdict(
-        _ entry: JustificationEntry,
-        requirement: JustificationRequirement
-    ) -> Verdict {
-        if !entry.targetExists {
-            return Verdict(label: "Target missing", tone: .warning, holds: false)
-        }
-        if entry.isExpired {
-            return Verdict(label: "Expired", tone: .warning, holds: false)
-        }
-        if requirement.directUserQuoteField != nil {
-            guard let quote = recordedQuote(entry) else {
-                return Verdict(label: "No user quote", tone: .neutral, holds: false)
-            }
-            if !entry.justification.contains(quote) {
-                return Verdict(label: "Quote not embedded", tone: .warning, holds: false)
-            }
-        }
-        if entry.wordCount < requirement.minimumWords {
-            return Verdict(label: "Too short", tone: .warning, holds: false)
-        }
-        return Verdict(label: "Holds", tone: .success, holds: true)
-    }
-
-    private func recordedQuote(_ entry: JustificationEntry) -> String? {
-        guard let quote = entry.directUserQuote, quote.contains(where: { !$0.isWhitespace }) else {
-            return nil
-        }
-        return quote
     }
 }
