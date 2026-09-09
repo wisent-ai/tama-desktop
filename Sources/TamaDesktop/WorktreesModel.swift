@@ -25,7 +25,7 @@ final class WorktreesModel: ObservableObject {
     }
 
     typealias List = @Sendable ([String]) async throws -> WorktreeListing
-    typealias Remove = @Sendable ([String], Bool, Bool) async throws -> WorktreeRemoval
+    typealias Remove = @Sendable ([String], [String], Bool, Bool) async throws -> WorktreeRemoval
 
     @Published private(set) var roots: [String] = []
     @Published private(set) var scanState: ScanState = .idle
@@ -42,13 +42,24 @@ final class WorktreesModel: ObservableObject {
     /// the difference between a refusal and discarded work.
     @Published private(set) var discardsUncommittedChanges = false
 
+    /// `--except` on the CLI: the worktrees the operator marked to keep. The
+    /// pass leaves each of them completely alone, so a kept worktree is
+    /// neither removed nor refused — kept is the operator's choice, refused is
+    /// the product's, and the screen never conflates the two.
+    @Published private(set) var keptPaths: Set<String> = []
+
     private let listRoute: List
     private let removeRoute: Remove
 
     init(
         list: @escaping List = { try await WorktreesClient().list(roots: $0) },
         remove: @escaping Remove = {
-            try await WorktreesClient().remove(roots: $0, apply: $1, force: $2)
+            try await WorktreesClient().remove(
+                roots: $0,
+                except: $1,
+                apply: $2,
+                force: $3
+            )
         }
     ) {
         listRoute = list
@@ -75,20 +86,36 @@ final class WorktreesModel: ObservableObject {
 
     var canScan: Bool { !roots.isEmpty && !isBusy }
 
-    var canPreview: Bool { canScan && worktreeCount > .zero }
+    var canPreview: Bool { canScan && removableCount > .zero }
 
     /// A preview whose refusals are all settled is the only thing that unlocks
     /// applying; with a refusal outstanding the backend refuses the whole pass
     /// anyway, and saying so before the request is the honest order.
     var canApply: Bool {
-        guard let preview else { return false }
-        return refusals.isEmpty && preview.worktreeCount > .zero && !isBusy
+        guard preview != nil else { return false }
+        return refusals.isEmpty && removableCount > .zero && !isBusy
     }
 
+    /// What the operator marked here, plus what the document reported back as
+    /// excepted: a path in either is kept out of the pass.
+    var kept: Set<String> { keptPaths.union(preview?.exceptedPaths ?? []) }
+
+    func isKept(_ record: WorktreeRecord) -> Bool { kept.contains(record.path) }
+
+    var keptWorktrees: [WorktreeRecord] { worktrees.filter { kept.contains($0.path) } }
+
+    /// The rows this pass would actually delete, which is what the counters,
+    /// the confirmation and its listing are all about.
+    var removableWorktrees: [WorktreeRecord] {
+        worktrees.filter { !kept.contains($0.path) }
+    }
+
+    var removableCount: Int { max(worktreeCount - keptWorktrees.count, .zero) }
+
     /// A worktree that would be discarded rather than removed cleanly, which is
-    /// what the confirmation has to say out loud.
+    /// what the confirmation has to say out loud. A kept one loses nothing.
     var worktreesNeedingForce: [WorktreeRecord] {
-        worktrees.filter(\.isRefusedWithoutForce)
+        removableWorktrees.filter(\.isRefusedWithoutForce)
     }
 
     /// Adding or dropping a root discards the listing and the preview: both
@@ -116,6 +143,20 @@ final class WorktreesModel: ObservableObject {
         removalState = .idle
     }
 
+    /// Marking a worktree kept changes which checkouts an apply would delete,
+    /// so it drops the preview for exactly the reason discarding does: an
+    /// apply must never run against a plan that no longer describes it.
+    func setKept(_ path: String, _ kept: Bool) {
+        guard self.kept.contains(path) != kept else { return }
+        if kept { keptPaths.insert(path) } else { keptPaths.remove(path) }
+        preview = nil
+        removalState = .idle
+    }
+
+    func toggleKept(_ record: WorktreeRecord) {
+        setKept(record.path, !isKept(record))
+    }
+
     // MARK: - Read
 
     func list() async {
@@ -128,9 +169,14 @@ final class WorktreesModel: ObservableObject {
         let route = listRoute
         scanState = .scanning
         do {
-            listing = try await Task.detached(priority: .userInitiated) {
+            let document = try await Task.detached(priority: .userInitiated) {
                 try await route(roots)
             }.value
+            listing = document
+            // A checkout this walk no longer reports is not one the pass could
+            // except, and `--except` refuses a path it does not know: the
+            // mark goes with the worktree it was put on.
+            keptPaths.formIntersection(document.allWorktrees.map(\.path))
             scanState = .done
         } catch {
             scanState = .failed(Self.sentence(error))
@@ -164,12 +210,13 @@ final class WorktreesModel: ObservableObject {
             return
         }
         let roots = roots
+        let except = keptPaths.sorted()
         let force = discardsUncommittedChanges
         let route = removeRoute
         removalState = apply ? .applying : .previewing
         do {
             let result = try await Task.detached(priority: .userInitiated) {
-                try await route(roots, apply, force)
+                try await route(roots, except, apply, force)
             }.value
             preview = result
             guard apply else {
@@ -205,6 +252,10 @@ final class WorktreesModel: ObservableObject {
         listing = nil
         preview = nil
         removed = []
+        // A mark names one worktree of the old walk; under a different set of
+        // roots there may be no such worktree, and `--except` refuses a path
+        // this pass does not know.
+        keptPaths = []
         scanState = .idle
         removalState = .idle
     }

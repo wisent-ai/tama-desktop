@@ -15,6 +15,7 @@ extension WorktreesView {
             if case let .failed(message) = model.removalState {
                 WisentAlertPanel(tone: .danger, title: "Removal refused", detail: message)
             }
+            keptOut
             refusals
             if model.worktreeCount > .zero { counters }
             content(visible: visible)
@@ -88,6 +89,39 @@ extension WorktreesView {
         )
     }
 
+    /// The worktrees the operator marked to keep, stated as a list and not as
+    /// an alert: nothing here needs settling, which is the whole difference
+    /// between kept and refused. Paths are read from the model, so a document
+    /// that reported `excepted` back shows the same rows as a fresh mark.
+    @ViewBuilder
+    private var keptOut: some View {
+        let paths = model.kept.sorted()
+        if !paths.isEmpty {
+            WisentSectionBox(
+                title: "Kept",
+                detail: "Sent as --except: left alone, neither removed nor refused.",
+                trailing: counted(paths.count, "worktree")
+            ) {
+                ForEach(paths, id: \.self) { path in
+                    HStack(spacing: WisentDesign.Space.x3) {
+                        Text(path)
+                            .font(WisentTypeScale.identifierSmall())
+                            .foregroundStyle(WisentDesign.ink)
+                            .lineLimit(1)
+                            .truncationMode(.head)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        WisentStatusChip(text: "Kept", tone: .info)
+                        WisentActionButton(
+                            action: WisentAction("Include", kind: .plain) {
+                                model.setKept(path, false)
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     /// One panel per refused worktree, carrying the command's own sentence: it
     /// names the path and the remedy, so there is nothing to paraphrase.
     @ViewBuilder
@@ -102,24 +136,33 @@ extension WorktreesView {
     }
 
     private var counters: some View {
-        WisentCounterRow(counters: [
+        // A kept worktree is refused nothing, so the two refusal counters read
+        // the removable rows and not every row git reported.
+        let removable = model.removableWorktrees
+        return WisentCounterRow(counters: [
             WisentCounterRow.Counter(
-                "Worktrees",
-                value: model.worktreeCount.formatted(.number),
-                detail: "Linked checkouts in \(counted(model.repositories.count, "repository"))",
-                tone: model.worktreeCount == .zero ? .success : .warning
+                "Removable",
+                value: model.removableCount.formatted(.number),
+                detail: "Of \(counted(model.worktreeCount, "linked checkout")) in \(counted(model.repositories.count, "repository"))",
+                tone: model.removableCount == .zero ? .success : .warning
+            ),
+            WisentCounterRow.Counter(
+                "Kept",
+                value: model.kept.count.formatted(.number),
+                detail: "Marked --except; this pass leaves them alone",
+                tone: model.kept.isEmpty ? .neutral : .info
             ),
             WisentCounterRow.Counter(
                 "Uncommitted",
-                value: model.worktrees.filter(\.dirty).count.formatted(.number),
+                value: removable.filter(\.dirty).count.formatted(.number),
                 detail: "Removal refuses these without discarding",
-                tone: model.worktrees.contains(where: \.dirty) ? .warning : .neutral
+                tone: removable.contains(where: \.dirty) ? .warning : .neutral
             ),
             WisentCounterRow.Counter(
                 "Locked",
-                value: model.worktrees.filter(\.locked).count.formatted(.number),
+                value: removable.filter(\.locked).count.formatted(.number),
                 detail: "Git refuses to remove a locked worktree",
-                tone: model.worktrees.contains(where: \.locked) ? .warning : .neutral
+                tone: removable.contains(where: \.locked) ? .warning : .neutral
             ),
             WisentCounterRow.Counter(
                 "Removed",

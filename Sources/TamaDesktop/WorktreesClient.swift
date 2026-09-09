@@ -104,6 +104,14 @@ struct WorktreeRemoval: Decodable, Sendable {
     let applied: Bool
     let removed: [String]
     let refused: [WorktreeRefusal]
+    /// The worktrees `--except` kept out of this pass. A document that omits
+    /// the key excepted nothing, which is an empty list and not a decode
+    /// failure: the field is younger than the route.
+    let excepted: [String]?
+
+    /// Kept is stated separately from refused everywhere on the screen, so the
+    /// absent key is resolved once, here.
+    var exceptedPaths: [String] { excepted ?? [] }
 }
 
 /// The two worktree routes on the local backend. `TamaClient` prepends `/v1`,
@@ -122,11 +130,19 @@ struct WorktreesClient: Sendable {
         )
     }
 
-    func remove(roots: [String], apply: Bool, force: Bool) async throws -> WorktreeRemoval {
+    /// `except` carries the worktrees the operator marked to keep. It is
+    /// optional on the route and empty means "nothing kept", so the same
+    /// request shape serves both.
+    func remove(
+        roots: [String],
+        except: [String],
+        apply: Bool,
+        force: Bool
+    ) async throws -> WorktreeRemoval {
         let paths = try validatedRoots(roots)
         return try await client().post(
             "worktrees/remove",
-            body: ["roots": paths, "apply": apply, "force": force],
+            body: ["roots": paths, "except": except, "apply": apply, "force": force],
             as: WorktreeRemoval.self,
             operation: Self.removeOperation
         )
