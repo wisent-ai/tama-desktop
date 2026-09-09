@@ -1,5 +1,6 @@
 .build/
 .swiftpm/
+__pycache__/
 .DS_Store
 .env
 .env.*
