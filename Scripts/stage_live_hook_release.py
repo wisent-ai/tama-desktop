@@ -17,6 +17,8 @@ from hook_release_native.build import (
     build_binaries,
     cargo_metadata,
     manifest_entry,
+    source_identity,
+    verify_source_identity,
 )
 
 NATIVE_MANIFEST_SCHEMA = "ai.wisent.tama.native-hook-binaries.v1"
@@ -82,6 +84,7 @@ def package_native_binaries(
     codesign_identity: str | None,
     codesign_timestamp: str,
 ) -> None:
+    identity = source_identity(source_root, release_root)
     registry = load_object(release_root / "shared-hooks/registry.json")
     metadata = cargo_metadata(cargo, source_root)
     targets = binary_targets(metadata)
@@ -135,8 +138,10 @@ def package_native_binaries(
             )
 
     workspace_root = Path(metadata["workspace_root"]).resolve()
+    verify_source_identity(source_root, identity)
     manifest = {
         "schema": NATIVE_MANIFEST_SCHEMA,
+        "sourceIdentity": identity,
         "hooks": [
             manifest_entry(targets[name], workspace_root) for name in sorted(hook_names)
         ],

@@ -351,7 +351,7 @@ python3 "$SCRIPT_DIR/stage_live_hook_release.py" \
     >/dev/null
 TAMA_HOOK_SOURCE_DIRTY="$HOOK_SOURCE_DIRTY" \
 TAMA_HOOK_SOURCE_REVISION="$HOOK_SOURCE_REVISION" \
-python3 "$SCRIPT_DIR/seal_hook_release.py" "$HOOK_RELEASE" >/dev/null
+python3 "$SCRIPT_DIR/seal_hook_release.py" --source-root "$HOOKS_ROOT" "$HOOK_RELEASE" >/dev/null
 install -m 0755 "$SCRIPT_DIR/emergency_disable_hooks" "$RESOURCES/emergency_disable_hooks"
 install -m 0755 "$SCRIPT_DIR/install_hook_release.py" "$RESOURCES/install_hook_release.py"
 if [ -f "$DESKTOP_ROOT/App/AppIcon.icns" ]; then

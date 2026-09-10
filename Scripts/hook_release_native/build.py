@@ -2,9 +2,96 @@
 
 from __future__ import annotations
 
+import hashlib
+import io
 import json
+import os
 from pathlib import Path
 import subprocess
+import stat
+
+
+SOURCE_INPUTS = (
+    "package.json", "shared-hooks", "claude-hooks", "codex-hooks", "repo-githooks", "rust",
+)
+PRUNED_GENERATORS = {
+    "shared-hooks/generate-configs.mjs",
+    "shared-hooks/providers.json",
+    "shared-hooks/run-one-session-hook.js",
+}
+
+
+def source_git(source_root: Path, *arguments: str) -> str:
+    environment = {
+        key: value for key, value in os.environ.items()
+        if key not in {"GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE"}
+    }
+    result = subprocess.run(
+        ["git", "-C", str(source_root), *arguments],
+        env=environment, capture_output=True, text=True, check=False,
+    )
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip()
+        raise RuntimeError(
+            f"Reading hook source identity at {source_root}: "
+            f"git {' '.join(arguments)} exited {result.returncode}: {detail}"
+        )
+    return result.stdout
+
+
+def file_digest(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for block in iter(lambda: source.read(io.DEFAULT_BUFFER_SIZE), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def source_identity(source_root: Path, release_root: Path | None = None) -> dict:
+    checkout = Path(source_git(source_root, "rev-parse", "--show-toplevel").strip()).resolve()
+    if checkout != source_root.resolve():
+        raise RuntimeError(f"Hook source root {source_root} is not the Git checkout root {checkout}")
+    revision = source_git(source_root, "rev-parse", "--verify", "HEAD").strip()
+    dirty = bool(source_git(source_root, "status", "--porcelain", "--untracked-files=normal"))
+    paths = source_git(
+        source_root, "ls-files", "--cached", "--others", "--exclude-standard", "-z",
+        "--", *SOURCE_INPUTS,
+    )
+    fingerprint = hashlib.sha256()
+    for relative in sorted(set(paths.split("\0")) - {""}):
+        path = source_root / relative
+        entry = {"path": relative, "mode": None, "target": None, "digest": None}
+        if path.exists() or path.is_symlink():
+            entry["mode"] = stat.S_IMODE(path.lstat().st_mode)
+            if path.is_symlink():
+                entry["target"] = os.readlink(path)
+            if not path.is_file():
+                raise RuntimeError(f"Hook source input is not a readable file: {path}")
+            entry["digest"] = file_digest(path)
+            if release_root is not None and not relative.startswith("rust/"):
+                staged = release_root / relative
+                pruned = relative in PRUNED_GENERATORS and not staged.exists()
+                if not pruned and (not staged.is_file() or file_digest(staged) != entry["digest"]):
+                    raise RuntimeError(
+                        f"Staged hook source differs from {path}: {staged}; restage the release"
+                    )
+        elif release_root is not None and not relative.startswith("rust/"):
+            staged = release_root / relative
+            if staged.exists():
+                raise RuntimeError(f"Deleted hook source remains staged: {staged}; restage the release")
+        fingerprint.update(json.dumps(entry, sort_keys=True).encode())
+        fingerprint.update(b"\n")
+    return {"revision": revision, "dirty": dirty, "fingerprint": fingerprint.hexdigest()}
+
+
+def verify_source_identity(source_root: Path, expected: dict) -> None:
+    observed = source_identity(source_root)
+    if observed != expected:
+        raise RuntimeError(
+            f"Hook source changed after staging at {source_root}: "
+            f"expected {json.dumps(expected, sort_keys=True)}, "
+            f"observed {json.dumps(observed, sort_keys=True)}; restage the release"
+        )
 
 
 def cargo_metadata(cargo: Path, source_root: Path) -> dict:

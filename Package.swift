@@ -50,5 +50,9 @@ let package = Package(
             dependencies: ["TamaDesktop"],
             path: "Tests/TamaDesktopTests"
         ),
+        .testTarget(
+            name: "HookReleaseTests",
+            path: "tests/release"
+        ),
     ]
 )

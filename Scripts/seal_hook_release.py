@@ -9,6 +9,38 @@ from pathlib import Path
 import sys
 import shutil
 
+from hook_release_native.build import source_identity, verify_source_identity
+
+
+def release_source_identity(root: Path, source_root: Path) -> dict:
+    native_manifest = root / "native-hook-binaries.json"
+    if native_manifest.is_file():
+        identity = json.loads(native_manifest.read_text()).get("sourceIdentity")
+        if (
+            not isinstance(identity, dict)
+            or not isinstance(identity.get("revision"), str)
+            or not isinstance(identity.get("dirty"), bool)
+            or not isinstance(identity.get("fingerprint"), str)
+        ):
+            raise RuntimeError(f"Native manifest has no recorded source identity: {native_manifest}; restage the release")
+        verify_source_identity(source_root, identity)
+    else:
+        if (root / "bin").exists():
+            raise RuntimeError(f"Native release lacks source identity: {root}; restage the release")
+        identity = source_identity(source_root)
+    expectations = {
+        "TAMA_HOOK_SOURCE_REVISION": identity["revision"],
+        "TAMA_HOOK_SOURCE_DIRTY": str(identity["dirty"]).lower(),
+    }
+    for name, observed in expectations.items():
+        expected = os.environ.get(name)
+        if expected is not None and expected != observed:
+            raise RuntimeError(
+                f"Hook source expectation {name} differs at {source_root}: "
+                f"expected {expected}, observed {observed}"
+            )
+    return identity
+
 
 def prune_ignored(root: Path) -> None:
     for directory in sorted(root.rglob("__pycache__"), reverse=True):
@@ -201,6 +233,7 @@ def main() -> int:
             "usage: seal_hook_release.py [--source-root <checkout>] <release-root>"
         )
     root = Path(arguments[0]).resolve()
+    identity = release_source_identity(root, source_root)
     prune_ignored(root)
     package = json.loads((root / "package.json").read_text())
     # The registry is restated first, so the external source manifest is keyed
@@ -210,14 +243,15 @@ def main() -> int:
     package_external_sources(root, registry, source_root)
     prune_ignored(root)
     catalog = registry.get("catalog", {})
+    verify_source_identity(source_root, identity)
     release = {
         "schema": "ai.wisent.tama.hook-release.v1",
         "releaseId": tree_digest(root),
         "packageVersion": package.get("version", "unknown"),
         "catalogVersion": catalog.get("version", "unknown"),
         "catalogUpdatedAt": catalog.get("updatedAt"),
-        "sourceDirty": os.environ.get("TAMA_HOOK_SOURCE_DIRTY", "true") == "true",
-        "sourceRevision": os.environ.get("TAMA_HOOK_SOURCE_REVISION", "unknown"),
+        "sourceDirty": identity["dirty"],
+        "sourceRevision": identity["revision"],
         "sealedAt": datetime.now(timezone.utc).isoformat(),
     }
     (root / "release.json").write_text(json.dumps(release, indent=2, sort_keys=True) + "\n")
