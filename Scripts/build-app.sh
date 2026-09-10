@@ -405,7 +405,11 @@ codesign \
     $CODESIGN_TIMESTAMP \
     "$FRAMEWORKS/Sparkle.framework"
 IDENTITY_HELPER="$CONTENTS/Helpers/WisentIdentityKeychainHelper"
-"$DESKTOP_ROOT/.build/checkouts/wisent-desktop-auth/scripts/build-keychain-helper.sh" "$IDENTITY_HELPER"
+IDENTITY_BUILD_DIR="$DESKTOP_ROOT/.build/identity-helper"
+swift build --package-path "$DESKTOP_ROOT/.build/checkouts/wisent-desktop-auth" \
+    --configuration release --product wisent-identity-keychain-helper --scratch-path "$IDENTITY_BUILD_DIR"
+mkdir -p "$(dirname "$IDENTITY_HELPER")"
+install -m 0755 "$IDENTITY_BUILD_DIR/release/wisent-identity-keychain-helper" "$IDENTITY_HELPER"
 codesign \
     --force \
     --sign "$CODESIGN_IDENTITY" \
