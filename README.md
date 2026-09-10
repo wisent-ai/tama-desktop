@@ -117,6 +117,15 @@ flowchart LR
 
 The signed app bundle and its build manifest identify the product build. The bundled hook release has an independent content digest because hook policy can evolve separately from the desktop app. Authoritative local state lives under `~/Library/Application Support/Tama`; session files and overrides use per-user permissions. The privileged daemon and Network Extension are separate trust boundaries. Wisent identity and repository contents are untrusted external inputs at their respective adapters.
 
+Hook staging captures the actual source checkout's Git revision, dirty state and
+source-input fingerprint in `native-hook-binaries.json`. Sealing verifies that
+capture instead of accepting an environment-supplied revision or writing
+`unknown`; changed inputs require a new stage. See the
+[hook release contract](https://tama.wisent.com/docs/hook-releases/).
+`swift test --filter HookReleaseSealTests --disable-automatic-resolution` runs the
+real sealer/Git stories under `Tests/release/` and retains their evidence under
+`.build/release-evidence/`.
+
 ## Quick start
 
 No supported binary has been published yet. The steps below are the contract for the first preview release; source builds are developer-only and are not a substitute for a supported release.
