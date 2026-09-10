@@ -52,7 +52,7 @@ let package = Package(
         ),
         .testTarget(
             name: "HookReleaseTests",
-            path: "tests/release"
+            path: "Tests/release"
         ),
     ]
 )
