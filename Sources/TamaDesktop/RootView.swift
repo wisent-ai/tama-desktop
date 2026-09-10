@@ -17,6 +17,7 @@ struct RootView: View {
 
     @StateObject private var inspection = InspectionModel()
     @StateObject private var worktrees = WorktreesModel()
+    @StateObject private var copies = CopiesModel()
     @State var selection: SidebarDestination = .posture
 
     var body: some View {
@@ -102,6 +103,8 @@ struct RootView: View {
             ViolationsView(model: violations, hasScope: !violations.repoPath.isEmpty)
         case .worktrees:
             WorktreesView(model: worktrees)
+        case .copies:
+            CopiesView(model: copies)
         case .justifications:
             JustificationsView(
                 collections: model.snapshot?.justifications ?? [],
