@@ -160,6 +160,14 @@ def stage_release(
     source_root: Path,
     replace_existing: bool,
 ) -> None:
+    # Staging starts from an installed runtime, so a machine that has never
+    # installed one - or a caller pointed at the wrong home - has to be told
+    # that, rather than meeting `FileNotFoundError` from inside copytree.
+    if not runtime.is_dir():
+        raise RuntimeError(
+            f"No installed hook runtime to stage from: {runtime}. Pass --runtime with an "
+            "installed release root, or install a release on this machine first."
+        )
     if destination.exists():
         if not replace_existing:
             raise RuntimeError(
