@@ -33,6 +33,9 @@ prepare_source() {
   verify_input "$swiftpm" "$SWIFTPM_SHA256"
   work="$WISENT_OUTPUT_DIR/work"
   rm -rf "$work"
+  # Throwaway state is removed by the code that made it: the unpacked hook
+  # source and everything signed inside it end with the run.
+  trap 'rm -rf "$work"' EXIT
   mkdir -p "$work"
   tar -xzf "$hooks" -C "$work"
   tar -xzf "$swiftpm" -C "$source"
@@ -75,6 +78,7 @@ build_release() {
   cleanup() {
     security delete-keychain "$keychain" >/dev/null 2>&1 || true
     rm -f "$cert" "$notary_key" "$sparkle_key" "$app_profile" "$network_profile"
+    rm -rf "$work"
   }
   trap cleanup EXIT
   printf '%s' "$MACOS_CERT_P12" | base64 -D > "$cert"
