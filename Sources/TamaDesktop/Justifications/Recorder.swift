@@ -9,9 +9,8 @@ import WisentDesignSystem
 /// CLI gained `tama justify` for that; this is the same capability on the
 /// graphical surface, because a capability the CLI has, the interface has.
 ///
-/// The rules are not restated here. The sheet runs the sealed `tama-cli` and
-/// shows whatever it says, so the interface can never accept an entry the CLI
-/// would refuse or refuse one it would accept.
+/// The sheet uses the same backend operation as the CLI and displays its
+/// refusal without maintaining a second implementation of the rules.
 struct JustificationRecorder: View {
     let collections: [JustificationCollection]
     let onRecorded: (String) -> Void
@@ -42,7 +41,7 @@ struct JustificationRecorder: View {
             VStack(alignment: .leading, spacing: WisentDesign.Space.x4) {
                 WisentSectionHeader(
                     "Record a justification",
-                    detail: "Written through the sealed CLI, which enforces the same rules the gates read."
+                    detail: "Recorded through Tama's backend using the same rules as the CLI."
                 )
                 picker
                 field("Absolute path", text: $target, prompt: "/Users/…/src/module.rs", lines: .one)
@@ -184,7 +183,7 @@ struct JustificationRecorder: View {
     }
 }
 
-/// Runs `tama justify record` from the sealed release beside the application.
+/// The existing file/test recorder shares the backend with CUA recording.
 struct JustificationRecordingClient {
     struct Request {
         let target: String
@@ -193,73 +192,19 @@ struct JustificationRecordingClient {
         let quote: String
     }
 
-    enum Failure: LocalizedError {
-        case cliMissing(String)
-        case refused(String)
-
-        var errorDescription: String? {
-            switch self {
-            case .cliMissing(let path): "The sealed Tama CLI is missing at \(path)."
-            case .refused(let message): message
-            }
-        }
+    private struct Recorded: Decodable {
+        let recorded: String
     }
 
     func record(_ request: Request) async throws {
-        let executable = try Self.executableURL()
-        var arguments = [
-            "justify", "record",
-            "--file", request.target,
-            "--justification", request.justification,
-            "--kind", request.isTest ? "test" : "file"
+        let client = TamaClient(baseURL: try await TamaBackend.shared.endpoint())
+        var body: [String: Any] = [
+            "kind": request.isTest ? "test" : "file",
+            "file": request.target,
+            "justification": request.justification,
         ]
-        if request.isTest {
-            arguments += ["--quote", request.quote]
-        }
-
-        let process = Process()
-        process.executableURL = executable
-        process.arguments = arguments
-        let errors = Pipe()
-        let output = Pipe()
-        process.standardError = errors
-        process.standardOutput = output
-        try process.run()
-        let refused = errors.fileHandleForReading.readDataToEndOfFile()
-        let printed = output.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        guard process.terminationStatus == .zero else {
-            let stated = String(decoding: refused, as: UTF8.self)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            let onStdout = String(decoding: printed, as: UTF8.self)
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            throw Failure.refused(stated.isEmpty ? onStdout : stated)
-        }
-    }
-
-    /// The binary sealed into this build's hook release, the same one the
-    /// backend runs. A debug build may point at a workspace binary.
-    static func executableURL() throws -> URL {
-        let manager = FileManager.default
-#if DEBUG
-        if let override = ProcessInfo.processInfo.environment["TAMA_CLI"], !override.isEmpty {
-            let url = URL(fileURLWithPath: override).standardizedFileURL
-            guard manager.isExecutableFile(atPath: url.path) else {
-                throw Failure.cliMissing(url.path)
-            }
-            return url
-        }
-#endif
-        guard let resources = Bundle.main.resourceURL else {
-            throw Failure.cliMissing("Tama.app/Contents/Resources")
-        }
-        let bundled = resources
-            .appendingPathComponent("hooks-release", isDirectory: true)
-            .appendingPathComponent("bin", isDirectory: true)
-            .appendingPathComponent("tama-cli")
-        guard manager.isExecutableFile(atPath: bundled.path) else {
-            throw Failure.cliMissing(bundled.path)
-        }
-        return bundled
+        if request.isTest { body["quote"] = request.quote }
+        _ = try await client.post("justifications/record", body: body,
+            as: Recorded.self, operation: "Recording a justification")
     }
 }

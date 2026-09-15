@@ -51,6 +51,11 @@ let package = Package(
             path: "Tests/TamaDesktopTests"
         ),
         .testTarget(
+            name: "CUAConsentTests",
+            dependencies: ["TamaDesktop"],
+            path: "tests/cua"
+        ),
+        .testTarget(
             name: "HookReleaseTests",
             path: "Tests/release"
         ),

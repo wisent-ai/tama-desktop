@@ -99,6 +99,25 @@ An operator confirms the emergency disable action. Tama pauses supervised sessio
 
 A maintainer selects a local repository and starts a read-only scan. Tama reports files, rules, skipped inputs, and scanner errors. Agent-assisted cleanup requires separate confirmation and requests working-tree edits only. Tama does not issue commit or push commands, rejects changed HEAD, checked-out branch, or local branch refs, performs a final scan, and requires the operator to inspect Git and remote state because the provider is external.
 
+### Record consent already given
+
+**Justifications → CUA consent** records a direct user grant from a named OMP
+session, shows the original message and exact app/action scope, and removes a
+selected quote after confirmation. It uses the same backend operation as
+`tama justify --kind cua`; no protected registry JSON needs to be pasted by
+hand. The file/test recorder uses the loopback backend too.
+
+Recording does not start Cua Driver or claim that a GUI action ran. The
+installed hook still checks session, target and action when the tool is used.
+The [Justifications reference](https://tama.wisent.com/docs/desktop/justifications/)
+describes the controls and refusals.
+
+`swift test --filter ConsentTests --disable-automatic-resolution` drives the
+actual native client against the real Tama backend with an isolated registry.
+Set `TAMA_TEST_CLI` to the built CLI and `TAMA_TEST_CUA_SESSION`,
+`TAMA_TEST_CUA_APP`, `TAMA_TEST_CUA_MATCH`, `TAMA_TEST_CUA_ACTIONS` to an
+existing real user grant. Evidence remains in `.build/consent-evidence/`.
+
 ## How the product works
 
 ```mermaid

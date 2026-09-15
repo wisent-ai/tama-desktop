@@ -26,6 +26,7 @@ struct JustificationsView: View {
     @State var selection: JustificationEntry.ID?
     @State var query = ""
     @State private var isRecordingSheetOpen = false
+    @State private var isCUASheetOpen = false
     @State private var lastRecorded: String?
 
     enum VerdictFacet: String, CaseIterable, Identifiable {
@@ -68,6 +69,9 @@ struct JustificationsView: View {
         .searchable(text: $query, placement: .toolbar, prompt: "Search target or justification")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
+                Button("CUA consent") { isCUASheetOpen = true }
+            }
+            ToolbarItem(placement: .primaryAction) {
                 Button {
                     isRecordingSheetOpen = true
                 } label: {
@@ -76,6 +80,7 @@ struct JustificationsView: View {
                 .help("Record a justification for a new file or a new test")
             }
         }
+        .sheet(isPresented: $isCUASheetOpen) { CUAGrantsView() }
         .sheet(isPresented: $isRecordingSheetOpen) {
             JustificationRecorder(collections: collections) { path in
                 lastRecorded = path
