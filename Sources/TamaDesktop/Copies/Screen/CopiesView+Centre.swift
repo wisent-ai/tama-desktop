@@ -160,7 +160,10 @@ extension CopiesView {
 
     /// What the walk crossed and this pass does not remove: linked worktrees,
     /// which `tama worktrees` owns, twin checkouts, where the choice is the
-    /// operator's, and candidates git would not answer for.
+    /// operator's, candidates git would not answer for, and the directories
+    /// the walk could not read at all — those last ones decide whether the
+    /// count above is an answer about the tree or only about the part of it
+    /// this pass could see.
     @ViewBuilder
     private var crossed: some View {
         ForEach(model.twins) { twin in
@@ -178,6 +181,20 @@ extension CopiesView {
                 tone: .warning,
                 title: "Skipped: \(URL(fileURLWithPath: path).lastPathComponent)",
                 detail: "\(path): git does not answer for it as a repository, so this pass reports it instead of reading it."
+            )
+        }
+        if !model.walkGaps.isEmpty {
+            WisentAlertPanel(
+                tone: .danger,
+                title: counted(model.walkGaps.count, "directory") + " could not be read",
+                detail: walkGapSummary(model.walkGaps)
+            )
+        }
+        ForEach(model.walkGaps) { gap in
+            WisentAlertPanel(
+                tone: .warning,
+                title: "Unreadable: \(gap.name)",
+                detail: gap.sentence
             )
         }
     }

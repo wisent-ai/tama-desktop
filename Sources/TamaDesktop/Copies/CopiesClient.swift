@@ -77,6 +77,12 @@ struct CopyListing: Decodable, Sendable {
     /// Candidates the walk found a `.git` for and git then refused to answer
     /// for: reported rather than dropped.
     let unreadable: [String]
+    /// Directories the walk could not list, each with the operating system's
+    /// own reason. A document that omits the key comes from a backend older
+    /// than the field, which is an empty list and not a decode failure.
+    let unreadableDirectories: [WalkGap]?
+
+    var walkGaps: [WalkGap] { unreadableDirectories ?? [] }
 
     var sizeLabel: String { copiedSize(bytes) }
 }
@@ -125,12 +131,17 @@ struct CopyRemoval: Decodable, Sendable {
     let linkedWorktrees: [String]
     let twins: [CopyTwin]
     let unreadable: [String]
+    /// Directories the walk could not list: a pass carrying one of these
+    /// removed nothing.
+    let unreadableDirectories: [WalkGap]?
     let excepted: [String]
     let applied: Bool
     let removed: [String]
     let refused: [CopyRefusal]
 
     var sizeLabel: String { copiedSize(bytes) }
+
+    var walkGaps: [WalkGap] { unreadableDirectories ?? [] }
 }
 
 /// The two copies routes on the local backend. `TamaClient` prepends `/v1`,

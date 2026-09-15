@@ -17,6 +17,7 @@ extension WorktreesView {
             }
             keptOut
             refusals
+            walkGaps
             if model.worktreeCount > .zero { counters }
             content(visible: visible)
         }
@@ -131,6 +132,27 @@ extension WorktreesView {
                 tone: .warning,
                 title: "Not removed: \(URL(fileURLWithPath: refusal.path).lastPathComponent)",
                 detail: refusal.sentence
+            )
+        }
+    }
+
+    /// What the walk could not read. This is the difference between "no second
+    /// checkouts here" and "none where this pass could look", and an operator
+    /// reading the empty table has to see it in the same place.
+    @ViewBuilder
+    private var walkGaps: some View {
+        if !model.walkGaps.isEmpty {
+            WisentAlertPanel(
+                tone: .danger,
+                title: counted(model.walkGaps.count, "directory") + " could not be read",
+                detail: walkGapSummary(model.walkGaps)
+            )
+        }
+        ForEach(model.walkGaps) { gap in
+            WisentAlertPanel(
+                tone: .warning,
+                title: "Unreadable: \(gap.name)",
+                detail: gap.sentence
             )
         }
     }

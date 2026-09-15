@@ -22,6 +22,11 @@ extension CopiesModel {
 
     var unreadable: [String] { preview?.unreadable ?? listing?.unreadable ?? [] }
 
+    /// Directories the walk could not read. The screen shows these beside the
+    /// count, because a table of no copies from a pass that could not look is
+    /// not the same answer as one checkout per repository.
+    var walkGaps: [WalkGap] { preview?.walkGaps ?? listing?.walkGaps ?? [] }
+
     var refusals: [CopyRefusal] { preview?.refused ?? [] }
 
     var isBusy: Bool {

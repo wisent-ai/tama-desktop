@@ -61,6 +61,14 @@ struct WorktreeListing: Decodable, Sendable {
     let roots: [String]
     let repositories: [WorktreeRepository]
     let worktreeCount: Int
+    /// Directories the walk could not list, each with the operating system's
+    /// own reason. A document that omits the key comes from a backend older
+    /// than the field, which is an empty list and not a decode failure.
+    let unreadableDirectories: [WalkGap]?
+
+    /// The absent key is resolved once, here, because every reader treats a
+    /// missing report and an empty one the same way.
+    var walkGaps: [WalkGap] { unreadableDirectories ?? [] }
 
     /// Flattened once, because the table ranks worktrees across repositories
     /// while the rail counts them per repository.
@@ -104,6 +112,9 @@ struct WorktreeRemoval: Decodable, Sendable {
     let applied: Bool
     let removed: [String]
     let refused: [WorktreeRefusal]
+    /// Directories the walk could not list, each with the operating system's
+    /// own reason: a pass carrying one of these removed nothing.
+    let unreadableDirectories: [WalkGap]?
     /// The worktrees `--except` kept out of this pass. A document that omits
     /// the key excepted nothing, which is an empty list and not a decode
     /// failure: the field is younger than the route.
@@ -112,6 +123,8 @@ struct WorktreeRemoval: Decodable, Sendable {
     /// Kept is stated separately from refused everywhere on the screen, so the
     /// absent key is resolved once, here.
     var exceptedPaths: [String] { excepted ?? [] }
+
+    var walkGaps: [WalkGap] { unreadableDirectories ?? [] }
 }
 
 /// The two worktree routes on the local backend. `TamaClient` prepends `/v1`,

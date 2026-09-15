@@ -80,6 +80,11 @@ final class WorktreesModel: ObservableObject {
 
     var refusals: [WorktreeRefusal] { preview?.refused ?? [] }
 
+    /// Directories the walk could not read. The screen shows these beside the
+    /// count, because an empty table from a pass that could not look is not
+    /// the same answer as a tree with no second checkouts in it.
+    var walkGaps: [WalkGap] { preview?.walkGaps ?? listing?.walkGaps ?? [] }
+
     var isBusy: Bool {
         scanState == .scanning || removalState == .previewing || removalState == .applying
     }
