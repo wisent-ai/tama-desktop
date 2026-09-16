@@ -132,11 +132,14 @@ extension CopiesView {
                 }
                 WisentField(label: "Copy of", value: record.ownerLabel)
                 WisentField(label: "Origin", value: record.originLabel)
+                if let retained = record.historyRetainedBy {
+                    WisentField(label: "Git history retained by", value: retained)
+                }
                 WisentField(label: "Apparent size", value: record.sizeLabel)
                 WisentField(
                     label: "State",
                     value: record.marks.isEmpty
-                        ? "Nothing uncommitted, every commit on a remote"
+                        ? "No working-tree changes; Git history is retained"
                         : record.marks.joined(separator: ", "),
                     tone: record.marks.isEmpty ? .success : .warning
                 )

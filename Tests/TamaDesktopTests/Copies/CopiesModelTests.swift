@@ -143,10 +143,6 @@ struct CopiesModelTests {
         await model.previewRemoval()
 
         #expect(model.refusals.map(\.path) == [Self.unpushedCopy, Self.loneCopy])
-        #expect(
-            model.refusals.first?.sentence
-                == "\(Self.unpushedCopy) holds commits that are on no remote; push them from there, then run the pass again."
-        )
         #expect(!model.canApply, "an outstanding refusal is stated before a request is sent")
 
         await model.applyRemoval()

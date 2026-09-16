@@ -16,6 +16,7 @@ struct CopyRecord: Decodable, Identifiable, Sendable {
     let bytes: Int
     let dirty: Bool
     let unpublished: Bool
+    let historyRetainedBy: String?
     let ownsWorktrees: Bool
     /// Echoed back by a pass the operator narrowed with `--only`.
     let named: Bool
@@ -35,8 +36,8 @@ struct CopyRecord: Decodable, Identifiable, Sendable {
     var marks: [String] {
         var marks: [String] = []
         if dirty { marks.append("Uncommitted changes") }
-        if unpublished { marks.append("Commits on no remote") }
-        if origin == nil { marks.append("No origin") }
+        if unpublished && historyRetainedBy == nil { marks.append("History not retained") }
+        if origin == nil && historyRetainedBy == nil { marks.append("No origin") }
         if owner == nil { marks.append("Only checkout here") }
         if ownsWorktrees { marks.append("Owns worktrees") }
         return marks
@@ -46,7 +47,9 @@ struct CopyRecord: Decodable, Identifiable, Sendable {
     /// answer for themselves by claiming the path; the rest are history.
     var isRefusedWithoutClaim: Bool { !marks.isEmpty }
 
-    var carriesWorkNowhereElse: Bool { dirty || unpublished || origin == nil }
+    var carriesWorkNowhereElse: Bool {
+        dirty || (historyRetainedBy == nil && (unpublished || origin == nil))
+    }
 }
 
 /// Two checkouts of one repository, both directly under a root. Reported,
@@ -111,7 +114,7 @@ struct CopyRefusal: Decodable, Identifiable, Sendable {
         case .uncommittedChanges:
             "\(path) has uncommitted changes; commit them there, then run the pass again."
         case .commitsNotOnRemote:
-            "\(path) holds commits that are on no remote; push them from there, then run the pass again."
+            "\(path) holds Git history without a remote-tracking or canonical retention proof; retain that history before removing this directory."
         case .noOriginRemote:
             "\(path) has no origin remote, so this pass cannot prove its history exists anywhere else."
         case .noCanonicalCheckout:
