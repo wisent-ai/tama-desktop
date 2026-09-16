@@ -135,6 +135,9 @@ extension CopiesView {
                 if let retained = record.historyRetainedBy {
                     WisentField(label: "Git history retained by", value: retained)
                 }
+                if let error = record.inspectionError {
+                    WisentField(label: "Git inspection error", value: error, tone: .warning)
+                }
                 WisentField(label: "Apparent size", value: record.sizeLabel)
                 WisentField(
                     label: "State",

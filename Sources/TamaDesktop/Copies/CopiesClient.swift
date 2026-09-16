@@ -14,8 +14,9 @@ struct CopyRecord: Decodable, Identifiable, Sendable {
     let owner: String?
     let origin: String?
     let bytes: Int
-    let dirty: Bool
-    let unpublished: Bool
+    let dirty: Bool?
+    let unpublished: Bool?
+    let inspectionError: String?
     let historyRetainedBy: String?
     let ownsWorktrees: Bool
     /// Echoed back by a pass the operator narrowed with `--only`.
@@ -35,8 +36,9 @@ struct CopyRecord: Decodable, Identifiable, Sendable {
     /// the command raises before deleting anything.
     var marks: [String] {
         var marks: [String] = []
-        if dirty { marks.append("Uncommitted changes") }
-        if unpublished && historyRetainedBy == nil { marks.append("History not retained") }
+        if inspectionError != nil || dirty == nil || unpublished == nil { marks.append("Unreadable Git state") }
+        if dirty == true { marks.append("Uncommitted changes") }
+        if unpublished == true && historyRetainedBy == nil { marks.append("History not retained") }
         if origin == nil && historyRetainedBy == nil { marks.append("No origin") }
         if owner == nil { marks.append("Only checkout here") }
         if ownsWorktrees { marks.append("Owns worktrees") }
@@ -48,7 +50,7 @@ struct CopyRecord: Decodable, Identifiable, Sendable {
     var isRefusedWithoutClaim: Bool { !marks.isEmpty }
 
     var carriesWorkNowhereElse: Bool {
-        dirty || (historyRetainedBy == nil && (unpublished || origin == nil))
+        inspectionError != nil || dirty != false || (historyRetainedBy == nil && (unpublished != false || origin == nil))
     }
 }
 
@@ -90,9 +92,9 @@ struct CopyListing: Decodable, Sendable {
     var sizeLabel: String { copiedSize(bytes) }
 }
 
-/// Why one copy was not removed. The five reasons are the five the command
-/// refuses the whole pass on.
+/// Why the backend refused a selected copy.
 enum CopyRefusalReason: String, Decodable, Sendable {
+    case unreadableGitState = "unreadable-git-state"
     case uncommittedChanges = "uncommitted-changes"
     case commitsNotOnRemote = "commits-not-on-remote"
     case noOriginRemote = "no-origin-remote"
@@ -111,6 +113,8 @@ struct CopyRefusal: Decodable, Identifiable, Sendable {
     /// product.
     var sentence: String {
         switch reason {
+        case .unreadableGitState:
+            "\(path) has unreadable Git state; inspect the reported Git error before forcing removal."
         case .uncommittedChanges:
             "\(path) has uncommitted changes; commit them there, then run the pass again."
         case .commitsNotOnRemote:
