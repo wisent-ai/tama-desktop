@@ -154,6 +154,13 @@ struct AgentSessionRecord: Decodable, Identifiable, Sendable {
 }
 
 struct SessionControlClient: Sendable {
+    /// A heartbeat TTL is honoured between five seconds and an hour, whatever the record claims.
+    private static let minimumHeartbeatTTLSeconds = 5
+    private static let maximumHeartbeatTTLSeconds = 3_600
+    /// An agent id is a short lowercase word; a control key is a 256-bit hex string.
+    private static let maximumAgentIdLength = 32
+    private static let controlKeyHexLength = 64
+
     private static let schema = "ai.wisent.tama.session-control.v2"
     private static let legacySchema = "ai.wisent.tama.session-control.v1"
     private static let responsePollInterval = TimeInterval("0.05")!
@@ -359,7 +366,7 @@ struct SessionControlClient: Sendable {
             return processIsAlive(session.pid)
         case "heartbeat":
             guard let updated = Self.date(from: session.updatedAt) else { return false }
-            let ttl = min(max(session.heartbeatTTLSeconds, 5), 3_600)
+            let ttl = min(max(session.heartbeatTTLSeconds, Self.minimumHeartbeatTTLSeconds), Self.maximumHeartbeatTTLSeconds)
             return updated.addingTimeInterval(TimeInterval(ttl)) >= now
         default:
             return false
@@ -379,7 +386,7 @@ struct SessionControlClient: Sendable {
     }
 
     private func isSafeAgentId(_ value: String) -> Bool {
-        guard let first = value.first, first.isASCII, first.isLetter, value.count <= 32 else {
+        guard let first = value.first, first.isASCII, first.isLetter, value.count <= Self.maximumAgentIdLength else {
             return false
         }
         return value.allSatisfy { character in
@@ -388,7 +395,7 @@ struct SessionControlClient: Sendable {
     }
 
     private func isSafeControlKey(_ value: String) -> Bool {
-        value.count == 64 && value.allSatisfy(\.isHexDigit)
+        value.count == Self.controlKeyHexLength && value.allSatisfy(\.isHexDigit)
     }
 }
 

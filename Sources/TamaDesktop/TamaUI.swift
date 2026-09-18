@@ -117,11 +117,13 @@ enum TamaTone {
 /// `3 hooks`, `1 hook`: a count and its noun, agreed, without a format string
 /// at every call site.
 func counted(_ value: Int, _ noun: String) -> String {
-    "\(value.formatted(.number)) \(noun)\(value == Int("1")! ? "" : "s")"
+    "\(value.formatted(.number)) \(noun)\(value == 1 ? "" : "s")"
 }
 
 /// A 64-character control key or a 40-character release identifier is evidence,
 /// not prose: the head is what identifies it in a log.
+private let shortIdentifierLength = 12
+
 func shortIdentifier(_ value: String) -> String {
-    String(value.prefix(Int("12")!))
+    String(value.prefix(shortIdentifierLength))
 }

@@ -16,7 +16,11 @@ SCHEMA = "ai.wisent.tama.hook-release.v1"
 INSTALLED_SCHEMA = "ai.wisent.tama.installed-hook-release.v1"
 NATIVE_MANIFEST_SCHEMA = "ai.wisent.tama.native-hook-binaries.v1"
 
-MINIMUM_NODE_MAJOR = int("20")
+MINIMUM_NODE_MAJOR = 20
+# `node --version` answers at once; a candidate that takes longer is not a working runtime.
+NODE_VERSION_PROBE_TIMEOUT_SECONDS = 5
+# A declared native binary must carry an execute bit for someone.
+EXECUTABLE_MODE_BITS = 0o111
 
 
 def atomic_json(path: Path, value: object) -> None:
@@ -358,7 +362,7 @@ def require_supported_node(home: Path) -> tuple[Path, str]:
                 capture_output=True,
                 text=True,
                 check=False,
-                timeout=int("5"),
+                timeout=NODE_VERSION_PROBE_TIMEOUT_SECONDS,
             )
         except (OSError, subprocess.SubprocessError):
             continue
@@ -470,7 +474,7 @@ def declared_native_binaries(
             if name in all_names:
                 raise RuntimeError(f"Duplicate declared native binary: {name}")
             binary = release_root / "bin" / name
-            if not binary.is_file() or not (binary.stat().st_mode & 0o111):
+            if not binary.is_file() or not (binary.stat().st_mode & EXECUTABLE_MODE_BITS):
                 raise RuntimeError(f"Declared native binary is missing or not executable: {name}")
             names.add(name)
             all_names.add(name)

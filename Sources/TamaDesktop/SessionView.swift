@@ -398,9 +398,11 @@ struct SessionView: View {
 
     /// A table inside a scrolling column must state its height, or it asks for
     /// the height of its contents and drags the window with it.
+    private static let visibleDecisionRows = 8
+
     private func tableHeight(rows: Int) -> CGFloat {
         let header = WisentAppLayout.denseRowHeight
-        let visible = min(rows, Int("8")!)
+        let visible = min(rows, Self.visibleDecisionRows)
         return header + CGFloat(visible) * WisentAppLayout.tableRowHeight
     }
 

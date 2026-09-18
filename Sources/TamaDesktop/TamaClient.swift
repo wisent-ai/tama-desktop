@@ -10,6 +10,10 @@ struct TamaClient: Sendable {
     /// The folded end of one streamed job: the status, the result document
     /// re-encoded as JSON, and the job's stdout and stderr text.
     struct JobResult: Sendable {
+        /// How much of stderr, and failing that of stdout, a failure sentence shows.
+        private static let stderrSentenceLimit = 600
+        private static let stdoutSentenceLimit = 4000
+
         let status: Int
         let document: Data
         let stdoutText: String
@@ -18,9 +22,9 @@ struct TamaClient: Sendable {
         /// The bounded stderr sentence, or the bounded stdout sentence when
         /// stderr stayed empty — the same preference the process runner had.
         var failureSentence: String {
-            let stderr = Self.snippet(stderrText, limit: Int("600")!)
+            let stderr = Self.snippet(stderrText, limit: Self.stderrSentenceLimit)
             if !stderr.isEmpty { return stderr }
-            return Self.snippet(stdoutText, limit: Int("4000")!)
+            return Self.snippet(stdoutText, limit: Self.stdoutSentenceLimit)
         }
 
         private static func snippet(_ text: String, limit: Int) -> String {

@@ -7,6 +7,10 @@ import tarfile
 import tempfile
 import urllib.request
 
+# An upload succeeded when the storage answered with any 2xx status.
+HTTP_SUCCESS_FIRST = 200
+HTTP_SUCCESS_END = 300
+
 
 def required(name: str) -> str:
     value = os.environ.get(name, "").strip()
@@ -62,7 +66,7 @@ with tempfile.TemporaryDirectory() as temporary:
             headers={"Authorization": f"Bearer {token}", "Content-Type": content_type},
         )
         with urllib.request.urlopen(request) as response:
-            if not 200 <= response.status < 300:
+            if not HTTP_SUCCESS_FIRST <= response.status < HTTP_SUCCESS_END:
                 raise RuntimeError(f"Sparkle upload returned HTTP {response.status}")
 
 public_base = f"https://updates.wisent.ai/{product}"

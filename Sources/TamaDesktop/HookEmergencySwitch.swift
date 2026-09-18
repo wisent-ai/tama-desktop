@@ -3,6 +3,12 @@ import Foundation
 
 struct HookEmergencySwitch: @unchecked Sendable {
     private static let schema = "ai.wisent.tama.hook-emergency-state.v1"
+    /// The command's output is kept to its last 64 KiB; the switch waits at most five minutes for
+    /// it, polling ten times a second, and gives a signalled process or a stuck reader five seconds.
+    private static let retainedOutputBytes = 64 * 1024
+    private static let commandTimeoutSeconds = 300
+    private static let pollIntervalMilliseconds = 100
+    private static let graceSeconds = 5
     private let manager = FileManager.default
 
     var isDisabled: Bool {
@@ -98,13 +104,13 @@ struct HookEmergencySwitch: @unchecked Sendable {
         DispatchQueue.global(qos: .userInitiated).async {
             outputBox.drain(
                 output.fileHandleForReading,
-                retaining: Int("65536")!
+                retaining: Self.retainedOutputBytes
             )
             drainGroup.leave()
         }
 
-        let deadline = DispatchTime.now() + .seconds(Int("300")!)
-        let pollInterval = DispatchTimeInterval.milliseconds(Int("100")!)
+        let deadline = DispatchTime.now() + .seconds(Self.commandTimeoutSeconds)
+        let pollInterval = DispatchTimeInterval.milliseconds(Self.pollIntervalMilliseconds)
         while completed.wait(timeout: .now() + pollInterval) == .timedOut {
             guard DispatchTime.now() < deadline else {
                 signalProcessTree(
@@ -112,7 +118,7 @@ struct HookEmergencySwitch: @unchecked Sendable {
                     signal: SIGTERM
                 )
                 if completed.wait(
-                    timeout: .now() + .seconds(Int("5")!)
+                    timeout: .now() + .seconds(Self.graceSeconds)
                 ) == .timedOut {
                     signalProcessTree(
                         rootPID: process.processIdentifier,
@@ -121,7 +127,7 @@ struct HookEmergencySwitch: @unchecked Sendable {
                     completed.wait()
                 }
                 if drainGroup.wait(
-                    timeout: .now() + .seconds(Int("5")!)
+                    timeout: .now() + .seconds(Self.graceSeconds)
                 ) == .timedOut {
                     try? output.fileHandleForReading.close()
                 }
@@ -129,7 +135,7 @@ struct HookEmergencySwitch: @unchecked Sendable {
             }
         }
         if drainGroup.wait(
-            timeout: .now() + .seconds(Int("5")!)
+            timeout: .now() + .seconds(Self.graceSeconds)
         ) == .timedOut {
             try? output.fileHandleForReading.close()
             throw HookEmergencyError.commandOutputReadFailed(

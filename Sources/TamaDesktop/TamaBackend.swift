@@ -205,6 +205,10 @@ final class TamaBackend: @unchecked Sendable {
 /// Lock-guarded state for the ready handshake: stdout buffer, stderr tail,
 /// the timeout, and the once-only resume of the awaiting continuation.
 private final class ReadyHandshake: @unchecked Sendable {
+    /// The stderr kept for a failed start, and how long the backend has to print its ready line.
+    private static let stderrTailCharacters = 2000
+    private static let readyTimeoutSeconds = 15
+
     private let lock = NSLock()
     private var stdoutBuffer = Data()
     private var stderrTail = ""
@@ -233,7 +237,7 @@ private final class ReadyHandshake: @unchecked Sendable {
 
     func appendError(_ text: String) {
         lock.lock()
-        stderrTail = String((stderrTail + text).suffix(Int("2000")!))
+        stderrTail = String((stderrTail + text).suffix(Self.stderrTailCharacters))
         lock.unlock()
     }
 
@@ -250,7 +254,7 @@ private final class ReadyHandshake: @unchecked Sendable {
         lock.lock()
         timeoutItem = item
         lock.unlock()
-        DispatchQueue.global().asyncAfter(deadline: .now() + .seconds(Int("15")!), execute: item)
+        DispatchQueue.global().asyncAfter(deadline: .now() + .seconds(Self.readyTimeoutSeconds), execute: item)
     }
 
     /// Runs `body` exactly once, cancelling the pending timeout and
@@ -327,12 +331,15 @@ func executableCandidates(named name: String) -> [URL] {
 }
 
 final class DataBox: @unchecked Sendable {
+    /// A pipe is read 64 KiB at a time.
+    private static let readChunkBytes = 64 * 1024
+
     private(set) var data = Data()
     private(set) var wasTruncated = false
     private(set) var readError: String?
 
     func drain(_ handle: FileHandle, retaining limit: Int) {
-        let chunkSize = Int("65536")!
+        let chunkSize = Self.readChunkBytes
         do {
             while let chunk = try handle.read(upToCount: chunkSize), !chunk.isEmpty {
                 let remaining = max(limit - data.count, .zero)

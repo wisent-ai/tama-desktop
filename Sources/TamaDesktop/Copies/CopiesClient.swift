@@ -239,11 +239,18 @@ enum CopiesError: LocalizedError {
     }
 }
 
+/// Binary units, as the command prints them.
+private enum ByteUnit {
+    static let kib = 1024.0
+    static let mib = kib * 1024.0
+    static let gib = mib * 1024.0
+}
+
 /// Apparent size in the same units the command prints, so a number read on
 /// the screen matches a number read in a terminal.
 func copiedSize(_ bytes: Int) -> String {
-    let mib = 1024.0 * 1024.0
-    let gib = mib * 1024.0
+    let mib = ByteUnit.mib
+    let gib = ByteUnit.gib
     let value = Double(bytes)
     if value >= gib {
         return String(format: "%.1f GiB", value / gib)
