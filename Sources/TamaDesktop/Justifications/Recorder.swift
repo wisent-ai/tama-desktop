@@ -82,18 +82,21 @@ struct JustificationRecorder: View {
         .padding(WisentDesign.Space.x5)
     }
 
-    /// How tall each text field stands. Layout only: nothing here changes what
-    /// the CLI accepts.
+    /// How tall each text field stands, in lines: one for a title, three for a
+    /// quote, six for prose. Layout only: nothing here changes what the CLI accepts.
     private enum FieldHeight {
         case one
         case quote
         case prose
 
+        private static let quoteLines = 3
+        private static let proseLines = 6
+
         var lines: Int {
             switch self {
-            case .one: Int("1")!
-            case .quote: Int("3")!
-            case .prose: Int("6")!
+            case .one: 1
+            case .quote: Self.quoteLines
+            case .prose: Self.proseLines
             }
         }
     }
