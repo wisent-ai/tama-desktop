@@ -8,6 +8,7 @@ extension HooksView {
     func centre(visible: [HookRecord]) -> some View {
         VStack(alignment: .leading, spacing: WisentDesign.Space.x4) {
             machineSelectionPanel
+            warmPanel
             if let catalogError = model.catalogError, model.snapshot != nil {
                 WisentErrorBanner(
                     title: "Policy refresh failed",

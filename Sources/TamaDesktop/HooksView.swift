@@ -10,6 +10,7 @@ import WisentDesignSystem
 struct HooksView: View {
     @ObservedObject var model: AppModel
     @StateObject var machineSelection = EnforcementSelectionModel()
+    @StateObject var warmModel = HookWarmModel()
 
     @State var query = ""
     @State var enforcement: EnforcementFacet = .all
