@@ -82,10 +82,6 @@ extension HooksView {
                     if event.blocking {
                         WisentStatusChip(text: "Blocking", tone: .warning)
                     }
-                    Text("\(event.timeout)s")
-                        .font(WisentTypeScale.identifierSmall())
-                        .foregroundStyle(WisentDesign.muted)
-                        .monospacedDigit()
                 }
                 .frame(height: WisentAppLayout.tableRowHeight)
             }

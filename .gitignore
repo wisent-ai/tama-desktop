@@ -7,3 +7,10 @@ __pycache__/
 *.log
 xcuserdata/
 *.xcuserstate
+
+# Agent run output: transcripts, working patches and scan reports a run writes
+# into the checkout. One of them is 142 MB, which GitHub refuses outright, and
+# none of it is source.
+.wisent-output/
+.bsp/
+.sourcekit-lsp/

@@ -125,11 +125,10 @@ struct JustificationEntry: Identifiable, Sendable {
 struct HookEvent: Decodable, Identifiable, Sendable {
     let event: String
     let blocking: Bool
-    let timeout: Int
     let statusMessage: String?
 
     var id: String {
-        "\(event)-\(blocking)-\(timeout)"
+        "\(event)-\(blocking)"
     }
 }
 

@@ -5,10 +5,10 @@ import Testing
 /// The Hooks screen's warm panel, against the real backend it calls.
 ///
 /// A hook binary that has never run pays the operating system's first-run
-/// assessment inside the next live event, where it reads as a timeout and
-/// refuses the turn: on 2026-09-20 `block-delegating-own-work timed out
-/// after 10s` blocked a finished turn while the binary itself answers in
-/// four milliseconds. The terminal pays that with `tama hooks warm`; the
+/// assessment inside the next live event, and the whole turn waits for it:
+/// on 2026-09-20 a freshly installed `tama-block-delegating-own-work` spent
+/// 147 seconds there while the binary itself answers in four milliseconds.
+/// The terminal pays that with `tama hooks warm`; the
 /// window has the same button, and it is worth nothing unless the route it
 /// calls answers the document the panel reads.
 ///
@@ -86,15 +86,16 @@ struct HookWarmBackendTests {
         let row = try #require(report.hooks.first)
         #expect(report.hooks.count == report.warmed + report.unusable)
         #expect(row.id == "block-delegating-own-work")
-        #expect(row.timeoutMs > 0)
         // Either the binary is installed and was measured, or it is not on
         // this machine and the panel has to say so rather than claim a run.
         if FileManager.default.isExecutableFile(atPath: row.path) {
             #expect(row.isUsable)
-            #expect(row.elapsedMs < row.timeoutMs || row.wasCold)
+            #expect(report.slowest == row.id)
+            #expect(report.slowestMs == row.elapsedMs)
         } else {
             #expect(!row.isUsable)
             #expect(report.unusable == report.hooks.count)
+            #expect(report.slowest == nil)
         }
     }
 

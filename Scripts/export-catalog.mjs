@@ -25,10 +25,7 @@ const catalog = {
     ...hook,
     category: hook.category ?? 'Uncategorized',
     status: hook.status ?? 'unknown',
-    events: hook.events.map((event) => ({
-      ...event,
-      timeout: event.timeout ?? 0,
-    })),
+    events: hook.events,
   })),
 };
 writeFileSync(outputPath, `${JSON.stringify(catalog, null, 2)}\n`, 'utf8');

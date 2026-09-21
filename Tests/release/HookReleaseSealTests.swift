@@ -113,3 +113,67 @@ struct HookReleaseSealTests {
         #expect(!FileManager.default.fileExists(atPath: fixture.release.appendingPathComponent("release.json").path))
     }
 }
+
+/// Installing a staged release on a machine, driven the way an operator drives
+/// it.
+///
+/// On 2026-09-11 a release was staged, sealed and verified, and then could not
+/// be installed: the installer answered `Full hook installation requires an
+/// emergency manifest`, and nothing in the product produces one for a machine
+/// that has never been in the bypass. The operator ran an invocation outside
+/// the contract, then a generator that narrowed both provider configs, and
+/// `tama validate` reported a hundred and forty uninstalled hook events on a
+/// machine whose hooks were meant to be complete.
+///
+/// The route that works is the bundled switch pointed at the release. These
+/// cases drive the real scripts into a scratch home and read the symlink, the
+/// provider configs and the drift report, because the defect was in what the
+/// install produced and never in what it printed.
+struct HookReleaseInstallTests {
+    @Test
+    func aFullInstallWithoutAManifestRefusesAndNamesWhatItNeeds() throws {
+        let machine = try InstallFixture()
+
+        let refused = try machine.installer(arguments: ["--release", machine.release.path,
+                                                        "--home", machine.home.path])
+
+        #expect(refused.status != .zero, "a full install has no manifest to apply here")
+        #expect(refused.error.contains("emergency manifest"),
+                "the refusal has to name what is missing: \(refused.error)")
+        #expect(!FileManager.default.fileExists(atPath: machine.currentLink.path),
+                "a refused install installs nothing")
+    }
+
+    @Test
+    func theSwitchInstallsTheStagedReleaseAndLeavesNoDrift() throws {
+        let machine = try InstallFixture()
+        let identity = try machine.releaseIdentity()
+
+        let disabled = try machine.switchRoute(action: "disable")
+        #expect(disabled.status == .zero, "disable failed: \(disabled.error)")
+        let enabled = try machine.switchRoute(action: "enable")
+        #expect(enabled.status == .zero, "enable failed: \(enabled.error)")
+
+        let installed = try FileManager.default
+            .destinationOfSymbolicLink(atPath: machine.currentLink.path)
+        #expect(installed.hasSuffix(identity),
+                "current has to point at the release that was staged: \(installed)")
+        #expect(enabled.output.contains(String(identity.prefix(12))),
+                "the switch names the release it enabled: \(enabled.output)")
+
+        // What an operator reads the report for: every catalogued hook the
+        // providers support is wired, so no material drift is left behind.
+        let report = try machine.validate()
+        let drift = (report.output + report.error)
+            .split(separator: "\n")
+            .filter { $0.hasPrefix("ERROR install drift") }
+        #expect(drift.isEmpty, "an installed release leaves no drift: \(drift.joined(separator: "\n"))")
+
+        for provider in [machine.home.appendingPathComponent(".codex/hooks.json"),
+                         machine.home.appendingPathComponent(".claude/settings.json")] {
+            let text = try String(contentsOf: provider, encoding: .utf8)
+            #expect(text.contains("record-current-assignment"),
+                    "\(provider.lastPathComponent) has to carry what the catalogue declares")
+        }
+    }
+}

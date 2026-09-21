@@ -4,12 +4,14 @@ import WisentDesignSystem
 extension HooksView {
     /// What this machine's gates cost to start, and the button that pays it.
     ///
-    /// The panel exists because a hook timeout is indistinguishable, from the
-    /// outside, from a policy refusal: on 2026-09-20 a stop hook whose first
-    /// execution spent 147 seconds in the operating system's signature
-    /// assessment blocked a finished turn with `timed out after 10s`. Running
-    /// each binary once here moves that cost out of the next live event, and
-    /// the measurements say which binaries were slow and which cannot run.
+    /// The panel exists because that cost lands inside a live event: on
+    /// 2026-09-20 a stop hook's first execution spent 147 seconds in the
+    /// operating system's signature assessment, and back then the engine
+    /// killed it at ten seconds and called that a refusal. The engine waits
+    /// now, so the same first run would be 147 seconds somebody sits through.
+    /// Running each binary once here moves that cost out of the next live
+    /// event, and the measurements say which binary cost the most and which
+    /// cannot run at all.
     var warmPanel: some View {
         WisentPanel {
             VStack(alignment: .leading, spacing: WisentDesign.Space.x2) {
@@ -21,8 +23,7 @@ extension HooksView {
                     if let report = warmModel.report {
                         WisentStatusChip(
                             text: "\(report.warmed) warmed",
-                            tone: report.unusable > 0 ? .danger
-                                : (report.cold > 0 ? .warning : .success)
+                            tone: report.unusable > 0 ? .danger : .success
                         )
                     } else {
                         WisentStatusChip(text: "Not measured", tone: .neutral)
@@ -39,7 +40,7 @@ extension HooksView {
                         }
                     )
                 }
-                Text("A binary that has never run pays the operating system's first-run check inside the next hook event, where it reads as a timeout and refuses the turn. Running each one here pays that once and reports what it cost.")
+                Text("A binary that has never run pays the operating system's first-run check inside the next hook event, where the whole turn waits for it. Running each one here pays that once and reports what it cost.")
                     .font(WisentTypeScale.caption())
                     .foregroundStyle(WisentDesign.secondary)
                     .fixedSize(horizontal: false, vertical: true)
