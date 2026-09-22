@@ -118,6 +118,19 @@ Set `TAMA_TEST_CLI` to the built CLI and `TAMA_TEST_CUA_SESSION`,
 `TAMA_TEST_CUA_APP`, `TAMA_TEST_CUA_MATCH`, `TAMA_TEST_CUA_ACTIONS` to an
 existing real user grant. Evidence remains in `.build/consent-evidence/`.
 
+### Record a build-count exception
+
+**Policy → Build registry** records a build for a full source revision. An
+optional exception requires the session and exact current user message giving
+permission to exceed the daily count. The backend verifies the capture and its
+meaning; a request to add this mechanism is not approval to use it.
+
+The screen shows refusals, current entries, local counts and retained approval
+history. **Close** removes the current authorization without erasing the quote
+or cancelling a job Stado already accepted. Recording never starts a build.
+The [build reference](https://tama.wisent.com/docs/cli/build/) describes the
+matching CLI commands, HTTP fields, fleet receipts and unchanged checks.
+
 ## How the product works
 
 ```mermaid
@@ -196,6 +209,45 @@ The native app does not parse or copy policy files and does not shell out to an
 import command. Successful import remains `inactive` with zero hooks installed
 or enabled; runtime installation and session enablement retain their existing
 separate confirmation boundaries.
+
+## Pin the backend shipped with a desktop release
+
+The desktop and its bundled Tama backend must support the same operations.
+After committing and pushing the backend change, run this reusable producer
+from the desktop checkout, then commit its generated pin and archive:
+
+```console
+python3 Scripts/hook_source/__main__.py pin --revision FULL_TAMA_COMMIT
+python3 Scripts/hook_source/__main__.py verify
+```
+
+`pin` reads the canonical sibling Tama checkout, requires a full commit rather
+than a moving ref, and archives only that committed source. It writes the digest
+beside the immutable archive as `source.sha256`, then updates
+`Release/tama-revision`, which both release lanes consume. Repeating the same
+pin is unchanged in content; changing it removes the previous pinned archive.
+Existing different bytes at an immutable archive path are refused.
+
+The Stado release entrypoint verifies both the archive's SHA-256 and its embedded
+Git commit, then uses `unpack` to retain that origin beside the extracted inputs.
+Native packaging and sealing use the same source identity reader for checkouts
+and immutable archives; they do not mistake an archive for its enclosing Git
+checkout. Changed, missing or additional source inputs stop the release.
+
+```console
+python3 Scripts/hook_source/__main__.py unpack --destination .build/source-check
+python3 Scripts/hook_release_native/source.py --source-root .build/source-check/tama
+python3 tests/builds/source_pin.test.py
+```
+
+`unpack` refuses to overwrite an existing source directory. The identity reader
+reports the pinned revision, dirty flag and input fingerprint, or the actual
+offending input. The real regression journey keeps command results, source
+revision, tool hashes and its verdict under `.build/source-proof/<run>` and
+removes only its own extracted inputs. It does not compile native binaries.
+The pin producer stages temporary files under `.build/source-pin` and removes
+its staging directory when it finishes; it creates no checkout. None of these
+source commands installs or restarts an application.
 
 ## Operational model
 

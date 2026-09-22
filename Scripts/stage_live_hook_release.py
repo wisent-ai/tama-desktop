@@ -17,9 +17,8 @@ from hook_release_native.build import (
     build_binaries,
     cargo_metadata,
     manifest_entry,
-    source_identity,
-    verify_source_identity,
 )
+from hook_release_native.source import source_identity, verify_source_identity
 
 NATIVE_MANIFEST_SCHEMA = "ai.wisent.tama.native-hook-binaries.v1"
 

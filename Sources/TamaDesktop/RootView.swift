@@ -105,6 +105,8 @@ struct RootView: View {
             WorktreesView(model: worktrees)
         case .copies:
             CopiesView(model: copies)
+        case .builds:
+            BuildsView()
         case .justifications:
             JustificationsView(
                 collections: model.snapshot?.justifications ?? [],

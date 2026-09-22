@@ -9,7 +9,7 @@ from pathlib import Path
 import sys
 import shutil
 
-from hook_release_native.build import source_identity, verify_source_identity
+from hook_release_native.source import source_identity, verify_source_identity
 
 
 def release_source_identity(root: Path, source_root: Path) -> dict:

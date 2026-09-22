@@ -2,7 +2,6 @@
 set -euo pipefail
 
 UPDATER_SHA256="1f3c919e7e15ef6736a7c9c841ca185cb487e502c0da39be68aa1aa8b487af47"
-TAMA_SOURCE_SHA256="9d50d01cbc733163698385a5aeeed651a75ac97a67a8914e9b246dcaa8924816"
 SWIFTPM_SHA256="69afd7557e507caa16f64ac96a723c5daa74091bbe3417e423409634b670ada3"
 PRODUCT="Tama"
 PRODUCT_SLUG="tama-desktop"
@@ -24,12 +23,11 @@ verify_input() {
 
 prepare_source() {
   source="$WISENT_SOURCE_DIR"
-  tama_revision="$(cat "$source/Release/tama-revision")"
   updater="$WISENT_INPUTS_DIR/wisent-desktop-update.tar.gz"
-  hooks="$source/Release/vendor/tama/$tama_revision/source.tar.gz"
+  hooks="$(python3 "$source/Scripts/hook_source/__main__.py" verify)"
+  TAMA_SOURCE_SHA256="$(shasum -a 256 "$hooks" | awk '{print $1}')"
   swiftpm="$WISENT_INPUTS_DIR/swiftpm-cache.tar.gz"
   verify_input "$updater" "$UPDATER_SHA256"
-  verify_input "$hooks" "$TAMA_SOURCE_SHA256"
   verify_input "$swiftpm" "$SWIFTPM_SHA256"
   work="$WISENT_OUTPUT_DIR/work"
   rm -rf "$work"
@@ -37,12 +35,11 @@ prepare_source() {
   # source and everything signed inside it end with the run.
   trap 'rm -rf "$work"' EXIT
   mkdir -p "$work"
-  tar -xzf "$hooks" -C "$work"
+  hooks_root="$(python3 "$source/Scripts/hook_source/__main__.py" unpack --destination "$work")"
   tar -xzf "$swiftpm" -C "$source"
   # Swift module caches contain absolute paths from the archive's producer.
   # Keep downloaded dependencies, but compile artifacts in this source checkout.
   swift package --package-path "$source" clean
-  hooks_root="$work/tama"
   [ -f "$hooks_root/package.json" ] || { printf 'immutable hook source is incomplete\n' >&2; exit 1; }
 }
 
