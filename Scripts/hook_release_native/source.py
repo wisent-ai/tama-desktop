@@ -129,6 +129,8 @@ def source_identity(source_root: Path, release_root: Path | None = None) -> dict
     fingerprint = hashlib.sha256()
     for relative in sorted(paths):
         path = source_root / relative
+        if archived is not None and relative not in archived:
+            raise RuntimeError(f"Additional source input is not in the pinned archive: {path}")
         entry = {"path": relative, "mode": None, "target": None, "digest": None}
         if path.exists() or path.is_symlink():
             entry["mode"] = stat.S_IMODE(path.lstat().st_mode)
