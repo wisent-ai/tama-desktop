@@ -78,8 +78,9 @@ An unauthenticated developer opens Tama with no local policy installation and ch
 
 An authorized operator chooses **Choose bundle** on first use or
 **Settings → Policy bundles → Import policy bundle** later. Tama sends the
-selected directory to its loopback backend, which uses the same core
-transaction as `tama policy import`. The operation reports imported, unchanged,
+selected directory to `tama-cli request policy-bundles/import`, one process
+that uses the same core transaction as `tama policy import` and exits once it
+has answered. The operation reports imported, unchanged,
 removed, conflicting, rejected, and ignored paths; it never installs or enables
 a hook. **Skip** leaves Tama empty and usable.
 
@@ -105,7 +106,7 @@ A maintainer selects a local repository and starts a read-only scan. Tama report
 session, shows the original message and exact app/action scope, and removes a
 selected quote after confirmation. It uses the same backend operation as
 `tama justify --kind cua`; no protected registry JSON needs to be pasted by
-hand. The file/test recorder uses the loopback backend too.
+hand. The file/test recorder runs a `tama-cli request` process too.
 
 Recording does not start Cua Driver or claim that a GUI action ran. The
 installed hook still checks session, target and action when the tool is used.
@@ -203,10 +204,12 @@ per-file hashes. An identical repeat is unchanged. Differing content produces a
 complete conflict list and no writes by default. Explicit replacement still
 refuses untracked or locally changed stored files.
 
-Tama Desktop uses `GET /v1/policy-bundles` and
-`POST /v1/policy-bundles/import` on the existing ephemeral loopback backend.
-The native app does not parse or copy policy files and does not shell out to an
-import command. Successful import remains `inactive` with zero hooks installed
+Tama Desktop runs `tama-cli request policy-bundles` and
+`tama-cli request policy-bundles/import` from its bundled release, one process
+per operation with the body on stdin; no Tama process stays running between
+two of them. The native app does not parse or copy policy files and does not
+build a command line for `tama policy import`. Successful import remains
+`inactive` with zero hooks installed
 or enabled; runtime installation and session enablement retain their existing
 separate confirmation boundaries.
 

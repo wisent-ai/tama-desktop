@@ -34,36 +34,19 @@ final class ConsentTests: XCTestCase {
         revision.waitUntilExit()
         XCTAssertEqual(revision.terminationStatus, .zero)
         try revisionData.write(to: evidence.appendingPathComponent("revision.txt"))
-        let backend = Process()
-        let output = Pipe()
-        let errors = Pipe()
-        backend.executableURL = URL(fileURLWithPath: binary)
-        backend.arguments = ["serve", "--port", "0"]
-        var backendEnvironment = environment
-        backendEnvironment["HOME"] = home.path
-        backendEnvironment["TAMA_OMP_SESSION_ROOT"] = environment["TAMA_OMP_SESSION_ROOT"]
+        var requestEnvironment = environment
+        requestEnvironment["HOME"] = home.path
+        requestEnvironment["TAMA_OMP_SESSION_ROOT"] = environment["TAMA_OMP_SESSION_ROOT"]
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".omp/agent/sessions").path
-        backend.environment = backendEnvironment
-        backend.standardOutput = output
-        backend.standardError = errors
-        try backend.run()
-        defer {
-            if backend.isRunning { backend.terminate() }
-            backend.waitUntilExit()
-            try? errors.fileHandleForReading.readDataToEndOfFile()
-                .write(to: evidence.appendingPathComponent("backend-stderr.txt"))
-            print("Native consent evidence: \(evidence.path)")
-        }
-        var ready = Data()
-        while let byte = try output.fileHandleForReading.read(upToCount: 1), !byte.isEmpty {
-            if byte == Data([10]) { break }
-            ready.append(byte)
-        }
-        try ready.write(to: evidence.appendingPathComponent("backend-ready.json"))
-        let document = try XCTUnwrap(JSONSerialization.jsonObject(with: ready) as? [String: Any])
-        let port = try XCTUnwrap(document["port"] as? Int)
-        let endpoint = try XCTUnwrap(URL(string: "http://127.0.0.1:\(port)"))
-        let client = CUAConsentClient(baseURL: endpoint)
+        defer { print("Native consent evidence: \(evidence.path)") }
+        // Every call below is one `tama-cli request` process, the way the
+        // window runs them: nothing is started before the first call and
+        // nothing is left running after the last.
+        let client = CUAConsentClient(command: TamaCommand(
+            executable: URL(fileURLWithPath: binary),
+            root: nil,
+            environment: requestEnvironment
+        ))
         let recorded = try await client.record(session: session, app: app, actions: actions,
             quote: quoteMatch, match: true)
         let registry = home.appendingPathComponent(".shared-hooks/cua_justifications.json")

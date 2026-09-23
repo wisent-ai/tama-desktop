@@ -95,10 +95,10 @@ struct ViolationsClient: Sendable {
 
     func scan(repoPath: String) async throws -> ViolationReport {
         let path = try validatedRepositoryPath(repoPath)
-        let result = try await client().postStreaming(
+        let result = try await client().job(
             "violations/scan",
             body: ["repo": path],
-            operation: Self.scanOperation
+            describing: Self.scanOperation
         )
         switch result.status {
         // Status 1 is "violations found", which is a report and not a failure.
@@ -126,10 +126,10 @@ struct ViolationsClient: Sendable {
     func clean(repoPath: String) async throws -> String {
         let path = try validatedRepositoryPath(repoPath)
         try ensureCleanupAgentAvailable()
-        let result = try await client().postStreaming(
+        let result = try await client().job(
             "violations/clean",
             body: ["repo": path],
-            operation: Self.cleanOperation
+            describing: Self.cleanOperation
         )
         switch result.status {
         case 0:
@@ -147,8 +147,8 @@ struct ViolationsClient: Sendable {
         }
     }
 
-    private func client() async throws -> TamaClient {
-        TamaClient(baseURL: try await TamaBackend.shared.endpoint())
+    private func client() -> TamaClient {
+        TamaClient()
     }
 
     private func validatedRepositoryPath(_ value: String) throws -> String {

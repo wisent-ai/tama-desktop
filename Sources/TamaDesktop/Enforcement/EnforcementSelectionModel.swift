@@ -37,10 +37,10 @@ final class EnforcementSelectionModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         do {
-            let loaded = try await client().get(
+            let loaded = try await client().request(
                 "enforcement",
                 as: EnforcementSelection.self,
-                operation: "read machine enforcement selection"
+                describing: "read machine enforcement selection"
             )
             selection = loaded
             readError = loaded.readError
@@ -89,11 +89,11 @@ final class EnforcementSelectionModel: ObservableObject {
         outcome = .working(working)
         Task {
             do {
-                let updated = try await client().post(
-                    "enforcement",
+                let updated = try await client().request(
+                    "enforcement/update",
                     body: body,
                     as: EnforcementSelection.self,
-                    operation: "set machine enforcement selection"
+                    describing: "set machine enforcement selection"
                 )
                 selection = updated
                 readError = updated.readError
@@ -105,8 +105,8 @@ final class EnforcementSelectionModel: ObservableObject {
         }
     }
 
-    private func client() async throws -> TamaClient {
-        TamaClient(baseURL: try await TamaBackend.shared.endpoint())
+    private func client() -> TamaClient {
+        TamaClient()
     }
 
     private static func sentence(_ error: Error) -> String {

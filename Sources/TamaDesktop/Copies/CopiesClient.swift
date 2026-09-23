@@ -151,23 +151,22 @@ struct CopyRemoval: Decodable, Sendable {
     var walkGaps: [WalkGap] { unreadableDirectories ?? [] }
 }
 
-/// The two copies routes on the local backend. `TamaClient` prepends `/v1`,
-/// so the paths here are the leaves and never the full route.
+/// The two copies operations, each one `tama-cli request` process.
 struct CopiesClient: Sendable {
     private static let listOperation = "The repository-copy scan"
     private static let removeOperation = "The repository-copy removal"
 
     func list(roots: [String]) async throws -> CopyListing {
         let paths = try validatedRoots(roots)
-        return try await client().post(
+        return try await client().request(
             "copies/list",
             body: ["roots": paths],
             as: CopyListing.self,
-            operation: Self.listOperation
+            describing: Self.listOperation
         )
     }
 
-    /// `except` spares paths and `only` narrows the pass to paths. The route
+    /// `except` spares paths and `only` narrows the pass to paths. The operation
     /// refuses a body carrying both, exactly as the command line does, so the
     /// caller sends one or the other.
     func remove(
@@ -178,7 +177,7 @@ struct CopiesClient: Sendable {
         force: Bool
     ) async throws -> CopyRemoval {
         let paths = try validatedRoots(roots)
-        return try await client().post(
+        return try await client().request(
             "copies/remove",
             body: [
                 "roots": paths,
@@ -188,12 +187,12 @@ struct CopiesClient: Sendable {
                 "force": force,
             ],
             as: CopyRemoval.self,
-            operation: Self.removeOperation
+            describing: Self.removeOperation
         )
     }
 
-    private func client() async throws -> TamaClient {
-        TamaClient(baseURL: try await TamaBackend.shared.endpoint())
+    private func client() -> TamaClient {
+        TamaClient()
     }
 
     /// No roots is a refusal here as well as in the command, and a root that

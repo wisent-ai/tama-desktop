@@ -11,7 +11,7 @@
             "Product contract, onboarding, operational, core, integration, example, testing, release, security, and support documentation.",
             "Authenticated guided setup that records completion only after the sealed runtime, enabled privileged backend, and a matching live kernel-gated agent session are all observed.",
             "Desktop build provenance and immutable release packaging contract.",
-            "Public Tama CLI for catalog listing and validation with opt-in local install-drift checks, exact hook inspection, live session state, registry-declared provider coverage, Git dispatcher installation, repository scans and cleanup, adaptive recovery, MCP configuration, and the loopback desktop backend.",
+            "Public Tama CLI for catalog listing and validation with opt-in local install-drift checks, exact hook inspection, live session state, registry-declared provider coverage, Git dispatcher installation, repository scans and cleanup, adaptive recovery, MCP configuration, and `tama request`, the per-operation entry point the desktop runs.",
             "Runnable `examples/` shell commands with inline risk, required-input, side-effect, and rollback comments; CLI link installation is retry-safe, and prose runbooks plus the Markdown coverage matrix were removed.",
             "Session destination that renders the capability a supervised session holds — lifetime, expiry, remaining uses and every tool grant — together with the register of semantic decisions that session published.",
             "Coverage destination for registry-declared provider coverage, and an Install plan destination that states each scope's target paths, the exact commands that write them, and the MCP server snippet.",
@@ -36,7 +36,8 @@
             "Per-session controls now expose only policy-permitted enable operations and wait for the live supervisor response; the desktop no longer offers or optimistically reports prohibited hook disablement.",
             "The interface is organized by operator decision rather than by data container: a grouped sidebar of eight destinations, a 44 pt context bar on every screen instead of a hero header, three-zone data screens with counted facet rails and inspectors, and the repository under repair selected once in the sidebar header.",
             "Disabling every managed hook, repairing violations with a headless agent, and deactivating local enforcement now open a decision dialog that quotes the exact effect, lists what it touches, and keeps the safe verb as the primary button.",
-            "Mutations report the backend's own sentence in place on the screen that started them, instead of a modal alert that closes without a trace."
+            "Mutations report the backend's own sentence in place on the screen that started them, instead of a modal alert that closes without a trace.",
+            "Every backend operation runs as one `tama-cli request <operation>` process that exits once it has answered, instead of a resident `tama-cli serve` loopback server kept alive for the whole session; cancelling a scan or cleanup, or quitting the app, ends that operation's process tree."
           ]
         },
         {

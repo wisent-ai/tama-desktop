@@ -23,11 +23,6 @@ final class TamaAppDelegate: NSObject, NSApplicationDelegate {
             }
         }
     }
-    /// The backend is the app's own child; it dies with the app rather than
-    /// outliving the window it served.
-    func applicationWillTerminate(_ notification: Notification) {
-        TamaBackend.shared.stop()
-    }
 }
 
 @main

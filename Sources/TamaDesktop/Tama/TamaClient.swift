@@ -1,11 +1,14 @@
 import Foundation
 
-/// HTTP/JSON client for the local Tama backend. Reads are plain GETs;
-/// long-running jobs POST and stream NDJSON — log events carry the job's own
-/// output in its own order, and the single result event carries the status
-/// the command would have exited with and the document it would have printed.
+/// The client for Tama's own operations. Every call runs one
+/// `tama-cli request <operation>` process (`TamaRequestProcess`): the body
+/// goes to its stdin, and nothing of Tama stays running once it has answered.
+/// A bounded operation answers with one document; a long-running job reports
+/// its own output in its own order, then the status the command would have
+/// exited with and the document it would have printed.
 struct TamaClient: Sendable {
-    let baseURL: URL
+    /// Nil runs the binary sealed into this build's hook release.
+    var command: TamaCommand?
 
     /// The folded end of one streamed job: the status, the result document
     /// re-encoded as JSON, and the job's stdout and stderr text.
@@ -34,33 +37,34 @@ struct TamaClient: Sendable {
         }
     }
 
-    // MARK: - Reads
+    // MARK: - Answers
 
-    /// GET, decoding the 2xx document; a non-2xx carries the backend's own
-    /// refusal sentence.
-    func get<Value: Decodable>(
-        _ path: String,
+    /// Runs `operation` and decodes the document it answers with; a refusal
+    /// carries the product's own sentence.
+    func request<Value: Decodable>(
+        _ operation: String,
+        body: [String: Any] = [:],
         as type: Value.Type,
-        operation: String
+        describing description: String
     ) async throws -> Value {
-        let data = try await getData(path, operation: operation)
+        let data = try await answer(operation, body: body, describing: description)
         do {
             return try JSONDecoder().decode(Value.self, from: data)
         } catch {
-            throw TamaBackendError.unreadableOutput(operation, error.localizedDescription)
+            throw TamaBackendError.unreadableOutput(description, error.localizedDescription)
         }
     }
 
-    /// GET returning the raw document, for the caller that walks a shape too
-    /// irregular for one Decodable type.
-    func getDocument(_ path: String, operation: String) async throws -> Data {
-        try await getData(path, operation: operation)
+    /// The raw document, for the caller that walks a shape too irregular for
+    /// one Decodable type.
+    func document(_ operation: String, describing description: String) async throws -> Data {
+        try await answer(operation, body: [:], describing: description)
     }
 
-    /// GET returning the document as pretty-printed text, for the snippet an
-    /// operator pastes into a client configuration.
-    func getPrettyText(_ path: String, operation: String) async throws -> String {
-        let data = try await getData(path, operation: operation)
+    /// The document as pretty-printed text, for the snippet an operator pastes
+    /// into a client configuration.
+    func prettyText(_ operation: String, describing description: String) async throws -> String {
+        let data = try await answer(operation, body: [:], describing: description)
         guard
             let object = try? JSONSerialization.jsonObject(with: data),
             let pretty = try? JSONSerialization.data(
@@ -69,139 +73,92 @@ struct TamaClient: Sendable {
             ),
             let text = String(data: pretty, encoding: .utf8)
         else {
-            throw TamaBackendError.unreadableOutput(operation, "not a JSON document")
+            throw TamaBackendError.unreadableOutput(description, "not a JSON document")
         }
         return text
     }
 
-    /// Ordinary JSON POST for bounded mutations such as policy-bundle import.
-    /// The backend returns the same result document as the CLI; no command
-    /// string or parser exists in the native app.
-    func post<Value: Decodable>(
-        _ path: String,
-        body: [String: Any],
-        as type: Value.Type,
-        operation: String
-    ) async throws -> Value {
-        var request = URLRequest(url: endpoint(path))
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await URLSession.shared.data(for: request)
-        } catch is CancellationError {
-            throw TamaBackendError.cancelled(operation)
-        }
-        guard let http = response as? HTTPURLResponse else { throw TamaBackendError.notHTTP }
-        guard (200...299).contains(http.statusCode) else {
-            throw Self.refusal(data: data, status: http.statusCode)
-        }
-        do {
-            return try JSONDecoder().decode(Value.self, from: data)
-        } catch {
-            throw TamaBackendError.unreadableOutput(operation, error.localizedDescription)
-        }
-    }
-
     // MARK: - Jobs
 
-    /// POST streaming NDJSON: a non-2xx before the stream starts is the
-    /// refusal envelope; inside the stream, exactly one result event ends the
-    /// job. Cancelling the calling task abandons the exchange.
-    func postStreaming(
-        _ path: String,
+    /// Runs a streamed job: a refusal before it starts is the product's own
+    /// sentence; otherwise exactly one result event ends it. Cancelling the
+    /// calling task ends the process and everything it started.
+    func job(
+        _ operation: String,
         body: [String: Any],
-        operation: String
+        describing description: String
     ) async throws -> JobResult {
-        do {
-            return try await performStreaming(path, body: body)
-        } catch is CancellationError {
-            throw TamaBackendError.cancelled(operation)
-        }
-    }
-
-    private func performStreaming(
-        _ path: String,
-        body: [String: Any]
-    ) async throws -> JobResult {
-        var request = URLRequest(url: endpoint(path))
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (bytes, response) = try await URLSession.shared.bytes(for: request)
-        guard let http = response as? HTTPURLResponse else { throw TamaBackendError.notHTTP }
-
-        // A non-2xx before the stream starts is the error envelope.
-        guard (200...299).contains(http.statusCode) else {
-            var data = Data()
-            for try await line in bytes.lines {
-                data.append(contentsOf: line.utf8)
+        let exchange = try await run(operation, body: body, describing: description)
+        switch exchange.end {
+        case let .result(status, document):
+            return JobResult(
+                status: status,
+                document: document,
+                stdoutText: exchange.stdoutText,
+                stderrText: exchange.stderrText
+            )
+        case let .response(status, document):
+            guard (200...299).contains(status) else {
+                throw Self.refusal(data: document, status: status)
             }
-            throw Self.refusal(data: data, status: http.statusCode)
+            throw TamaBackendError.unreadableOutput(
+                description,
+                "\(operation) answered instead of running a job"
+            )
+        case nil:
+            throw TamaBackendError.endedWithoutAnswer(exchange.exitStatus, exchange.processError)
         }
-
-        var stdoutText = ""
-        var stderrText = ""
-        var resultStatus: Int?
-        var resultDocument = Data()
-        for try await line in bytes.lines {
-            guard !line.isEmpty,
-                  let lineData = line.data(using: .utf8),
-                  let event = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
-                  let type = event["type"] as? String
-            else { continue }
-            switch type {
-            case "log":
-                let chunk = event["chunk"] as? String ?? ""
-                if event["stream"] as? String == "stderr" {
-                    stderrText += chunk
-                } else {
-                    stdoutText += chunk
-                }
-            case "result":
-                resultStatus = (event["status"] as? NSNumber)?.intValue
-                if let document = event["json"] {
-                    resultDocument =
-                        (try? JSONSerialization.data(withJSONObject: document)) ?? Data()
-                }
-            default:
-                continue
-            }
-        }
-        guard let status = resultStatus else { throw TamaBackendError.streamClosedEarly }
-        return JobResult(
-            status: status,
-            document: resultDocument,
-            stdoutText: stdoutText,
-            stderrText: stderrText
-        )
     }
 
     // MARK: - Transport
 
-    private func getData(_ path: String, operation: String) async throws -> Data {
-        let data: Data
-        let response: URLResponse
+    private func answer(
+        _ operation: String,
+        body: [String: Any],
+        describing description: String
+    ) async throws -> Data {
+        let exchange = try await run(operation, body: body, describing: description)
+        switch exchange.end {
+        case let .response(status, document):
+            guard (200...299).contains(status) else {
+                throw Self.refusal(data: document, status: status)
+            }
+            return document
+        case .result:
+            throw TamaBackendError.unreadableOutput(
+                description,
+                "\(operation) ran a job instead of answering"
+            )
+        case nil:
+            throw TamaBackendError.endedWithoutAnswer(exchange.exitStatus, exchange.processError)
+        }
+    }
+
+    /// A process that cannot be found or started is reported where it
+    /// happens, once; a cancelled run is the operator's choice, not a failure.
+    private func run(
+        _ operation: String,
+        body: [String: Any],
+        describing description: String
+    ) async throws -> TamaExchange {
+        let input = body.isEmpty ? Data() : try JSONSerialization.data(withJSONObject: body)
+        let exchange: TamaExchange
         do {
-            (data, response) = try await URLSession.shared.data(from: endpoint(path))
-        } catch is CancellationError {
-            throw TamaBackendError.cancelled(operation)
+            let command = try self.command ?? TamaCommand.bundled()
+            exchange = try await TamaRequestProcess.run(command, operation: operation, body: input)
+        } catch {
+            TamaFailureReporting.report(
+                failurePoint: "tama.backend.start",
+                code: TamaFailureReporting.code(for: error),
+                detail: (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            )
+            throw error
         }
-        guard let http = response as? HTTPURLResponse else { throw TamaBackendError.notHTTP }
-        guard (200...299).contains(http.statusCode) else {
-            throw Self.refusal(data: data, status: http.statusCode)
-        }
-        return data
+        if Task.isCancelled { throw TamaBackendError.cancelled(description) }
+        return exchange
     }
 
-    private func endpoint(_ path: String) -> URL {
-        baseURL.appendingPathComponent("v1").appendingPathComponent(path)
-    }
-
-    /// The error envelope is {"error": "<one sentence>"} — the product's own
+    /// The refusal envelope is {"error": "<one sentence>"} — the product's own
     /// refusal, surfaced verbatim.
     private static func refusal(data: Data, status: Int) -> TamaBackendError {
         let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]

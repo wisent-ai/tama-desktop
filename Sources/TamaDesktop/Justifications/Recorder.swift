@@ -200,14 +200,14 @@ struct JustificationRecordingClient {
     }
 
     func record(_ request: Request) async throws {
-        let client = TamaClient(baseURL: try await TamaBackend.shared.endpoint())
+        let client = TamaClient()
         var body: [String: Any] = [
             "kind": request.isTest ? "test" : "file",
             "file": request.target,
             "justification": request.justification,
         ]
         if request.isTest { body["quote"] = request.quote }
-        _ = try await client.post("justifications/record", body: body,
-            as: Recorded.self, operation: "Recording a justification")
+        _ = try await client.request("justifications/record", body: body,
+            as: Recorded.self, describing: "Recording a justification")
     }
 }

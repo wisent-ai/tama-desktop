@@ -127,24 +127,23 @@ struct WorktreeRemoval: Decodable, Sendable {
     var walkGaps: [WalkGap] { unreadableDirectories ?? [] }
 }
 
-/// The two worktree routes on the local backend. `TamaClient` prepends `/v1`,
-/// so the paths here are the leaves and never the full route.
+/// The two worktree operations, each one `tama-cli request` process.
 struct WorktreesClient: Sendable {
     private static let listOperation = "The worktree scan"
     private static let removeOperation = "The worktree removal"
 
     func list(roots: [String]) async throws -> WorktreeListing {
         let paths = try validatedRoots(roots)
-        return try await client().post(
+        return try await client().request(
             "worktrees/list",
             body: ["roots": paths],
             as: WorktreeListing.self,
-            operation: Self.listOperation
+            describing: Self.listOperation
         )
     }
 
     /// `except` carries the worktrees the operator marked to keep. It is
-    /// optional on the route and empty means "nothing kept", so the same
+    /// optional in the operation and empty means "nothing kept", so the same
     /// request shape serves both.
     func remove(
         roots: [String],
@@ -153,16 +152,16 @@ struct WorktreesClient: Sendable {
         force: Bool
     ) async throws -> WorktreeRemoval {
         let paths = try validatedRoots(roots)
-        return try await client().post(
+        return try await client().request(
             "worktrees/remove",
             body: ["roots": paths, "except": except, "apply": apply, "force": force],
             as: WorktreeRemoval.self,
-            operation: Self.removeOperation
+            describing: Self.removeOperation
         )
     }
 
-    private func client() async throws -> TamaClient {
-        TamaClient(baseURL: try await TamaBackend.shared.endpoint())
+    private func client() -> TamaClient {
+        TamaClient()
     }
 
     /// No roots is a refusal here as well as in the CLI, and a root that is not

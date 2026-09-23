@@ -4,8 +4,9 @@ import Foundation
 enum TamaBackendError: LocalizedError {
     case backendMissing(String)
     case startFailed(String)
-    case notHTTP
-    case streamClosedEarly
+    /// The request process ended without printing its answer: it was killed,
+    /// or crashed, and its own stderr says why.
+    case endedWithoutAnswer(Int32, String)
     case refused(String)
     case unreadableOutput(String, String)
     case cancelled(String)
@@ -18,10 +19,10 @@ enum TamaBackendError: LocalizedError {
             detail.isEmpty
                 ? "The Tama backend did not start."
                 : "The Tama backend did not start: \(detail)"
-        case .notHTTP:
-            "The Tama backend sent a response the app could not read."
-        case .streamClosedEarly:
-            "The Tama backend closed the stream before reporting a result."
+        case let .endedWithoutAnswer(status, detail):
+            detail.isEmpty
+                ? "The Tama backend ended with status \(status) before it answered."
+                : "The Tama backend ended with status \(status) before it answered: \(detail)"
         case let .refused(message):
             message
         case let .unreadableOutput(operation, reason):

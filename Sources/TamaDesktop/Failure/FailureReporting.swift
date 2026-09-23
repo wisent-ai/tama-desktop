@@ -18,8 +18,8 @@ enum TamaFailureReporting {
         )
     }
 
-    /// The catalogue's classification of an HTTP status the backend answered
-    /// a request with.
+    /// The catalogue's classification of the status a request process
+    /// answered with, in HTTP's vocabulary.
     static func code(forRefusalStatus status: Int) -> String {
         switch status {
         case 401, 403:
@@ -45,7 +45,7 @@ enum TamaFailureReporting {
             return switch failure {
             case .backendMissing:
                 "config"
-            case .startFailed, .notHTTP, .streamClosedEarly:
+            case .startFailed, .endedWithoutAnswer:
                 "infra_down"
             case .refused, .unreadableOutput, .cancelled:
                 "unknown"
@@ -73,7 +73,7 @@ enum TamaFailureReporting {
         return switch failure {
         case .refused, .startFailed, .backendMissing, .cancelled:
             true
-        case .notHTTP, .streamClosedEarly, .unreadableOutput:
+        case .endedWithoutAnswer, .unreadableOutput:
             false
         }
     }

@@ -1,17 +1,10 @@
 #!/bin/sh
-# Read-only: registry-declared provider coverage from the loopback backend;
-# this is not live execution evidence.
-# Requires the `tama` CLI on PATH, curl, and python3.
+# Read-only: registry-declared provider coverage, the same request the Coverage
+# screen runs; this is not live execution evidence.
+# Requires the `tama` CLI on PATH and python3.
 set -eu
 
-OUT=$(mktemp)
-tama serve --port 0 > "$OUT" 2>&1 &
-SERVER=$!
-trap 'kill "$SERVER" 2>/dev/null || true; rm -f "$OUT"' EXIT
-
-# The backend prints exactly one ready line: {"port":N,"ready":true}
-until [ -s "$OUT" ]; do sleep 0.1; done
-PORT=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['port'])" "$OUT")
-
-# Every provider, event, runtime event, and hook ID mapping.
-curl -s "http://127.0.0.1:$PORT/v1/coverage" | python3 -m json.tool
+# One process answers and exits. It prints one response event whose `json` is
+# every provider, event, runtime event, and hook ID mapping, and it exits
+# non-zero when the status in that event is a refusal.
+tama request coverage < /dev/null | python3 -m json.tool

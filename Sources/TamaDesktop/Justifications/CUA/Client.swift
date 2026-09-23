@@ -27,10 +27,11 @@ struct CUARemoval: Decodable, Sendable {
 }
 
 struct CUAConsentClient: Sendable {
-    var baseURL: URL?
+    /// Nil runs the binary sealed into this build's hook release.
+    var command: TamaCommand?
 
     func list() async throws -> CUAListing {
-        try await client().get("justifications/cua", as: CUAListing.self, operation: "Reading CUA consent")
+        try await client().request("justifications/cua", as: CUAListing.self, describing: "Reading CUA consent")
     }
 
     func record(session: String, app: String, actions: [String], quote: String, match: Bool) async throws -> CUARecording {
@@ -38,17 +39,16 @@ struct CUAConsentClient: Sendable {
             "sessionId": session, "app": app, "actions": actions,
             match ? "quoteMatch" : "quote": quote,
         ]
-        return try await client().post("justifications/cua/record", body: body,
-            as: CUARecording.self, operation: "Recording CUA consent")
+        return try await client().request("justifications/cua/record", body: body,
+            as: CUARecording.self, describing: "Recording CUA consent")
     }
 
     func remove(quote: String) async throws -> CUARemoval {
-        try await client().post("justifications/cua/remove", body: ["quote": quote],
-            as: CUARemoval.self, operation: "Removing CUA consent")
+        try await client().request("justifications/cua/remove", body: ["quote": quote],
+            as: CUARemoval.self, describing: "Removing CUA consent")
     }
 
-    private func client() async throws -> TamaClient {
-        if let baseURL { return TamaClient(baseURL: baseURL) }
-        return TamaClient(baseURL: try await TamaBackend.shared.endpoint())
+    private func client() -> TamaClient {
+        TamaClient(command: command)
     }
 }

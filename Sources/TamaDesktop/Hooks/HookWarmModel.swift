@@ -52,11 +52,11 @@ final class HookWarmModel: ObservableObject {
         outcome = .working("Running every hook binary once…")
         Task {
             do {
-                let measured = try await client().post(
+                let measured = try await client().request(
                     "hooks/warm",
                     body: only.isEmpty ? [:] : ["only": only],
                     as: HookWarmReport.self,
-                    operation: "warm the machine's hook binaries"
+                    describing: "warm the machine's hook binaries"
                 )
                 report = measured
                 outcome = .succeeded(Self.sentence(for: measured))
@@ -82,8 +82,8 @@ final class HookWarmModel: ObservableObject {
         return said
     }
 
-    private func client() async throws -> TamaClient {
-        TamaClient(baseURL: try await TamaBackend.shared.endpoint())
+    private func client() -> TamaClient {
+        TamaClient()
     }
 
     private static func sentence(_ error: Error) -> String {

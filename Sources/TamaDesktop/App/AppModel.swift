@@ -193,15 +193,14 @@ final class AppModel: ObservableObject {
         policyBundleMutation = .working("Validating the complete policy bundle before writing…")
         defer { isImportingPolicyBundle = false }
         do {
-            let endpoint = try await TamaBackend.shared.endpoint()
-            let result = try await TamaClient(baseURL: endpoint).post(
+            let result = try await TamaClient().request(
                 "policy-bundles/import",
                 body: [
                     "sourcePath": source.standardizedFileURL.path,
                     "replace": replace,
                 ],
                 as: PolicyBundleImportResult.self,
-                operation: "import policy bundle"
+                describing: "import policy bundle"
             )
             policyBundleImport = result
             if result.accepted {
@@ -219,11 +218,10 @@ final class AppModel: ObservableObject {
 
     func refreshPolicyBundles() async {
         do {
-            let endpoint = try await TamaBackend.shared.endpoint()
-            policyBundles = try await TamaClient(baseURL: endpoint).get(
+            policyBundles = try await TamaClient().request(
                 "policy-bundles",
                 as: PolicyBundleList.self,
-                operation: "list policy bundles"
+                describing: "list policy bundles"
             )
         } catch {
             policyBundles = nil

@@ -12,8 +12,8 @@ import Testing
 /// window has the same button, and it is worth nothing unless the route it
 /// calls answers the document the panel reads.
 ///
-/// So this starts the real `tama-cli serve`, calls the real route through the
-/// desktop's own client, and reads the report and the refusal.
+/// So this runs the real `tama-cli request hooks/warm` through the desktop's
+/// own client, and reads the report and the refusal.
 struct HookWarmBackendTests {
     /// The checkout that holds this file's sibling repositories.
     private static var workspace: URL {
@@ -34,53 +34,31 @@ struct HookWarmBackendTests {
         return candidates.first { FileManager.default.isExecutableFile(atPath: $0.path) }
     }
 
-    /// Start the backend and return its base URL, or nil when this machine
-    /// holds no built CLI and no checkout to serve.
-    private static func startBackend() throws -> (Process, URL)? {
+    /// The request command against the sibling checkout, or nil when this
+    /// machine holds no built CLI and no checkout to read.
+    private static func command() -> TamaCommand? {
         guard let executable = backendExecutable() else { return nil }
         let checkout = workspace.appendingPathComponent("tama")
         guard FileManager.default.fileExists(
             atPath: checkout.appendingPathComponent("shared-hooks/registry.json").path
         ) else { return nil }
-        let process = Process()
-        process.executableURL = executable
-        process.arguments = ["serve", "--port", "0", "--root", checkout.path]
-        let output = Pipe()
-        process.standardOutput = output
-        process.standardError = Pipe()
-        try process.run()
-        let handle = output.fileHandleForReading
-        var buffer = Data()
-        while !buffer.contains(UInt8(ascii: "\n")) {
-            let chunk = handle.availableData
-            if chunk.isEmpty { break }
-            buffer.append(chunk)
-        }
-        let newline = buffer.firstIndex(of: UInt8(ascii: "\n")) ?? buffer.endIndex
-        let line = Data(buffer[buffer.startIndex..<newline])
-        guard
-            let ready = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
-            let port = (ready["port"] as? NSNumber)?.intValue,
-            let url = URL(string: "http://127.0.0.1:\(port)")
-        else {
-            process.terminate()
-            Issue.record("the backend announced no port: \(String(decoding: buffer, as: UTF8.self))")
-            return nil
-        }
-        return (process, url)
+        return TamaCommand(
+            executable: executable,
+            root: checkout,
+            environment: ProcessInfo.processInfo.environment
+        )
     }
 
     @Test
     func theWindowReadsAMeasuredWarmReportFromTheRealBackend() async throws {
-        guard let (process, baseURL) = try Self.startBackend() else { return }
-        defer { process.terminate() }
-        let client = TamaClient(baseURL: baseURL)
+        guard let command = Self.command() else { return }
+        let client = TamaClient(command: command)
 
-        let report = try await client.post(
+        let report = try await client.request(
             "hooks/warm",
             body: ["only": ["block-delegating-own-work"]],
             as: HookWarmReport.self,
-            operation: "warm the machine's hook binaries"
+            describing: "warm the machine's hook binaries"
         )
 
         let row = try #require(report.hooks.first)
@@ -101,16 +79,15 @@ struct HookWarmBackendTests {
 
     @Test
     func anUnknownHookIsRefusedWithTheBackendsOwnSentence() async throws {
-        guard let (process, baseURL) = try Self.startBackend() else { return }
-        defer { process.terminate() }
-        let client = TamaClient(baseURL: baseURL)
+        guard let command = Self.command() else { return }
+        let client = TamaClient(command: command)
 
         await #expect(throws: TamaBackendError.self) {
-            _ = try await client.post(
+            _ = try await client.request(
                 "hooks/warm",
                 body: ["only": ["block-nothing-at-all"]],
                 as: HookWarmReport.self,
-                operation: "warm the machine's hook binaries"
+                describing: "warm the machine's hook binaries"
             )
         }
     }

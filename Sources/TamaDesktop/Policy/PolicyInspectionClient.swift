@@ -72,34 +72,35 @@ struct InstallPlan: Sendable {
 /// These three reads exist in the core and had no surface at all, so the
 /// operator had to leave the application to answer "which provider is covered"
 /// and "where would an install write". Nothing here mutates: every read is a
-/// GET, and each failure carries the backend's own sentence back to the screen.
+/// request with an empty body, and each failure carries the backend's own
+/// sentence back to the screen.
 struct PolicyInspectionClient: Sendable {
     private static let coverageOperation = "The provider coverage read"
     private static let planOperation = "The install plan read"
     private static let mcpOperation = "The MCP snippet read"
 
     func providerCoverage() async throws -> [ProviderCoverage] {
-        try await client().get(
+        try await client().request(
             "coverage",
             as: [ProviderCoverage].self,
-            operation: Self.coverageOperation
+            describing: Self.coverageOperation
         )
     }
 
     func installPlan() async throws -> InstallPlan {
-        let document = try await client().getDocument(
+        let document = try await client().document(
             "install-plan",
-            operation: Self.planOperation
+            describing: Self.planOperation
         )
         return try Self.decodePlan(document)
     }
 
     func mcpConfiguration() async throws -> String {
-        try await client().getPrettyText("mcp-config", operation: Self.mcpOperation)
+        try await client().prettyText("mcp-config", describing: Self.mcpOperation)
     }
 
-    private func client() async throws -> TamaClient {
-        TamaClient(baseURL: try await TamaBackend.shared.endpoint())
+    private func client() -> TamaClient {
+        TamaClient()
     }
 
     /// The plan's levels do not share a shape: one carries seven runtime

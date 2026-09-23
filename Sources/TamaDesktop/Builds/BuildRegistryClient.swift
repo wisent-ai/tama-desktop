@@ -57,7 +57,7 @@ struct BuildClosing: Decodable, Sendable { let closed: String }
 
 struct BuildRegistryClient: Sendable {
     func list() async throws -> BuildListing {
-        try await client().get("builds", as: BuildListing.self, operation: "Reading build registry")
+        try await client().request("builds", as: BuildListing.self, describing: "Reading build registry")
     }
 
     func record(target: String, revision: String, reason: String, repository: String,
@@ -66,16 +66,16 @@ struct BuildRegistryClient: Sendable {
             "revision": revision, "reason": reason, "repository": repository]
         if let session { body["approvalSession"] = session }
         if let quote { body["approvalQuote"] = quote }
-        return try await client().post("builds/record", body: body,
-            as: BuildRecording.self, operation: "Recording build intent and consent")
+        return try await client().request("builds/record", body: body,
+            as: BuildRecording.self, describing: "Recording build intent and consent")
     }
 
     func close(kind: String, target: String) async throws -> BuildClosing {
-        try await client().post("builds/close", body: ["kind": kind, "target": target],
-            as: BuildClosing.self, operation: "Closing build authorization")
+        try await client().request("builds/close", body: ["kind": kind, "target": target],
+            as: BuildClosing.self, describing: "Closing build authorization")
     }
 
-    private func client() async throws -> TamaClient {
-        TamaClient(baseURL: try await TamaBackend.shared.endpoint())
+    private func client() -> TamaClient {
+        TamaClient()
     }
 }
