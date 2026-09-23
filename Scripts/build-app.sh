@@ -126,13 +126,13 @@ xcrun --sdk macosx clang \
     "$SYSTEM_POLICY_SOURCE/TamaNetworkFilter.m" \
     -o "$NETWORK_FILTER_BINARY"
 install -m 0644 \
-    "$SYSTEM_POLICY_SOURCE/TamaNetworkFilter-Info.plist" \
+    "$SYSTEM_POLICY_SOURCE/Bundle/TamaNetworkFilter-Info.plist" \
     "$NETWORK_FILTER_CONTENTS/Info.plist"
 plutil -replace CFBundleShortVersionString -string "$BUNDLE_SHORT_VERSION" "$NETWORK_FILTER_CONTENTS/Info.plist"
 plutil -replace TamaProductVersion -string "$PRODUCT_VERSION" "$NETWORK_FILTER_CONTENTS/Info.plist"
 plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$NETWORK_FILTER_CONTENTS/Info.plist"
 install -m 0644 \
-    "$SYSTEM_POLICY_SOURCE/ai.wisent.tama.system-policy.plist" \
+    "$SYSTEM_POLICY_SOURCE/Bundle/ai.wisent.tama.system-policy.plist" \
     "$LAUNCH_DAEMONS/ai.wisent.tama.system-policy.plist"
 for executable in "$SYSTEM_POLICY_BACKEND" "$SYSTEM_POLICY_DAEMON"; do
     codesign \
@@ -140,7 +140,7 @@ for executable in "$SYSTEM_POLICY_BACKEND" "$SYSTEM_POLICY_DAEMON"; do
         --sign "$CODESIGN_IDENTITY" \
         --options runtime \
         $CODESIGN_TIMESTAMP \
-        --entitlements "$SYSTEM_POLICY_SOURCE/TamaSystemPolicy.entitlements" \
+        --entitlements "$SYSTEM_POLICY_SOURCE/Bundle/TamaSystemPolicy.entitlements" \
         "$executable"
     codesign --verify --strict "$executable"
 done
@@ -155,7 +155,7 @@ codesign \
     --identifier ai.wisent.tama.network-filter \
     --options runtime \
     $CODESIGN_TIMESTAMP \
-    --entitlements "$SYSTEM_POLICY_SOURCE/TamaNetworkFilter.entitlements" \
+    --entitlements "$SYSTEM_POLICY_SOURCE/Bundle/TamaNetworkFilter.entitlements" \
     "$SYSTEM_EXTENSION"
 codesign --verify --strict "$SYSTEM_EXTENSION"
 # Package every native hook command declared by the registry together with the
