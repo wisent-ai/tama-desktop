@@ -13,18 +13,18 @@ struct SettingsView: View {
     @ObservedObject var journey: TamaFirstUseJourney
     let continueToSignIn: (() -> Void)?
 
-    @State private var isDecidingDeactivation = false
-    @State private var walkthroughOutcome: WalkthroughOutcome?
-    @State private var isReopeningWalkthrough = false
+    @State var isDecidingDeactivation = false
+    @State var walkthroughOutcome: WalkthroughOutcome?
+    @State var isReopeningWalkthrough = false
 
     /// What the last press of "Show it again" did, said where it was pressed.
-    private enum WalkthroughOutcome {
+    enum WalkthroughOutcome {
         case started
         case failed(String)
     }
 
-    private var buildIdentity: BuildIdentity { .current }
-    private var backendReady: Bool { model.systemPolicyServiceStatus == "Enabled" }
+    var buildIdentity: BuildIdentity { .current }
+    var backendReady: Bool { model.systemPolicyServiceStatus == "Enabled" }
 
     var body: some View {
         WisentScreen(
@@ -45,7 +45,7 @@ struct SettingsView: View {
         .task { await model.refreshPolicyBundles() }
     }
 
-    private var actions: [WisentAction] {
+    var actions: [WisentAction] {
         guard model.allowsControl else {
             guard let continueToSignIn else { return [] }
             return [
@@ -63,7 +63,7 @@ struct SettingsView: View {
 
     // MARK: - Local enforcement
 
-    private var localEnforcement: some View {
+    var localEnforcement: some View {
         WisentSectionBox(
             title: "Local protection",
             trailing: model.areHooksDisabled ? "off" : "on"
@@ -140,7 +140,7 @@ struct SettingsView: View {
 
     // MARK: - Policy bundles
 
-    private var policyBundles: some View {
+    var policyBundles: some View {
         WisentSectionBox(
             title: "Policy bundles",
             detail: "Adopt an existing self-contained Tama policy bundle or sealed release without installing or enabling it.",
@@ -209,7 +209,7 @@ struct SettingsView: View {
         }
     }
 
-    private func choosePolicyBundle() {
+    func choosePolicyBundle() {
         let panel = NSOpenPanel()
         panel.title = "Choose a Tama policy bundle"
         panel.message = "Choose a self-contained Tama policy bundle or sealed release containing shared-hooks/registry.json. Import does not install or enable hooks."
@@ -224,7 +224,7 @@ struct SettingsView: View {
 
     // MARK: - Build
 
-    private var build: some View {
+    var build: some View {
         WisentSectionBox(
             title: "Build",
             trailing: buildIdentity.channel
@@ -266,80 +266,8 @@ struct SettingsView: View {
 
     // MARK: - First-run walkthrough
 
-    /// The first run is gated on `tama.hasCompletedSetup`, and nothing ever
-    /// turned that back off, so the walkthrough was readable once per machine
-    /// and then gone. Asking to read it again is a setting, not a reinstall.
-    private var walkthrough: some View {
-        WisentSectionBox(
-            title: "First-run walkthrough",
-            detail: "See the walkthrough this product shows on a first run."
-        ) {
-            WisentPanel {
-                VStack(alignment: .leading, spacing: WisentDesign.Space.x3) {
-                    WisentActionButton(
-                        action: WisentAction(
-                            "Show it again",
-                            symbol: "arrow.counterclockwise",
-                            kind: .secondary,
-                            isEnabled: !isReopeningWalkthrough
-                        ) {
-                            reopenWalkthrough()
-                        }
-                    )
-                    switch walkthroughOutcome {
-                    case .none:
-                        EmptyView()
-                    case .started:
-                        Text("The walkthrough is on screen.")
-                            .font(WisentTypeScale.caption())
-                            .foregroundStyle(WisentDesign.success)
-                    case let .failed(reason):
-                        Text(reason)
-                            .font(WisentTypeScale.caption())
-                            .foregroundStyle(WisentDesign.danger)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-            }
-        }
-    }
 
-    private func reopenWalkthrough() {
-        isReopeningWalkthrough = true
-        Task {
-            do {
-                try await journey.showWalkthroughAgain()
-                walkthroughOutcome = .started
-            } catch {
-                walkthroughOutcome = .failed(error.localizedDescription)
-            }
-            isReopeningWalkthrough = false
-        }
-    }
 
     // MARK: - The decision
 
-    /// Deactivation removes machine-wide enforcement, and macOS may require a
-    /// restart before the System Extension is actually gone. What ran unchecked
-    /// in between cannot be recalled.
-    private var deactivationDecision: some View {
-        WisentDecisionDialog(
-            tone: .danger,
-            title: "Turn off policy protection on this machine",
-            lines: [
-                "Unsafe actions will no longer be blocked.",
-                "Current sessions will keep running without policy checks.",
-                "macOS may require a restart.",
-            ],
-            actions: [
-                WisentAction("Turn off protection", kind: .destructive) {
-                    isDecidingDeactivation = false
-                    model.deactivateLocalSetup()
-                },
-                WisentAction("Keep protection", kind: .primary) {
-                    isDecidingDeactivation = false
-                },
-            ]
-        )
-    }
 }
