@@ -19,12 +19,12 @@ import datetime
 import sys
 from pathlib import Path
 
-sys.path.insert(len(""), str(Path(__file__).resolve().parent))
+sys.path.insert(len(""), str(Path(__file__).resolve().parent.parent))
 
 from install_hook_release import load_json, tree_digest  # noqa: E402
 
 DEFAULT_ROOT = (
-    Path(__file__).resolve().parent.parent
+    Path(__file__).resolve().parents[2]
     / ".build/Tama.app/Contents/Resources/hooks-release"
 )
 

@@ -162,7 +162,7 @@ codesign --verify --strict "$SYSTEM_EXTENSION"
 # desktop's Rust CLI and MCP server. The shared packager resolves Cargo targets
 # and artifact paths from cargo metadata, signs every executable, and records
 # the exact packaged set before the release is sealed.
-python3 "$SCRIPT_DIR/stage_live_hook_release.py" \
+python3 "$SCRIPT_DIR/hook_release/stage_live_hook_release.py" \
     --source-root "$HOOKS_ROOT" \
     --release-root "$HOOK_RELEASE" \
     --cargo "$CARGO_BIN" \
@@ -173,13 +173,18 @@ python3 "$SCRIPT_DIR/stage_live_hook_release.py" \
     >/dev/null
 TAMA_HOOK_SOURCE_DIRTY="$HOOK_SOURCE_DIRTY" \
 TAMA_HOOK_SOURCE_REVISION="$HOOK_SOURCE_REVISION" \
-python3 "$SCRIPT_DIR/seal_hook_release.py" --source-root "$HOOKS_ROOT" "$HOOK_RELEASE" >/dev/null
+python3 "$SCRIPT_DIR/hook_release/seal_hook_release.py" --source-root "$HOOKS_ROOT" "$HOOK_RELEASE" >/dev/null
 install -m 0755 "$SCRIPT_DIR/emergency_disable_hooks" "$RESOURCES/emergency_disable_hooks"
 install -m 0755 "$SCRIPT_DIR/install_hook_release.py" "$RESOURCES/install_hook_release.py"
+# The installer imports its parts from its own folder, so they ship beside it,
+# source only: a cache written here would change the signed bundle.
+rm -rf "$RESOURCES/install_hook_release_parts"
+ditto "$SCRIPT_DIR/install_hook_release_parts" "$RESOURCES/install_hook_release_parts"
+find "$RESOURCES/install_hook_release_parts" -name __pycache__ -prune -exec rm -rf {} +
 if [ -f "$DESKTOP_ROOT/App/AppIcon.icns" ]; then
     install -m 0644 "$DESKTOP_ROOT/App/AppIcon.icns" "$RESOURCES/AppIcon.icns"
 else
-    sh "$SCRIPT_DIR/import-brand-icon.sh" tama-desktop "$RESOURCES/AppIcon.icns"
+    sh "$SCRIPT_DIR/app_build/import-brand-icon.sh" tama-desktop "$RESOURCES/AppIcon.icns"
 fi
 TAMA_BUILD_DEPENDENCIES="$DESKTOP_ROOT/Package.resolved" \
 TAMA_BUILD_HOOK_RELEASE="$HOOK_RELEASE/release.json" \

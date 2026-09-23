@@ -27,7 +27,7 @@ INSTALLED_BY_RELEASE = {"generate-configs.mjs", "providers.json", "run-one-sessi
 def installer_module():
     """Import the installer so the digest has exactly one definition."""
     spec = importlib.util.spec_from_file_location(
-        "tama_install_hook_release", HERE / "install_hook_release.py"
+        "tama_install_hook_release", HERE.parent / "install_hook_release.py"
     )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -38,7 +38,7 @@ def default_root() -> Path:
     bundled = HERE / "hooks-release"
     if bundled.is_dir():
         return bundled
-    return HERE.parent / ".build/Tama.app/Contents/Resources/hooks-release"
+    return HERE.parent.parent / ".build/Tama.app/Contents/Resources/hooks-release"
 
 
 def uninstallable(root: Path) -> list[Path]:

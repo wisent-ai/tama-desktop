@@ -2,7 +2,7 @@
 set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-DESKTOP_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+DESKTOP_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
 HOOKS_ROOT=${TAMA_HOOK_ROOT:-"$DESKTOP_ROOT/../tama"}
 if [ ! -f "$DESKTOP_ROOT/Package.resolved" ]; then
     printf '%s\n' "A committed Package.resolved is required for release."
@@ -87,7 +87,7 @@ TAMA_CODESIGN_TIMESTAMP=--timestamp \
 TAMA_BUILD_CHANNEL="$BUILD_CHANNEL" \
 TAMA_INSTALL_AFTER_BUILD=no \
 TAMA_RELEASE_VERSION="$PRODUCT_VERSION" \
-sh "$SCRIPT_DIR/build-app.sh"
+sh "$SCRIPT_DIR/../build-app.sh"
 TAMA_BUILD_MANIFEST="$DESKTOP_ROOT/.build/Tama.app/Contents/Resources/tama-build.json" \
 python3 - <<'PY'
 import json
@@ -152,7 +152,7 @@ for output in "$ARTIFACT" "$DIGEST_FILE" "$PROVENANCE_FILE" "$QUALIFICATION_FILE
 done
 mkdir -p "$RELEASE_DIR"
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$ARTIFACT"
-DIGEST=$(python3 "$SCRIPT_DIR/seal_hook_release.py" --digest-file "$ARTIFACT")
+DIGEST=$(python3 "$SCRIPT_DIR/../hook_release/seal_hook_release.py" --digest-file "$ARTIFACT")
 printf '%s  %s\n' "$DIGEST" "$ARTIFACT_NAME" > "$DIGEST_FILE"
 TAMA_ARTIFACT="$ARTIFACT" \
 TAMA_ARTIFACT_DIGEST="$DIGEST" \

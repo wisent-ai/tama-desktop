@@ -9,8 +9,8 @@ cd "$(dirname "$0")/../.."
 # Default: the release inside the built app; pass any release root as $1.
 RELEASE_ROOT=${1:-.build/Tama.app/Contents/Resources/hooks-release}
 
-python3 Scripts/verify_hook_release.py "$RELEASE_ROOT"
+python3 Scripts/integrity/verify_hook_release.py "$RELEASE_ROOT"
 
 # The same question answered with the installer's own digest implementation,
 # plus build-residue attribution on mismatch.
-python3 Scripts/report_hook_release_integrity.py "$RELEASE_ROOT"
+python3 Scripts/integrity/report_hook_release_integrity.py "$RELEASE_ROOT"

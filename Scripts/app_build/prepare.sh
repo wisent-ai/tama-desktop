@@ -147,7 +147,7 @@ done
 if ! otool -l "$MACOS/Tama" | grep -q '@executable_path/../Frameworks'; then
     install_name_tool -add_rpath '@executable_path/../Frameworks' "$MACOS/Tama"
 fi
-"$NODE_BIN" "$SCRIPT_DIR/export-catalog.mjs" "$HOOKS_ROOT" "$RESOURCES/tama-catalog.json"
+"$NODE_BIN" "$SCRIPT_DIR/app_build/export-catalog.mjs" "$HOOKS_ROOT" "$RESOURCES/tama-catalog.json"
 HOOK_RELEASE="$RESOURCES/hooks-release"
 mkdir -p "$HOOK_RELEASE"
 install -m 0644 "$HOOKS_ROOT/package.json" "$HOOK_RELEASE/package.json"

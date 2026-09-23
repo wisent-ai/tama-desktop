@@ -51,7 +51,7 @@ struct Fixture {
         let identity: [String: Any] = [
             "sourceRevision": owner.output.trimmingCharacters(in: .whitespacesAndNewlines),
             "fixtureRevision": revision,
-            "sealer": scripts.appendingPathComponent("seal_hook_release.py").path
+            "sealer": scripts.appendingPathComponent("hook_release/seal_hook_release.py").path
         ]
         try JSONSerialization.data(withJSONObject: identity, options: [.sortedKeys, .prettyPrinted])
             .write(to: reports.appendingPathComponent("run.json"))
@@ -104,7 +104,7 @@ struct Fixture {
 
     func seal(sourceRoot: URL?, expectedRevision: String? = nil) throws
         -> (status: Int32, output: String, error: String) {
-        var arguments = [scripts.appendingPathComponent("seal_hook_release.py").path]
+        var arguments = [scripts.appendingPathComponent("hook_release/seal_hook_release.py").path]
         if let sourceRoot { arguments += ["--source-root", sourceRoot.path] }
         arguments.append(release.path)
         let environment = expectedRevision.map { ["TAMA_HOOK_SOURCE_REVISION": $0] } ?? [:]
@@ -175,12 +175,12 @@ struct InstallFixture {
         // The pipeline scripts build with the machine's toolchain and write
         // only into the destination above, so they run with the machine's own
         // home; the scratch home is the install target, nothing else.
-        let staged = try pipeline("stage_live_hook_release.py",
+        let staged = try pipeline("hook_release/stage_live_hook_release.py",
                                   ["--source-root", hookCheckout.path,
                                    "--runtime", installed.path,
                                    "--destination", release.path])
         #expect(staged.status == .zero, "staging failed: \(staged.error)")
-        let sealed = try pipeline("seal_hook_release.py",
+        let sealed = try pipeline("hook_release/seal_hook_release.py",
                                   ["--source-root", hookCheckout.path, release.path])
         #expect(sealed.status == .zero, "sealing failed: \(sealed.error)")
         print("Retained install evidence: \(reports.path)")

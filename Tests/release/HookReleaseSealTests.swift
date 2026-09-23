@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-/// `Scripts/seal_hook_release.py` driven the way the release pipeline drives it.
+/// `Scripts/hook_release/seal_hook_release.py` driven the way the release pipeline drives it.
 ///
 /// On 2026-09-08 no hook release could be sealed at all, and the one that was
 /// finally installed wrote thirty-nine hook commands with the home directory

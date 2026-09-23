@@ -195,7 +195,7 @@ def stage_release(
 
 def main() -> None:
     home = Path.home()
-    project = Path(__file__).resolve().parent.parent
+    project = Path(__file__).resolve().parents[2]
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--source-root",
