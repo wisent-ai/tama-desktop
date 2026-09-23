@@ -12,6 +12,11 @@ import shutil
 import subprocess
 import sys
 
+# 8a40c3a filed this script under Scripts/hook_release/ and left the package it
+# imports in Scripts/; Python only looks beside the script, so every staging run
+# since stopped at this import and no live hook release was installed.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from hook_release_native.build import (
     binary_targets,
     build_binaries,

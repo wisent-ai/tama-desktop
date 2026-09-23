@@ -9,6 +9,9 @@ from pathlib import Path
 import sys
 import shutil
 
+# hook_release_native lives in Scripts/, one level above this script (8a40c3a).
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from hook_release_native.source import source_identity, verify_source_identity
 
 
