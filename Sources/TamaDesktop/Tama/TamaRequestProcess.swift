@@ -2,7 +2,7 @@ import AppKit
 import Darwin
 import Foundation
 
-/// How the app runs `tama-cli request <operation>`: the binary, the release it
+/// How the app runs `tama request <operation>`: the binary, the release it
 /// reads, and the environment it inherits.
 struct TamaCommand: Sendable {
     let executable: URL
@@ -45,7 +45,7 @@ struct TamaCommand: Sendable {
 #endif
         let bundled = root
             .appendingPathComponent("bin", isDirectory: true)
-            .appendingPathComponent("tama-cli")
+            .appendingPathComponent("tama")
         guard manager.isExecutableFile(atPath: bundled.path) else {
             throw TamaBackendError.backendMissing(bundled.path)
         }
@@ -83,9 +83,9 @@ struct TamaExchange: Sendable {
     let exitStatus: Int32
 }
 
-/// One `tama-cli request <operation>` process per operation.
+/// One `tama request <operation>` process per operation.
 ///
-/// The app used to start `tama-cli serve --port 0` on first use and keep it
+/// The app used to start `tama serve --port 0` on first use and keep it
 /// for as long as it ran: a second resident Tama process with its own
 /// loopback port. Every operation is now one finite process. The body goes to
 /// its stdin as one JSON document, and every event it prints on stdout is read

@@ -12,7 +12,7 @@ import Testing
 /// window has the same button, and it is worth nothing unless the route it
 /// calls answers the document the panel reads.
 ///
-/// So this runs the real `tama-cli request hooks/warm` through the desktop's
+/// So this runs the real `tama request hooks/warm` through the desktop's
 /// own client, and reads the report and the refusal.
 struct HookWarmBackendTests {
     /// The checkout that holds this file's sibling repositories.
@@ -27,9 +27,9 @@ struct HookWarmBackendTests {
     /// The CLI this machine builds, then the one it installs.
     private static func backendExecutable() -> URL? {
         let candidates = [
-            workspace.appendingPathComponent("tama/rust/target/release/tama-cli"),
+            workspace.appendingPathComponent("tama/rust/target/release/tama"),
             FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent(".local/bin/tama-cli"),
+                .appendingPathComponent(".local/bin/tama"),
         ]
         return candidates.first { FileManager.default.isExecutableFile(atPath: $0.path) }
     }

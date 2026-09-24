@@ -222,7 +222,7 @@ def main() -> None:
     parser.add_argument(
         "--include-bin",
         action="append",
-        default=["tama-cli", "tama-mcp-server", "tama-run-hook"],
+        default=["tama", "tama-mcp-server", "tama-run-hook"],
     )
     parser.add_argument("--codesign-identity")
     parser.add_argument("--codesign-timestamp", default="--timestamp=none")

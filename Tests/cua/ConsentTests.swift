@@ -39,7 +39,7 @@ final class ConsentTests: XCTestCase {
         requestEnvironment["TAMA_OMP_SESSION_ROOT"] = environment["TAMA_OMP_SESSION_ROOT"]
             ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".omp/agent/sessions").path
         defer { print("Native consent evidence: \(evidence.path)") }
-        // Every call below is one `tama-cli request` process, the way the
+        // Every call below is one `tama request` process, the way the
         // window runs them: nothing is started before the first call and
         // nothing is left running after the last.
         let client = CUAConsentClient(command: TamaCommand(

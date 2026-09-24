@@ -127,7 +127,7 @@ struct WorktreeRemoval: Decodable, Sendable {
     var walkGaps: [WalkGap] { unreadableDirectories ?? [] }
 }
 
-/// The two worktree operations, each one `tama-cli request` process.
+/// The two worktree operations, each one `tama request` process.
 struct WorktreesClient: Sendable {
     private static let listOperation = "The worktree scan"
     private static let removeOperation = "The worktree removal"

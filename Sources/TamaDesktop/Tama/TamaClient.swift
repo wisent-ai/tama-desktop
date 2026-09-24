@@ -1,7 +1,7 @@
 import Foundation
 
 /// The client for Tama's own operations. Every call runs one
-/// `tama-cli request <operation>` process (`TamaRequestProcess`): the body
+/// `tama request <operation>` process (`TamaRequestProcess`): the body
 /// goes to its stdin, and nothing of Tama stays running once it has answered.
 /// A bounded operation answers with one document; a long-running job reports
 /// its own output in its own order, then the status the command would have

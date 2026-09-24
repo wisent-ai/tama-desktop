@@ -7,7 +7,7 @@ set -eu
 
 cd "$(dirname "$0")/../.."
 
-TAMA_CLI=${TAMA_CLI:-.build/Tama.app/Contents/Resources/hooks-release/bin/tama-cli}
+TAMA_CLI=${TAMA_CLI:-.build/Tama.app/Contents/Resources/hooks-release/bin/tama}
 
 # One line per live session: agent id, session id, hook state.
 # Prints nothing (exit 0) when no supervised session is running.

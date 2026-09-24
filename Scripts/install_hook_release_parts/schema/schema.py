@@ -161,7 +161,7 @@ def provider_hook_block(
     it installed beside it. It refuses rather than return an empty block, and
     an empty block is what left both providers enforcing nothing.
     """
-    cli = release_root / "bin/tama-cli"
+    cli = release_root / "bin/tama"
     if not cli.is_file() or not os.access(cli, os.X_OK):
         raise RuntimeError("Approved hook release is missing the sealed Tama CLI")
     result = subprocess.run(

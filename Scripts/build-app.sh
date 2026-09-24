@@ -166,7 +166,7 @@ python3 "$SCRIPT_DIR/hook_release/stage_live_hook_release.py" \
     --source-root "$HOOKS_ROOT" \
     --release-root "$HOOK_RELEASE" \
     --cargo "$CARGO_BIN" \
-    --include-bin tama-cli \
+    --include-bin tama \
     --include-bin tama-mcp-server \
     --codesign-identity "$CODESIGN_IDENTITY" \
     --codesign-timestamp="$CODESIGN_TIMESTAMP" \

@@ -218,7 +218,7 @@ struct InstallFixture {
     /// The sealed CLI reading this home's installed configs against the
     /// catalogue in the hook checkout.
     func validate() throws -> (status: Int32, output: String, error: String) {
-        try run(release.appendingPathComponent("bin/tama-cli").path, ["validate"],
+        try run(release.appendingPathComponent("bin/tama").path, ["validate"],
                 environment: ["HOME": home.path, "TAMA_ROOT": hookCheckout.path],
                 directory: hookCheckout)
     }

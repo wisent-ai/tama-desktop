@@ -151,7 +151,7 @@ struct CopyRemoval: Decodable, Sendable {
     var walkGaps: [WalkGap] { unreadableDirectories ?? [] }
 }
 
-/// The two copies operations, each one `tama-cli request` process.
+/// The two copies operations, each one `tama request` process.
 struct CopiesClient: Sendable {
     private static let listOperation = "The repository-copy scan"
     private static let removeOperation = "The repository-copy removal"
