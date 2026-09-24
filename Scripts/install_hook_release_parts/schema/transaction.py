@@ -6,7 +6,7 @@ from pathlib import Path
 import shutil
 import shlex
 import subprocess
-from install_hook_release_parts.schema.schema import EXECUTABLE_MODE_BITS, MINIMUM_NODE_MAJOR, NATIVE_MANIFEST_SCHEMA, NODE_VERSION_PROBE_TIMEOUT_SECONDS, load_json
+from install_hook_release_parts.schema.schema import EXECUTABLE_MODE_BITS, MINIMUM_NODE_MAJOR, NATIVE_MANIFEST_SCHEMA, NODE_VERSION_PROBE_TIMEOUT_SECONDS, UNIFIED_CLI, load_json
 
 
 class Transaction:
@@ -204,7 +204,9 @@ def declared_native_binaries(
                 )
             if field == "hooks" and not source.endswith(".rs"):
                 raise RuntimeError(f"Native hook source is not Rust: {name}: {source}")
-            if Path(name).name != name or not name.startswith("tama-"):
+            # `tama` is the one unified CLI the release ships beside its hook
+            # binaries; every other executable is a `tama-` program.
+            if Path(name).name != name or not (name == UNIFIED_CLI or name.startswith("tama-")):
                 raise RuntimeError(f"Invalid declared native binary name: {name}")
             if name in all_names:
                 raise RuntimeError(f"Duplicate declared native binary: {name}")

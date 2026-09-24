@@ -18,6 +18,8 @@ MINIMUM_NODE_MAJOR = 20
 NODE_VERSION_PROBE_TIMEOUT_SECONDS = 5
 # A declared native binary must carry an execute bit for someone.
 EXECUTABLE_MODE_BITS = 0o111
+# The one unified CLI the tama release ships as an additional executable.
+UNIFIED_CLI = "tama"
 
 
 def atomic_json(path: Path, value: object) -> None:
