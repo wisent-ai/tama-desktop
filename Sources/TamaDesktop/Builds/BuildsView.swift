@@ -29,7 +29,11 @@ struct BuildsView: View {
                 if let listing {
                     Text(listing.registry).font(WisentTypeScale.identifierSmall()).textSelection(.enabled)
                     ForEach(listing.ration) { allowance in
-                        Text("\(allowance.kind): \(allowance.spent) intents recorded in 24 hours; local limit \(allowance.allowed).")
+                        if let left = allowance.fleetRemaining {
+                            Text("\(allowance.kind): the fleet has \(left) build jobs left today.")
+                        } else {
+                            Text("\(allowance.kind): \(allowance.spent) intents recorded in 24 hours; local limit \(allowance.allowed).")
+                        }
                     }
                     Text("Current entries").font(WisentTypeScale.body()).bold()
                     if listing.entries.isEmpty { Text("No open registry entries.") }

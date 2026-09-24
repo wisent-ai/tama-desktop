@@ -42,7 +42,15 @@ struct BuildAllowance: Decodable, Identifiable, Sendable {
     let spent: UInt64
     let allowed: UInt64
     let left: UInt64
+    /// Build jobs the fleet has left today; absent when Stado could not be
+    /// asked, and then the local count is the only one.
+    let fleetRemaining: UInt64?
     var id: String { kind }
+
+    enum CodingKeys: String, CodingKey {
+        case kind, spent, allowed, left
+        case fleetRemaining = "fleet_remaining"
+    }
 }
 
 struct BuildListing: Decodable, Sendable {
