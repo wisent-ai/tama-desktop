@@ -119,16 +119,18 @@ Set `TAMA_TEST_CLI` to the built CLI and `TAMA_TEST_CUA_SESSION`,
 `TAMA_TEST_CUA_APP`, `TAMA_TEST_CUA_MATCH`, `TAMA_TEST_CUA_ACTIONS` to an
 existing real user grant. Evidence remains in `.build/consent-evidence/`.
 
-### Record a build-count exception
+### Record a build intent
 
-**Policy → Build registry** records a build for a full source revision. An
-optional exception requires the session and exact current user message giving
-permission to exceed the daily count. The backend verifies the capture and its
-meaning; a request to add this mechanism is not approval to use it.
+**Policy → Build registry** requires the agent to write which whole task was
+finished before recording one build of a full source revision. The statement
+has at least eight words and stays visible with the entry; Tama records the
+claim but cannot prove the work is complete. A used entry cannot authorize a
+second build. An optional daily-count exception requires the session and exact
+current user message granting it; a request to add the mechanism is not consent.
 
 The screen shows refusals, current entries, local counts and retained approval
-history. **Close** removes the current authorization without erasing the quote
-or cancelling a job Stado already accepted. Recording never starts a build.
+history. **Close** removes an authorization without erasing the quote or
+cancelling a job Stado already accepted. Recording never starts a build.
 The [build reference](https://tama.wisent.com/docs/cli/build/) describes the
 matching CLI commands, HTTP fields, fleet receipts and unchanged checks.
 

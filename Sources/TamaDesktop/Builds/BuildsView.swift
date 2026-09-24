@@ -7,6 +7,7 @@ struct BuildsView: View {
     @State private var revision = ""
     @State private var reason = ""
     @State private var repository = ""
+    @State private var completedTask = ""
     @State private var hasConsent = false
     @State private var session = ""
     @State private var quote = ""
@@ -18,7 +19,7 @@ struct BuildsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: WisentDesign.Space.x4) {
                 HStack {
-                    WisentSectionHeader("Build registry", detail: "Record a build and the user's permission to exceed the daily limit.")
+                    WisentSectionHeader("Build registry", detail: "Write which whole task is finished before recording one build.")
                     Spacer()
                     Button("Refresh") { Task { await refresh() } }.disabled(busy)
                 }
@@ -33,7 +34,7 @@ struct BuildsView: View {
                     Text("Current entries").font(WisentTypeScale.body()).bold()
                     if listing.entries.isEmpty { Text("No open registry entries.") }
                     ForEach(listing.entries) { row in
-                        intent(row.entry, status: row.open ? "Open" : "Expired")
+                        intent(row.entry, status: row.entry.usedAt != nil ? "Used" : row.open ? "Open" : "Expired")
                         Button("Close \(row.entry.target)") { Task { await close(row.entry) } }
                             .disabled(busy).accessibilityIdentifier("tama.build.close.\(row.key)")
                     }
@@ -55,6 +56,10 @@ struct BuildsView: View {
                 TextField("Full source revision", text: $revision).accessibilityIdentifier("tama.build.revision")
                 TextField("Repository path", text: $repository).accessibilityIdentifier("tama.build.repository")
                 TextField("Reason for this build", text: $reason, axis: .vertical)
+                TextField("Completed whole task and result (at least eight words)", text: $completedTask, axis: .vertical)
+                    .accessibilityIdentifier("tama.build.completed-task")
+                Text("This is your recorded declaration, not proof that Tama checked the task. One entry allows one build attempt.")
+                    .font(WisentTypeScale.caption()).foregroundStyle(WisentDesign.secondary)
                 Toggle("Use recorded user consent for a daily-limit exception", isOn: $hasConsent)
                     .accessibilityIdentifier("tama.build.use-consent")
                 if hasConsent {
@@ -76,6 +81,9 @@ struct BuildsView: View {
             VStack(alignment: .leading, spacing: WisentDesign.Space.x2) {
                 Text("\(entry.target) — \(status)").font(WisentTypeScale.body()).bold()
                 Text(entry.reason)
+                if let completedTask = entry.completedTask {
+                    Text("Completed task: \(completedTask)").textSelection(.enabled)
+                }
                 if let revision = entry.revision { Text(revision).textSelection(.enabled) }
                 Text("Expires: \(Date(timeIntervalSince1970: TimeInterval(entry.expiresAt)).formatted())")
                 if let approval = entry.userApproval {
@@ -118,8 +126,8 @@ struct BuildsView: View {
         defer { busy = false }
         do {
             let result = try await BuildRegistryClient().record(target: target, revision: revision,
-                reason: reason, repository: repository, session: hasConsent ? session : nil,
-                quote: hasConsent ? quote : nil)
+                reason: reason, repository: repository, completedTask: completedTask,
+                session: hasConsent ? session : nil, quote: hasConsent ? quote : nil)
             listing = try await BuildRegistryClient().list()
             notice = "\(result.entry.target): the intent and any verified consent are recorded. No build has been started by this action."
         } catch { failure = error.localizedDescription }

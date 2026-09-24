@@ -15,13 +15,17 @@ struct BuildIntent: Decodable, Identifiable, Sendable {
     let target: String
     let reason: String
     let revision: String?
+    let completedTask: String?
     let recordedAt: UInt64
     let expiresAt: UInt64
+    let usedAt: UInt64?
     let userApproval: BuildApproval?
     var id: String { "\(kind):\(target):\(revision ?? ""):\(recordedAt)" }
     enum CodingKeys: String, CodingKey {
         case kind, target, reason, revision
+        case completedTask = "completed_task"
         case recordedAt = "recorded_at_epoch", expiresAt = "expires_at_epoch"
+        case usedAt = "used_at_epoch"
         case userApproval = "user_approval"
     }
 }
@@ -61,9 +65,10 @@ struct BuildRegistryClient: Sendable {
     }
 
     func record(target: String, revision: String, reason: String, repository: String,
-                session: String?, quote: String?) async throws -> BuildRecording {
+                completedTask: String, session: String?, quote: String?) async throws -> BuildRecording {
         var body: [String: Any] = ["kind": "build", "target": target,
-            "revision": revision, "reason": reason, "repository": repository]
+            "revision": revision, "reason": reason, "repository": repository,
+            "completedTask": completedTask]
         if let session { body["approvalSession"] = session }
         if let quote { body["approvalQuote"] = quote }
         return try await client().request("builds/record", body: body,
