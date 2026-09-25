@@ -219,10 +219,12 @@ def main() -> None:
         help="Package an already prepared release instead of staging the live runtime",
     )
     parser.add_argument("--cargo", type=Path)
+    # Tama builds one program; every hook, the engine and the MCP server are
+    # its subcommands, so `tama` is the only executable a release carries.
     parser.add_argument(
         "--include-bin",
         action="append",
-        default=["tama", "tama-mcp-server", "tama-run-hook"],
+        default=["tama"],
     )
     parser.add_argument("--codesign-identity")
     parser.add_argument("--codesign-timestamp", default="--timestamp=none")

@@ -158,16 +158,16 @@ codesign \
     --entitlements "$SYSTEM_POLICY_SOURCE/Bundle/TamaNetworkFilter.entitlements" \
     "$SYSTEM_EXTENSION"
 codesign --verify --strict "$SYSTEM_EXTENSION"
-# Package every native hook command declared by the registry together with the
-# desktop's Rust CLI and MCP server. The shared packager resolves Cargo targets
-# and artifact paths from cargo metadata, signs every executable, and records
-# the exact packaged set before the release is sealed.
+# Package the one `tama` program the registry runs every native hook through:
+# the hooks, the engine and the MCP server are its subcommands. The shared
+# packager resolves the Cargo target and artifact path from cargo metadata,
+# signs the executable, and records the exact packaged set before the release
+# is sealed.
 python3 "$SCRIPT_DIR/hook_release/stage_live_hook_release.py" \
     --source-root "$HOOKS_ROOT" \
     --release-root "$HOOK_RELEASE" \
     --cargo "$CARGO_BIN" \
     --include-bin tama \
-    --include-bin tama-mcp-server \
     --codesign-identity "$CODESIGN_IDENTITY" \
     --codesign-timestamp="$CODESIGN_TIMESTAMP" \
     >/dev/null
