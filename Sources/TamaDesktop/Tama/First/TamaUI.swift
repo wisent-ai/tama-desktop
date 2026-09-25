@@ -17,6 +17,7 @@ enum SidebarDestination: String, Identifiable, CaseIterable {
     case copies
     case justifications
     case builds
+    case learning
     case coverage
     case installPlan
     case settings
@@ -33,7 +34,7 @@ enum SidebarDestination: String, Identifiable, CaseIterable {
 
     var group: Group {
         switch self {
-        case .posture, .hooks, .session, .builds: .policy
+        case .posture, .hooks, .session, .builds, .learning: .policy
         case .violations, .worktrees, .copies, .justifications: .repair
         case .coverage, .installPlan, .settings: .system
         }
@@ -49,6 +50,7 @@ enum SidebarDestination: String, Identifiable, CaseIterable {
         case .copies: "Copies"
         case .justifications: "Justifications"
         case .builds: "Build registry"
+        case .learning: "Learned"
         case .coverage: "Coverage"
         case .installPlan: "Install plan"
         case .settings: "Settings"
@@ -65,6 +67,7 @@ enum SidebarDestination: String, Identifiable, CaseIterable {
         case .copies: "square.on.square.dashed"
         case .justifications: "text.badge.checkmark"
         case .builds: "hammer"
+        case .learning: "lightbulb"
         case .coverage: "point.3.connected.trianglepath.dotted"
         case .installPlan: "shippingbox"
         case .settings: "gearshape.2"
@@ -77,7 +80,7 @@ enum SidebarDestination: String, Identifiable, CaseIterable {
     /// authorization boundary rather than appearing as dead rows.
     var requiresControl: Bool {
         switch self {
-        case .session, .violations, .worktrees, .copies, .justifications, .builds: true
+        case .session, .violations, .worktrees, .copies, .justifications, .builds, .learning: true
         case .posture, .hooks, .coverage, .installPlan, .settings: false
         }
     }

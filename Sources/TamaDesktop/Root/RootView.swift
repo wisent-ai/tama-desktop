@@ -107,6 +107,8 @@ struct RootView: View {
             CopiesView(model: copies)
         case .builds:
             BuildsView()
+        case .learning:
+            LearningView()
         case .justifications:
             JustificationsView(
                 collections: model.snapshot?.justifications ?? [],
