@@ -27,6 +27,10 @@
           "build"
         ]
       },
+      "tests": [
+        {"name": "desktop", "argv": ["swift", "test", "--filter", "TamaDesktopTests"]},
+        {"name": "hook-release-seal", "argv": ["swift", "test", "--filter", "HookReleaseTests"]}
+      ],
       "stage": {
         "release/Tama.app": "Tama.app",
         "release/Tama.zip": "Tama.zip",
