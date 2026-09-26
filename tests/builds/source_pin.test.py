@@ -11,7 +11,7 @@ import uuid
 
 PROJECT = Path(__file__).resolve().parents[2]
 PRODUCER = PROJECT / "Scripts/hook_source/__main__.py"
-CONSUMER = PROJECT / "Scripts/hook_release_native/source.py"
+CONSUMER = PROJECT.parent / "tama/release/hook_release/hook_release_native/source.py"
 
 
 class SourceArchiveJourney(unittest.TestCase):

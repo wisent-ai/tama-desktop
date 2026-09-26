@@ -59,7 +59,7 @@ for required in "$DIGEST_FILE" "$PROVENANCE_FILE" "$QUALIFICATION_FILE"; do
     fi
 done
 read -r EXPECTED_DIGEST EXPECTED_NAME < "$DIGEST_FILE"
-ACTUAL_DIGEST=$(python3 "$SCRIPT_DIR/../hook_release/seal_hook_release.py" --digest-file "$ARTIFACT")
+ACTUAL_DIGEST=$(python3 "${TAMA_HOOK_ROOT:-$SCRIPT_DIR/../../../tama}/release/hook_release/hook_release/seal_hook_release.py" --digest-file "$ARTIFACT")
 if [ "$EXPECTED_DIGEST" != "$ACTUAL_DIGEST" ] || [ "$EXPECTED_NAME" != "$(basename "$ARTIFACT")" ]; then
     printf '%s\n' "Artifact digest sidecar does not match the packaged bytes."
     false

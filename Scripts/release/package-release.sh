@@ -152,7 +152,7 @@ for output in "$ARTIFACT" "$DIGEST_FILE" "$PROVENANCE_FILE" "$QUALIFICATION_FILE
 done
 mkdir -p "$RELEASE_DIR"
 ditto -c -k --sequesterRsrc --keepParent "$APP" "$ARTIFACT"
-DIGEST=$(python3 "$SCRIPT_DIR/../hook_release/seal_hook_release.py" --digest-file "$ARTIFACT")
+DIGEST=$(python3 "${TAMA_HOOK_ROOT:-$SCRIPT_DIR/../../../tama}/release/hook_release/hook_release/seal_hook_release.py" --digest-file "$ARTIFACT")
 printf '%s  %s\n' "$DIGEST" "$ARTIFACT_NAME" > "$DIGEST_FILE"
 TAMA_ARTIFACT="$ARTIFACT" \
 TAMA_ARTIFACT_DIGEST="$DIGEST" \

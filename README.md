@@ -241,7 +241,7 @@ checkout. Changed, missing or additional source inputs stop the release.
 
 ```console
 python3 Scripts/hook_source/__main__.py unpack --destination .build/source-check
-python3 Scripts/hook_release_native/source.py --source-root .build/source-check/tama
+python3 ../tama/release/hook_release/hook_release_native/source.py --source-root .build/source-check/tama
 python3 tests/builds/source_pin.test.py
 ```
 

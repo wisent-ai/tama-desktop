@@ -1,7 +1,9 @@
 #!/bin/bash
 # Sourced by build-app.sh: validate source and prepare the signed bundle inputs.
 HOOKS_ROOT=${TAMA_HOOK_ROOT:-"$DESKTOP_ROOT/../tama"}
-HOOK_SOURCE_IDENTITY=$(python3 "$SCRIPT_DIR/hook_release_native/source.py" --source-root "$HOOKS_ROOT" --shell)
+# Tama owns its hook release scripts; the app bundles a release made by them.
+HOOK_RELEASE_SCRIPTS="$HOOKS_ROOT/release/hook_release"
+HOOK_SOURCE_IDENTITY=$(python3 "$HOOK_RELEASE_SCRIPTS/hook_release_native/source.py" --source-root "$HOOKS_ROOT" --shell)
 HOOK_SOURCE_REVISION=${HOOK_SOURCE_IDENTITY%% *}
 HOOK_SOURCE_DIRTY=${HOOK_SOURCE_IDENTITY#* }
 NODE_BIN=${TAMA_NODE:-}

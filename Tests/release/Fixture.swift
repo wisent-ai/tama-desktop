@@ -13,7 +13,8 @@ struct Fixture {
     init(declaredSource: String = "rust/crates/tama-hook-tools/src/bin/block/stop/guard.rs") throws {
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        scripts = repository.appendingPathComponent("Scripts", isDirectory: true)
+        scripts = repository.deletingLastPathComponent()
+            .appendingPathComponent("tama/release/hook_release", isDirectory: true)
         root = repository.appendingPathComponent(".build/release-evidence", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         release = root.appendingPathComponent("release", isDirectory: true)
@@ -153,7 +154,8 @@ struct InstallFixture {
     init() throws {
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        scripts = repository.appendingPathComponent("Scripts", isDirectory: true)
+        scripts = repository.deletingLastPathComponent()
+            .appendingPathComponent("tama/release/hook_release", isDirectory: true)
         hookCheckout = repository.deletingLastPathComponent()
             .appendingPathComponent("tama", isDirectory: true)
         root = repository.appendingPathComponent(".build/install-evidence", isDirectory: true)
