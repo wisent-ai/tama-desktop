@@ -1,11 +1,6 @@
 #!/bin/bash
 # Sourced by build-app.sh: validate source and prepare the signed bundle inputs.
 HOOKS_ROOT=${TAMA_HOOK_ROOT:-"$DESKTOP_ROOT/../tama"}
-# Tama owns its hook release scripts; the app bundles a release made by them.
-HOOK_RELEASE_SCRIPTS="$HOOKS_ROOT/release/hook_release"
-HOOK_SOURCE_IDENTITY=$(python3 "$HOOK_RELEASE_SCRIPTS/hook_release_native/source.py" --source-root "$HOOKS_ROOT" --shell)
-HOOK_SOURCE_REVISION=${HOOK_SOURCE_IDENTITY%% *}
-HOOK_SOURCE_DIRTY=${HOOK_SOURCE_IDENTITY#* }
 NODE_BIN=${TAMA_NODE:-}
 if [ -z "$NODE_BIN" ]; then
     NODE_BIN=$(command -v node || true)
@@ -26,6 +21,13 @@ if [ -z "$CARGO_BIN" ] || [ ! -x "$CARGO_BIN" ]; then
     printf '%s\n' "cargo is required to build the bundled Tama backend."
     false
 fi
+# Tama packages, seals and installs its own hook release; the app bundles a
+# release made by the tama program built from that checkout.
+"$CARGO_BIN" build --manifest-path "$HOOKS_ROOT/rust/Cargo.toml" --locked --release -p tama-cli
+TAMA_PROGRAM="$HOOKS_ROOT/rust/target/release/tama"
+HOOK_SOURCE_IDENTITY=$("$TAMA_PROGRAM" hooks source-identity --source-root "$HOOKS_ROOT" --shell)
+HOOK_SOURCE_REVISION=${HOOK_SOURCE_IDENTITY%% *}
+HOOK_SOURCE_DIRTY=${HOOK_SOURCE_IDENTITY#* }
 CODESIGN_IDENTITY=${WISENT_CODESIGN_IDENTITY:-}
 APP_PROVISIONING_PROFILE=${WISENT_APP_PROVISIONING_PROFILE:-}
 CODESIGN_TIMESTAMP=${TAMA_CODESIGN_TIMESTAMP:---timestamp=none}

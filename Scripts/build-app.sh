@@ -163,24 +163,18 @@ codesign --verify --strict "$SYSTEM_EXTENSION"
 # packager resolves the Cargo target and artifact path from cargo metadata,
 # signs the executable, and records the exact packaged set before the release
 # is sealed.
-python3 "$HOOK_RELEASE_SCRIPTS/hook_release/stage_live_hook_release.py" \
+"$TAMA_PROGRAM" hooks stage \
     --source-root "$HOOKS_ROOT" \
     --release-root "$HOOK_RELEASE" \
     --cargo "$CARGO_BIN" \
-    --include-bin tama \
     --codesign-identity "$CODESIGN_IDENTITY" \
     --codesign-timestamp="$CODESIGN_TIMESTAMP" \
     >/dev/null
 TAMA_HOOK_SOURCE_DIRTY="$HOOK_SOURCE_DIRTY" \
 TAMA_HOOK_SOURCE_REVISION="$HOOK_SOURCE_REVISION" \
-python3 "$HOOK_RELEASE_SCRIPTS/hook_release/seal_hook_release.py" --source-root "$HOOKS_ROOT" "$HOOK_RELEASE" >/dev/null
+"$TAMA_PROGRAM" hooks seal --source-root "$HOOKS_ROOT" "$HOOK_RELEASE" >/dev/null
+# The release's own bin/tama is its installer (`tama hooks install-release`).
 install -m 0755 "$SCRIPT_DIR/emergency_disable_hooks" "$RESOURCES/emergency_disable_hooks"
-install -m 0755 "$HOOK_RELEASE_SCRIPTS/install_hook_release.py" "$RESOURCES/install_hook_release.py"
-# The installer imports its parts from its own folder, so they ship beside it,
-# source only: a cache written here would change the signed bundle.
-rm -rf "$RESOURCES/install_hook_release_parts"
-ditto "$HOOK_RELEASE_SCRIPTS/install_hook_release_parts" "$RESOURCES/install_hook_release_parts"
-find "$RESOURCES/install_hook_release_parts" -name __pycache__ -prune -exec rm -rf {} +
 if [ -f "$DESKTOP_ROOT/App/AppIcon.icns" ]; then
     install -m 0644 "$DESKTOP_ROOT/App/AppIcon.icns" "$RESOURCES/AppIcon.icns"
 else
