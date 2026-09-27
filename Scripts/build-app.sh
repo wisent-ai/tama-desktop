@@ -13,13 +13,21 @@ if ! printf '%s\n' "$BUNDLE_SHORT_VERSION" | LC_ALL=C grep -Eq '^[[:digit:]]+\.[
     false
 fi
 BUILD_CHANNEL=${TAMA_BUILD_CHANNEL:-development}
-SOURCE_REVISION=$(git -C "$DESKTOP_ROOT" rev-parse HEAD)
+# A release worker builds an unpacked git archive, which has no repository to
+# ask: the release names its commit in WISENT_SOURCE_COMMIT, and an archive of
+# a commit is clean by construction. A local checkout is asked directly.
+if [ -n "${WISENT_SOURCE_COMMIT:-}" ] && [ ! -e "$DESKTOP_ROOT/.git" ]; then
+    SOURCE_REVISION=$WISENT_SOURCE_COMMIT
+    SOURCE_DIRTY=false
+else
+    SOURCE_REVISION=$(git -C "$DESKTOP_ROOT" rev-parse HEAD)
+    SOURCE_DIRTY=false
+    if [ -n "$(git -C "$DESKTOP_ROOT" status --porcelain --untracked-files=normal)" ]; then
+        SOURCE_DIRTY=true
+    fi
+fi
 BUILD_NUMBER=${WISENT_BUILD_NUMBER:-$(git -C "$DESKTOP_ROOT" rev-list --count HEAD)}
 TARGET_ARCH=$(uname -m)
-SOURCE_DIRTY=false
-if [ -n "$(git -C "$DESKTOP_ROOT" status --porcelain --untracked-files=normal)" ]; then
-    SOURCE_DIRTY=true
-fi
 
 BUILD_STAGING_BUNDLE=
 INSTALL_STAGING_BUNDLE=
