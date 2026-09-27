@@ -14,6 +14,6 @@ TAMA_CLI=${TAMA_CLI:-.build/Tama.app/Contents/Resources/hooks-release/bin/tama}
 "$TAMA_CLI" sessions
 "$TAMA_CLI" sessions --json
 
-# Digest every tree under hooks-runtime/releases against its directory name.
-# TAMA_HOME selects another home; TAMA_HOOK_RELEASE_ROOT another bundled release.
-python3 Scripts/integrity/verify_installed_releases.py
+# Digest every tree under hooks-runtime/releases against its directory name,
+# marking the current one. TAMA_HOME selects another home.
+"$TAMA_CLI" hooks integrity --home "${TAMA_HOME:-$HOME}"
