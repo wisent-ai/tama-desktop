@@ -78,10 +78,7 @@
     {
       "name": "sparkle-appcast",
       "platform": "darwin-arm64",
-      "argv": [
-        "python3",
-        "Release/deliver-sparkle.py"
-      ],
+      "argv": ["stado", "product", "deliver", "sparkle"],
       "required": true,
       "secret_env": {
         "WISENT_SPARKLE_UPLOAD_BASE_URL": "tama-desktop-sparkle#upload_base_url",
