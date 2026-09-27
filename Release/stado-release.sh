@@ -24,7 +24,7 @@ verify_input() {
 prepare_source() {
   source="$WISENT_SOURCE_DIR"
   updater="$WISENT_INPUTS_DIR/wisent-desktop-update.tar.gz"
-  hooks="$(python3 "$source/Scripts/hook_source/__main__.py" verify)"
+  hooks="$(bash "$source/Release/tama-source.sh" verify)"
   TAMA_SOURCE_SHA256="$(shasum -a 256 "$hooks" | awk '{print $1}')"
   swiftpm="$WISENT_INPUTS_DIR/swiftpm-cache.tar.gz"
   verify_input "$updater" "$UPDATER_SHA256"
@@ -35,7 +35,7 @@ prepare_source() {
   # source and everything signed inside it end with the run.
   trap 'rm -rf "$work"' EXIT
   mkdir -p "$work"
-  hooks_root="$(python3 "$source/Scripts/hook_source/__main__.py" unpack --destination "$work")"
+  hooks_root="$(bash "$source/Release/tama-source.sh" unpack --destination "$work")"
   tar -xzf "$swiftpm" -C "$source"
   # Swift module caches contain absolute paths from the archive's producer.
   # Keep downloaded dependencies, but compile artifacts in this source checkout.

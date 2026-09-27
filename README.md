@@ -222,8 +222,8 @@ After committing and pushing the backend change, run this reusable producer
 from the desktop checkout, then commit its generated pin and archive:
 
 ```console
-python3 Scripts/hook_source/__main__.py pin --revision FULL_TAMA_COMMIT
-python3 Scripts/hook_source/__main__.py verify
+bash Release/tama-source.sh pin --revision FULL_TAMA_COMMIT
+bash Release/tama-source.sh verify
 ```
 
 `pin` reads the canonical sibling Tama checkout, requires a full commit rather
@@ -240,9 +240,9 @@ and immutable archives; they do not mistake an archive for its enclosing Git
 checkout. Changed, missing or additional source inputs stop the release.
 
 ```console
-python3 Scripts/hook_source/__main__.py unpack --destination .build/source-check
+bash Release/tama-source.sh unpack --destination .build/source-check
 ../tama/rust/target/release/tama hooks source-identity --source-root .build/source-check/tama
-python3 tests/builds/source_pin.test.py
+bash Tests/builds/source_pin.sh
 ```
 
 `unpack` refuses to overwrite an existing source directory. The identity reader
