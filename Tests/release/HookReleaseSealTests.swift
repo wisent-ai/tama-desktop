@@ -1,17 +1,15 @@
 import Foundation
 import Testing
 
-/// `Scripts/hook_release/seal_hook_release.py` driven the way the release pipeline drives it.
+/// `tama hooks seal` driven the way the release pipeline drives it.
 ///
-/// On 2026-09-08 no hook release could be sealed at all, and the one that was
-/// finally installed wrote thirty-nine hook commands with the home directory
-/// doubled — paths that do not exist, so those hooks stop running and nothing
-/// says so. Three defects, one shape: the registry declares its checkout in
-/// one field, three consumers read it, and nothing checked what they produced.
+/// The registry declares its checkout in one field and three consumers read
+/// it; a seal that resolved it wrongly wrote hook commands to paths that do
+/// not exist, so those hooks stopped running and nothing said so.
 ///
-/// These cases run the real script over a real fixture tree and read the files
-/// it writes, because every one of those defects was in what the script
-/// resolved and recorded, never in what it printed.
+/// These cases run the real sealer over a real fixture tree and read the files
+/// it writes, because such defects live in what the sealer resolves and
+/// records, never in what it prints.
 struct HookReleaseSealTests {
     @Test
     func sealRecordsTheDeclaredSourceSoTheInstallerCanMatchIt() throws {

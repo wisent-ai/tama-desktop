@@ -6,15 +6,16 @@ struct Fixture {
     let release: URL
     let checkout: URL
     let sourceFile: URL
-    private let scripts: URL
+    private let tama: URL
     private let reports: URL
     private(set) var revision = ""
 
     init(declaredSource: String = "rust/crates/tama-hook-tools/src/bin/block/stop/guard.rs") throws {
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        scripts = repository.deletingLastPathComponent()
-            .appendingPathComponent("tama/release/hook_release", isDirectory: true)
+        // The sealer is the tama program built from the hook checkout beside this one.
+        tama = repository.deletingLastPathComponent()
+            .appendingPathComponent("tama/rust/target/release/tama")
         root = repository.appendingPathComponent(".build/release-evidence", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         release = root.appendingPathComponent("release", isDirectory: true)
@@ -52,7 +53,7 @@ struct Fixture {
         let identity: [String: Any] = [
             "sourceRevision": owner.output.trimmingCharacters(in: .whitespacesAndNewlines),
             "fixtureRevision": revision,
-            "sealer": scripts.appendingPathComponent("hook_release/seal_hook_release.py").path
+            "sealer": tama.path
         ]
         try JSONSerialization.data(withJSONObject: identity, options: [.sortedKeys, .prettyPrinted])
             .write(to: reports.appendingPathComponent("run.json"))
@@ -105,11 +106,11 @@ struct Fixture {
 
     func seal(sourceRoot: URL?, expectedRevision: String? = nil) throws
         -> (status: Int32, output: String, error: String) {
-        var arguments = [scripts.appendingPathComponent("hook_release/seal_hook_release.py").path]
+        var arguments = ["hooks", "seal"]
         if let sourceRoot { arguments += ["--source-root", sourceRoot.path] }
         arguments.append(release.path)
         let environment = expectedRevision.map { ["TAMA_HOOK_SOURCE_REVISION": $0] } ?? [:]
-        return try run("python3", arguments, environment: environment)
+        return try run(tama.path, arguments, environment: environment)
     }
 
     func mappings() throws -> [String: String] {
@@ -143,7 +144,7 @@ struct InstallFixture {
     let root: URL
     let home: URL
     let release: URL
-    private let scripts: URL
+    private let switchScript: URL
     private let hookCheckout: URL
     private let reports: URL
 
@@ -154,37 +155,34 @@ struct InstallFixture {
     init() throws {
         let repository = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
-        scripts = repository.deletingLastPathComponent()
-            .appendingPathComponent("tama/release/hook_release", isDirectory: true)
+        switchScript = repository.appendingPathComponent("Scripts/emergency_disable_hooks")
         hookCheckout = repository.deletingLastPathComponent()
             .appendingPathComponent("tama", isDirectory: true)
         root = repository.appendingPathComponent(".build/install-evidence", isDirectory: true)
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
         home = root.appendingPathComponent("home", isDirectory: true)
-        release = root.appendingPathComponent("hook-release", isDirectory: true)
+        let output = root.appendingPathComponent("build", isDirectory: true)
+        release = output.appendingPathComponent("stage/share/tama/hook-release", isDirectory: true)
         reports = root.appendingPathComponent("reports", isDirectory: true)
         try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: reports, withIntermediateDirectories: true)
         #expect(FileManager.default.fileExists(atPath: hookCheckout.path),
                 "the hook source checkout has to be beside this one: \(hookCheckout.path)")
-        // Staging starts from an installed runtime, which is this machine's
-        // own; the scratch home below is only the install target, so the
-        // source has to be named rather than inherited from the isolated HOME.
-        let installed = URL(fileURLWithPath: NSHomeDirectory())
-            .appendingPathComponent("Library/Application Support/Tama/hooks-runtime/current")
-        #expect(FileManager.default.fileExists(atPath: installed.path),
-                "staging reads the installed runtime: \(installed.path)")
-        // The pipeline scripts build with the machine's toolchain and write
-        // only into the destination above, so they run with the machine's own
-        // home; the scratch home is the install target, nothing else.
-        let staged = try pipeline("hook_release/stage_live_hook_release.py",
-                                  ["--source-root", hookCheckout.path,
-                                   "--runtime", installed.path,
-                                   "--destination", release.path])
-        #expect(staged.status == .zero, "staging failed: \(staged.error)")
-        let sealed = try pipeline("hook_release/seal_hook_release.py",
-                                  ["--source-root", hookCheckout.path, release.path])
-        #expect(sealed.status == .zero, "sealing failed: \(sealed.error)")
+        // Tama's own release build assembles, stages and seals the hook
+        // release from the checkout's committed tree, the same way a fleet
+        // build does; it builds with the machine's toolchain and writes only
+        // into the output directory, so it runs with the machine's own home.
+        let revision = try run("git", ["-C", hookCheckout.path, "rev-parse", "HEAD"])
+        #expect(revision.status == .zero, "\(revision.error)")
+        let built = try run("bash", [hookCheckout.appendingPathComponent("release/build.sh").path],
+                            environment: [
+                                "HOME": NSHomeDirectory(),
+                                "WISENT_SOURCE_DIR": hookCheckout.path,
+                                "WISENT_SOURCE_COMMIT": revision.output
+                                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                                "WISENT_OUTPUT_DIR": output.path
+                            ])
+        #expect(built.status == .zero, "building the hook release failed: \(built.error)")
         print("Retained install evidence: \(reports.path)")
     }
 
@@ -195,25 +193,19 @@ struct InstallFixture {
     }
 
     func installer(arguments: [String]) throws -> (status: Int32, output: String, error: String) {
-        try script("install_hook_release.py", arguments)
-    }
-
-    private func pipeline(_ name: String, _ arguments: [String]) throws
-        -> (status: Int32, output: String, error: String) {
-        try run("python3", [scripts.appendingPathComponent(name).path] + arguments,
-                environment: ["HOME": NSHomeDirectory()])
+        try run(release.appendingPathComponent("bin/tama").path, ["hooks", "install-release"] + arguments)
     }
 
     /// The bundled switch, pointed at this release and this home: the route the
     /// product documents for installing a release on a machine.
     func switchRoute(action: String) throws -> (status: Int32, output: String, error: String) {
-        try run("sh", [scripts.appendingPathComponent("emergency_disable_hooks").path],
+        try run("sh", [switchScript.path],
                 environment: [
                     "TAMA_HOME": home.path,
                     "TAMA_EMERGENCY_ACTION": action,
                     "TAMA_SKIP_SESSION_RESTART": "1",
                     "TAMA_HOOK_RELEASE_ROOT": release.path,
-                    "TAMA_HOOK_INSTALLER": scripts.appendingPathComponent("install_hook_release.py").path
+                    "TAMA_HOOK_INSTALLER": release.appendingPathComponent("bin/tama").path
                 ])
     }
 
@@ -223,11 +215,6 @@ struct InstallFixture {
         try run(release.appendingPathComponent("bin/tama").path, ["validate"],
                 environment: ["HOME": home.path, "TAMA_ROOT": hookCheckout.path],
                 directory: hookCheckout)
-    }
-
-    private func script(_ name: String, _ arguments: [String]) throws
-        -> (status: Int32, output: String, error: String) {
-        try run("python3", [scripts.appendingPathComponent(name).path] + arguments)
     }
 
     private func run(_ program: String, _ arguments: [String],
