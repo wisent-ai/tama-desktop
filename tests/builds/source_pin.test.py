@@ -11,7 +11,8 @@ import uuid
 
 PROJECT = Path(__file__).resolve().parents[2]
 PRODUCER = PROJECT / "Scripts/hook_source/__main__.py"
-CONSUMER = PROJECT.parent / "tama/release/hook_release/hook_release_native/source.py"
+CONSUMER = PROJECT.parent / "tama/rust/target/release/tama"
+IDENTITY = (str(CONSUMER), "hooks", "source-identity", "--source-root")
 
 
 class SourceArchiveJourney(unittest.TestCase):
@@ -50,7 +51,7 @@ class SourceArchiveJourney(unittest.TestCase):
             }, indent=2) + "\n")
             with tempfile.TemporaryDirectory(prefix="inputs-", dir=evidence) as temporary:
                 root = Path(success(sys.executable, str(PRODUCER), "unpack", "--destination", temporary))
-                identity = json.loads(success(sys.executable, str(CONSUMER), "--source-root", str(root)))
+                identity = json.loads(success(*IDENTITY, str(root)))
                 self.assertEqual(identity["revision"], pinned_revision)
                 self.assertFalse(identity["dirty"])
                 self.assertFalse((root / ".git").exists())
@@ -60,23 +61,23 @@ class SourceArchiveJourney(unittest.TestCase):
                 self.assertNotEqual(refused.returncode, 0)
                 self.assertEqual(package.read_bytes(), original)
                 package.write_bytes(original + b"\n")
-                self.assertNotEqual(run(sys.executable, str(CONSUMER), "--source-root", str(root)).returncode, 0)
+                self.assertNotEqual(run(*IDENTITY, str(root)).returncode, 0)
                 package.write_bytes(original)
                 additional = root / "rust/approval-proof-extra.rs"
                 additional.write_text("pub const UNCOMMITTED: bool = true;\n")
-                self.assertNotEqual(run(sys.executable, str(CONSUMER), "--source-root", str(root)).returncode, 0)
+                self.assertNotEqual(run(*IDENTITY, str(root)).returncode, 0)
                 additional.unlink()
                 package.unlink()
-                self.assertNotEqual(run(sys.executable, str(CONSUMER), "--source-root", str(root)).returncode, 0)
+                self.assertNotEqual(run(*IDENTITY, str(root)).returncode, 0)
                 package.write_bytes(original)
                 marker = root / ".tama-source-archive.json"
                 original_marker = marker.read_text()
                 wrong_origin = json.loads(original_marker)
                 wrong_origin["revision"] = "0" * 40
                 marker.write_text(json.dumps(wrong_origin))
-                self.assertNotEqual(run(sys.executable, str(CONSUMER), "--source-root", str(root)).returncode, 0)
+                self.assertNotEqual(run(*IDENTITY, str(root)).returncode, 0)
                 marker.write_text(original_marker)
-                final = json.loads(success(sys.executable, str(CONSUMER), "--source-root", str(root)))
+                final = json.loads(success(*IDENTITY, str(root)))
                 self.assertEqual(final, identity)
             passed = True
         finally:
