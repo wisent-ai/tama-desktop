@@ -67,23 +67,21 @@ build_release() {
   mkdir -p "$release" "$evidence"
   keychain="$work/release.keychain-db"
   cert="$work/developer-id.p12"
-  notary_key="$work/notary-key.p8"
   sparkle_key="$work/sparkle-private-key"
   app_profile="$work/tama-app.provisionprofile"
   network_profile="$work/tama-network-filter.provisionprofile"
   keychain_password="$(uuidgen)"
   cleanup() {
     security delete-keychain "$keychain" >/dev/null 2>&1 || true
-    rm -f "$cert" "$notary_key" "$sparkle_key" "$app_profile" "$network_profile"
+    rm -f "$cert" "$sparkle_key" "$app_profile" "$network_profile"
     rm -rf "$work"
   }
   trap cleanup EXIT
   printf '%s' "$MACOS_CERT_P12" | base64 -D > "$cert"
-  printf '%s' "$AC_API_KEY_P8" | base64 -D > "$notary_key"
   printf '%s' "$SPARKLE_PRIVATE_KEY" > "$sparkle_key"
   printf '%s' "$TAMA_APP_PROFILE_B64" | base64 -D > "$app_profile"
   printf '%s' "$TAMA_NETWORK_FILTER_PROFILE_B64" | base64 -D > "$network_profile"
-  chmod 600 "$notary_key" "$sparkle_key" "$app_profile" "$network_profile"
+  chmod 600 "$sparkle_key" "$app_profile" "$network_profile"
   security create-keychain -p "$keychain_password" "$keychain"
   security set-keychain-settings -lut 21600 "$keychain"
   security unlock-keychain -p "$keychain_password" "$keychain"
@@ -106,11 +104,7 @@ build_release() {
 
   app="$source/.build/$PRODUCT.app"
   [ -d "$app" ] || { printf 'release bundle was not produced: %s\n' "$app" >&2; exit 1; }
-  ditto -c -k --keepParent "$app" "$work/notarize.zip"
-  xcrun notarytool submit "$work/notarize.zip" --key "$notary_key" --key-id "$AC_API_KEY_ID" --issuer "$AC_API_ISSUER_ID" --wait --output-format json > "$evidence/notary.json"
-  xcrun stapler staple "$app"
-  xcrun stapler validate "$app"
-  spctl --assess --type execute --verbose=2 "$app"
+  stado product signing notarize --app "$app" --evidence "$evidence/notary.json"
 
   staged_app="$release/$PRODUCT.app"
   archive="$release/$PRODUCT.zip"

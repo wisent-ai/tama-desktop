@@ -74,11 +74,9 @@ PY
 : "${WISENT_CODESIGN_IDENTITY:?Set the dedicated release signing identity.}"
 : "${WISENT_APP_PROVISIONING_PROFILE:?Set the app provisioning profile.}"
 : "${WISENT_NETWORK_FILTER_PROVISIONING_PROFILE:?Set the Network Extension provisioning profile.}"
-NOTARY_PROFILE=${WISENT_NOTARY_PROFILE:-}
-if [ -z "$NOTARY_PROFILE" ]; then
-    printf '%s\n' "Published releases require WISENT_NOTARY_PROFILE."
-    false
-fi
+: "${AC_API_KEY_ID:?Published releases require AC_API_KEY_ID (skarbiec wisent-apple-notary#key_id).}"
+: "${AC_API_ISSUER_ID:?Published releases require AC_API_ISSUER_ID (skarbiec wisent-apple-notary#issuer_id).}"
+: "${AC_API_KEY_P8:?Published releases require AC_API_KEY_P8 (skarbiec wisent-apple-notary#private_key_p8_base64).}"
 case "$VERSION_WITHOUT_BUILD" in
     *-*) BUILD_CHANNEL=preview ;;
     *) BUILD_CHANNEL=stable ;;
@@ -122,21 +120,13 @@ if [ "$APP_PRODUCT_VERSION" != "$PRODUCT_VERSION" ] \
     false
 fi
 NOTARY_DIR="$DESKTOP_ROOT/.build/notary/$PRODUCT_VERSION"
-NOTARY_ZIP="$NOTARY_DIR/Tama-notarization.zip"
-if [ -e "$NOTARY_ZIP" ]; then
+if [ -e "$NOTARY_DIR/notary.json" ]; then
     printf '%s\n' "Refusing to overwrite an existing notarization submission."
     false
 fi
 mkdir -p "$NOTARY_DIR"
-ditto -c -k --sequesterRsrc --keepParent "$APP" "$NOTARY_ZIP"
-xcrun notarytool submit "$NOTARY_ZIP" \
-    --keychain-profile "$NOTARY_PROFILE" \
-    --wait
-xcrun stapler staple "$APP"
-xcrun stapler validate "$APP"
-rm -f "$NOTARY_ZIP"
+WISENT_OUTPUT_DIR="$NOTARY_DIR" stado product signing notarize --app "$APP" --evidence "$NOTARY_DIR/notary.json"
 codesign --verify --strict --deep "$APP"
-spctl --assess --type execute "$APP"
 ARCH=$(uname -m)
 RELEASE_DIR="$DESKTOP_ROOT/.build/releases/$PRODUCT_VERSION"
 ARTIFACT_NAME="Tama-$PRODUCT_VERSION-macOS-$ARCH.zip"
