@@ -111,7 +111,12 @@ final class TamaFirstUseJourney: ObservableObject {
     }
 
     func expose() async {
-        try? await client?.expose(evidenceRevision: evidenceRevision)
+        guard let client else { return }
+        do {
+            try await client.expose(evidenceRevision: evidenceRevision)
+        } catch {
+            errorMessage = "Tama could not record that this step was shown. \(error.localizedDescription)"
+        }
     }
 
     func advance(evidence: [String: JSONValue] = [:]) async {
