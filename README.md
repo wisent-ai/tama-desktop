@@ -254,6 +254,23 @@ The pin producer stages temporary files under `.build/source-pin` and removes
 its staging directory when it finishes; it creates no checkout. None of these
 source commands installs or restarts an application.
 
+## Provisioning profiles for a release
+
+The app (`ai.wisent.tama.desktop`) and its network filter system extension
+(`ai.wisent.tama.network-filter`) are signed with Developer ID provisioning
+profiles, which the Stado release reads from the owner-vault item
+`tama-desktop-signing`. Stado makes or reuses them through App Store Connect
+and stores them there:
+
+```sh
+stado credentials item apple-profile --host <owner-vault-host> tama-desktop-signing \
+  --profile app_provisioning_profile_base64=ai.wisent.tama.desktop \
+  --profile network_filter_provisioning_profile_base64=ai.wisent.tama.network-filter
+```
+
+Both bundle ids must be registered in the team's Apple Developer account with
+their Network Extension capability; an unregistered one is refused by name.
+
 ## Operational model
 
 Tama is local-first. It reads its catalog from the signed application, stores managed runtime state under `~/Library/Application Support/Tama`, and stores installed hook entrypoints only in explicitly documented per-user locations. Credentials remain in the macOS Keychain through Wisent Auth; Tama does not serialize access tokens into its own state or logs.
