@@ -4,6 +4,7 @@
   "type": "signed-macos-hook-manager",
   "manifest": "Package.swift",
   "publisher": [
-    "github-releases"
+    "sparkle",
+    "stado-release-channel"
   ]
 }
