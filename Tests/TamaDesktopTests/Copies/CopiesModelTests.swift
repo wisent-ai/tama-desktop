@@ -252,7 +252,7 @@ struct CopiesModelTests {
           "linkedWorktrees": ["\(worktree)"],
           "twins": [
             {"path": "\(twinCopy)", "twin": "\(twinOriginal)", \
-        "origin": "github.com/wisent-ai/stado"}
+        "origin": "github.com/wisent-ai/stado", "basis": "origin"}
           ],
           "unreadable": []
         """

@@ -54,17 +54,24 @@ struct CopyRecord: Decodable, Identifiable, Sendable {
     }
 }
 
-/// Two checkouts of one repository, both directly under a root. Reported,
-/// never removed: which of the two to keep is the operator's call.
+/// Two checkouts of one repository that the pass reports and never removes:
+/// which of the two to keep is the operator's call. `basis` says what makes
+/// them one repository: `origin` (both name it) or `first-commits` (the
+/// origins differ, the history starts from the same commits, as after a
+/// GitHub move or in a fork).
 struct CopyTwin: Decodable, Identifiable, Sendable {
     let path: String
     let twin: String
     let origin: String
+    let basis: String
 
     var id: String { path }
 
     var sentence: String {
-        "\(path) and \(twin) are both checkouts of \(origin); this pass removes neither, because which one you keep is your call."
+        if basis == "first-commits" {
+            return "\(path) and \(twin) start from the same commits (\(origin)) under different origins, so they are one repository or a fork of it; this pass removes neither, because which one you keep is your call."
+        }
+        return "\(path) and \(twin) are both checkouts of \(origin); this pass removes neither, because which one you keep is your call."
     }
 }
 
