@@ -43,9 +43,13 @@ final class TamaFirstUseJourney: ObservableObject {
             hasStarted = true
             currentScreen = await client.currentScreen
             status = progress.status
-            try? await client.flush()
         } catch {
             errorMessage = "Tama could not load its signed first-use journey. \(error.localizedDescription)"
+            isLoading = false
+            return
+        }
+        do { try await client?.flush() } catch {
+            errorMessage = "Tama couldn’t send its first-use events. \(error.localizedDescription)"
         }
         isLoading = false
     }
