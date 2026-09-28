@@ -73,17 +73,5 @@
       "stable"
     ],
     "reconcile": false
-  },
-  "deliveries": [
-    {
-      "name": "sparkle-appcast",
-      "platform": "darwin-arm64",
-      "argv": ["stado", "product", "deliver", "sparkle"],
-      "required": true,
-      "secret_env": {
-        "WISENT_SPARKLE_UPLOAD_BASE_URL": "tama-desktop-sparkle#upload_base_url",
-        "WISENT_SPARKLE_TOKEN": "tama-desktop-sparkle#delivery_token"
-      }
-    }
-  ]
+  }
 }
