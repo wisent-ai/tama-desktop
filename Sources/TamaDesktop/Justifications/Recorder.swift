@@ -4,10 +4,12 @@ import WisentDesignSystem
 
 /// Recording a justification from the application, not only reading one.
 ///
-/// The gates require a justification before a new file or test is written, and
-/// the registries holding them sit inside the protected hook directory. The
-/// CLI gained `tama justify` for that; this is the same capability on the
+/// The gate requires a justification before a new file is written, and the
+/// registry holding them sits inside the protected hook directory. The CLI
+/// gained `tama justify` for that; this is the same capability on the
 /// graphical surface, because a capability the CLI has, the interface has.
+/// Test code is not justified here: the operator approves it under Test
+/// approvals, as `tama tests approve` does.
 ///
 /// The sheet uses the same backend operation as the CLI and displays its
 /// refusal without maintaining a second implementation of the rules.
@@ -17,25 +19,10 @@ struct JustificationRecorder: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var target = ""
-    @State private var kind = Kind.file
     @State private var justification = ""
-    @State private var quote = ""
     @State private var refusal: String?
     @State private var isRecording = false
 
-    enum Kind: String, CaseIterable, Identifiable {
-        case file
-        case test
-
-        var id: String { rawValue }
-
-        var label: String {
-            switch self {
-            case .file: "New file"
-            case .test: "New test"
-            }
-        }
-    }
     var body: some View {
         WisentPanel {
             VStack(alignment: .leading, spacing: WisentDesign.Space.x4) {
@@ -43,7 +30,6 @@ struct JustificationRecorder: View {
                     "Record a justification",
                     detail: "Recorded through Tama's backend using the same rules as the CLI."
                 )
-                picker
                 field("Absolute path", text: $target, prompt: "/Users/…/src/module.rs", lines: .one)
                 field(
                     "Justification",
@@ -51,14 +37,6 @@ struct JustificationRecorder: View {
                     prompt: "What the file is for and why it exists.",
                     lines: .prose
                 )
-                if kind == .test {
-                    field(
-                        "Verbatim user request",
-                        text: $quote,
-                        prompt: "Copied word for word from the request that asked for this test.",
-                        lines: .quote
-                    )
-                }
                 length
                 if let refusal {
                     WisentAlertPanel(tone: .danger, title: "Refused", detail: refusal)
@@ -82,32 +60,20 @@ struct JustificationRecorder: View {
         .padding(WisentDesign.Space.x5)
     }
 
-    /// How tall each text field stands, in lines: one for a title, three for a
-    /// quote, six for prose. Layout only: nothing here changes what the CLI accepts.
+    /// How tall each text field stands, in lines: one for a title, six for
+    /// prose. Layout only: nothing here changes what the CLI accepts.
     private enum FieldHeight {
         case one
-        case quote
         case prose
 
-        private static let quoteLines = 3
         private static let proseLines = 6
 
         var lines: Int {
             switch self {
             case .one: 1
-            case .quote: Self.quoteLines
             case .prose: Self.proseLines
             }
         }
-    }
-
-    private var picker: some View {
-        Picker("Registry", selection: $kind) {
-            ForEach(Kind.allCases) { option in
-                Text(option.label).tag(option)
-            }
-        }
-        .pickerStyle(.segmented)
     }
 
     /// The registry states its own minimum and the application reads it. When
@@ -152,10 +118,7 @@ struct JustificationRecorder: View {
 
     private var minimumWords: Int? {
         collections.first { collection in
-            switch kind {
-            case .file: collection.requirement.directUserQuoteField == nil
-            case .test: collection.requirement.directUserQuoteField != nil
-            }
+            collection.requirement.directUserQuoteField == nil
         }?.requirement.minimumWords
     }
 
@@ -164,9 +127,7 @@ struct JustificationRecorder: View {
         isRecording = true
         let request = JustificationRecordingClient.Request(
             target: target.trimmingCharacters(in: .whitespacesAndNewlines),
-            isTest: kind == .test,
-            justification: justification,
-            quote: quote.trimmingCharacters(in: .whitespacesAndNewlines)
+            justification: justification
         )
         Task {
             do {
@@ -186,13 +147,11 @@ struct JustificationRecorder: View {
     }
 }
 
-/// The existing file/test recorder shares the backend with CUA recording.
+/// The file recorder shares the backend with CUA recording.
 struct JustificationRecordingClient {
     struct Request {
         let target: String
-        let isTest: Bool
         let justification: String
-        let quote: String
     }
 
     private struct Recorded: Decodable {
@@ -201,12 +160,11 @@ struct JustificationRecordingClient {
 
     func record(_ request: Request) async throws {
         let client = TamaClient()
-        var body: [String: Any] = [
-            "kind": request.isTest ? "test" : "file",
+        let body: [String: Any] = [
+            "kind": "file",
             "file": request.target,
             "justification": request.justification,
         ]
-        if request.isTest { body["quote"] = request.quote }
         _ = try await client.request("justifications/record", body: body,
             as: Recorded.self, describing: "Recording a justification")
     }
