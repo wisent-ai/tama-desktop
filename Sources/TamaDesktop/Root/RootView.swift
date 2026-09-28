@@ -18,6 +18,7 @@ struct RootView: View {
     @StateObject private var inspection = InspectionModel()
     @StateObject private var worktrees = WorktreesModel()
     @StateObject private var copies = CopiesModel()
+    @StateObject private var merges = MergesModel()
     @State var selection: SidebarDestination = .posture
 
     var body: some View {
@@ -105,6 +106,8 @@ struct RootView: View {
             WorktreesView(model: worktrees)
         case .copies:
             CopiesView(model: copies)
+        case .merges:
+            MergesView(model: merges)
         case .builds:
             BuildsView()
         case .learning:
