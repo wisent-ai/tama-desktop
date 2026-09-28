@@ -5,7 +5,6 @@ UPDATER_SHA256="1f3c919e7e15ef6736a7c9c841ca185cb487e502c0da39be68aa1aa8b487af47
 SWIFTPM_SHA256="69afd7557e507caa16f64ac96a723c5daa74091bbe3417e423409634b670ada3"
 PRODUCT="Tama"
 PRODUCT_SLUG="tama-desktop"
-PUBLIC_UPDATE_ROOT="https://updates.wisent.ai"
 
 load_contract() {
   : "${WISENT_VERSION:?WISENT_VERSION is required}"
@@ -58,6 +57,7 @@ build_release() {
   : "${AC_API_ISSUER_ID:?AC_API_ISSUER_ID is required}"
   : "${AC_API_KEY_P8:?AC_API_KEY_P8 is required}"
   : "${SPARKLE_PRIVATE_KEY:?SPARKLE_PRIVATE_KEY is required}"
+  : "${SPARKLE_PUBLIC_KEY:?SPARKLE_PUBLIC_KEY is required}"
   : "${TAMA_APP_PROFILE_B64:?TAMA_APP_PROFILE_B64 is required}"
   : "${TAMA_NETWORK_FILTER_PROFILE_B64:?TAMA_NETWORK_FILTER_PROFILE_B64 is required}"
   case "$MACOS_SIGN_IDENTITY" in 'Developer ID Application:'*) ;; *) printf 'Developer ID Application identity required\n' >&2; exit 1 ;; esac
@@ -89,6 +89,9 @@ build_release() {
   security list-keychains -d user -s "$keychain"
   security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" >/dev/null
 
+  # From the fleet's declared public origin; a separate assignment so a
+  # refusal stops the build instead of stamping an empty feed.
+  feed_url="$(stado web origin url /api/release/appcast --query "product=$PRODUCT_SLUG")"
   TAMA_HOOK_ROOT="$hooks_root" \
   TAMA_RELEASE_VERSION="$WISENT_VERSION" \
   TAMA_BUILD_CHANNEL=stable \
@@ -96,7 +99,7 @@ build_release() {
   TAMA_INSTALL_AFTER_BUILD=no \
   WISENT_RELEASE_VERSION="$WISENT_VERSION" \
   WISENT_BUILD_NUMBER="$WISENT_VERSION" \
-  WISENT_UPDATE_FEED_URL="$PUBLIC_UPDATE_ROOT/$PRODUCT_SLUG/appcast.xml" \
+  WISENT_UPDATE_FEED_URL="$feed_url" \
   WISENT_CODESIGN_IDENTITY="$MACOS_SIGN_IDENTITY" \
   WISENT_APP_PROVISIONING_PROFILE="$app_profile" \
   WISENT_NETWORK_FILTER_PROVISIONING_PROFILE="$network_profile" \
@@ -104,6 +107,9 @@ build_release() {
 
   app="$source/.build/$PRODUCT.app"
   [ -d "$app" ] || { printf 'release bundle was not produced: %s\n' "$app" >&2; exit 1; }
+  # Installed copies trust only the SUPublicEDKey they carry, so an app whose
+  # key is not the public half of the key this release signs with could never update.
+  [ "$(/usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' "$app/Contents/Info.plist")" = "$SPARKLE_PUBLIC_KEY" ] || { printf 'SUPublicEDKey is not the public half of the Sparkle key this release signs with\n' >&2; exit 1; }
   stado product signing notarize --app "$app" --evidence "$evidence/notary.json"
 
   staged_app="$release/$PRODUCT.app"
@@ -116,9 +122,14 @@ build_release() {
   signature_line="$("$signer" --ed-key-file "$sparkle_key" "$archive")"
   case "$signature_line" in *'sparkle:edSignature='*) ;; *) printf 'Sparkle signature was not produced\n' >&2; exit 1 ;; esac
   printf '%s\n' "$signature_line" > "$archive.sparkle-signature"
-  archive_name="$PRODUCT-$WISENT_VERSION.zip"
-  archive_url="$PUBLIC_UPDATE_ROOT/$PRODUCT_SLUG/$archive_name"
+  # The enclosure is the update archive inside this very release, from the
+  # fleet's declared public origin; the XML attribute needs its query
+  # separators escaped.
+  archive_url="$(stado web origin url /api/release/sparkle --query "product=$PRODUCT_SLUG" --query "version=$WISENT_VERSION" --query "file=$PRODUCT.zip" | sed 's/&/\&amp;/g')"
   printf '%s\n' '<?xml version="1.0" encoding="utf-8"?>' "<rss version=\"2.0\" xmlns:sparkle=\"http://www.andymatuschak.org/xml-namespaces/sparkle\"><channel><title>$PRODUCT updates</title><item><title>$PRODUCT $WISENT_VERSION</title><sparkle:version>$WISENT_VERSION</sparkle:version><sparkle:shortVersionString>$WISENT_VERSION</sparkle:shortVersionString><sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion><enclosure url=\"$archive_url\" $signature_line type=\"application/octet-stream\"/></item></channel></rss>" > "$release/appcast.xml"
+  # Apps that set SURequireSignedFeed accept a feed only with the EdDSA
+  # signature sign_update embeds in the appcast itself.
+  "$signer" --ed-key-file "$sparkle_key" "$release/appcast.xml"
   archive_sha="$(shasum -a 256 "$archive" | awk '{print $1}')"
   appcast_sha="$(shasum -a 256 "$release/appcast.xml" | awk '{print $1}')"
   signature_sha="$(shasum -a 256 "$archive.sparkle-signature" | awk '{print $1}')"
