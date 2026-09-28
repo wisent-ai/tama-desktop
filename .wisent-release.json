@@ -47,7 +47,8 @@
         "AC_API_KEY_ID": "wisent-apple-notary#key_id",
         "AC_API_ISSUER_ID": "wisent-apple-notary#issuer_id",
         "AC_API_KEY_P8": "wisent-apple-notary#private_key_p8_base64",
-        "SPARKLE_PRIVATE_KEY": "tama-desktop-sparkle#private_key",
+        "SPARKLE_PRIVATE_KEY": "desktop-release-sparkle-tama-desktop#private_key",
+        "SPARKLE_PUBLIC_KEY": "desktop-release-sparkle-tama-desktop#public_key",
         "TAMA_APP_PROFILE_B64": "tama-desktop-signing#app_provisioning_profile_base64",
         "TAMA_NETWORK_FILTER_PROFILE_B64": "tama-desktop-signing#network_filter_provisioning_profile_base64"
       }
