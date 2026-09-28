@@ -23,6 +23,8 @@ final class AppModel: ObservableObject {
     @Published var policyBundleMutation: WisentMutationOutcome = .idle
     @Published var policyBundleImport: PolicyBundleImportResult?
     @Published var policyBundles: PolicyBundleList?
+    /// Why the last `policy-bundles` read failed; the previous list is kept.
+    @Published var policyBundlesError: String?
     @Published var isImportingPolicyBundle = false
 
     @Published var areHooksDisabled = false
@@ -223,8 +225,9 @@ final class AppModel: ObservableObject {
                 as: PolicyBundleList.self,
                 describing: "list policy bundles"
             )
+            policyBundlesError = nil
         } catch {
-            policyBundles = nil
+            policyBundlesError = Self.sentence(error)
         }
     }
 

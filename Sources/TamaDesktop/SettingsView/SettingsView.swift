@@ -188,6 +188,11 @@ struct SettingsView: View {
                         }
                     }
                     Divider()
+                    if let failure = model.policyBundlesError {
+                        Text("The imported policy bundles could not be listed — \(failure)")
+                            .font(WisentTypeScale.caption())
+                            .foregroundStyle(WisentDesign.danger)
+                    }
                     if let bundles = model.policyBundles?.bundles, !bundles.isEmpty {
                         ForEach(bundles) { bundle in
                             VStack(alignment: .leading, spacing: WisentDesign.Space.x1) {
@@ -198,7 +203,7 @@ struct SettingsView: View {
                                     .foregroundStyle(WisentDesign.secondary)
                             }
                         }
-                    } else {
+                    } else if model.policyBundlesError == nil {
                         Text("No policy bundle imported. Tama remains empty and usable; the bundled release is unchanged.")
                             .font(WisentTypeScale.caption())
                             .foregroundStyle(WisentDesign.secondary)
