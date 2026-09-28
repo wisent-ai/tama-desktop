@@ -195,14 +195,23 @@ final class TamaFirstUseJourney: ObservableObject {
 
     func observeSupervisedSession() async {
         guard let client, isAwaitingFirstSession else { return }
+        let completed: Bool
         do {
-            _ = try await client.complete(
+            completed = try await client.complete(
                 evidence: ["supervised_session_observed": .boolean(true)],
                 evidenceRevision: evidenceRevision
             )
-            await refresh()
         } catch {
             errorMessage = "Tama observed the session but could not record first success. \(error.localizedDescription)"
+            return
+        }
+        await refresh()
+        guard completed else {
+            errorMessage = "Tama observed the session but the first-use journey did not accept it as first success yet."
+            return
+        }
+        do { try await client.flush() } catch {
+            errorMessage = "Tama recorded first success but couldn’t send its first-use events. \(error.localizedDescription)"
         }
     }
 
