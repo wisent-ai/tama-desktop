@@ -3,9 +3,9 @@ import Foundation
 /// A directory a scan could not read, and the reason the operating system
 /// gave for it.
 ///
-/// Both removal screens need it for the same reason the CLI reports it: on
-/// 2026-09-12 a worktrees pass over a tree it could not list at all answered
-/// that the machine holds no second checkouts, and that answer was quoted as
+/// Both removal screens need it for the same reason the CLI reports it: a
+/// worktrees pass over a tree it cannot list at all would answer that the
+/// machine holds no second checkouts, and that answer would be quoted as
 /// proof. A screen showing the same empty table with no warning would repeat
 /// the failure in a nicer font.
 struct WalkGap: Decodable, Identifiable, Sendable {
