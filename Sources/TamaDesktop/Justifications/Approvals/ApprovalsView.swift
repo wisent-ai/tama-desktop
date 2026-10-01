@@ -37,6 +37,7 @@ struct TestApprovalsView: View {
                         if listing.approved.isEmpty { Text("No test code is approved.") }
                         ForEach(listing.approved) { approval in row(approval) }
                     }
+                    TestAuditPanel()
                 }
             }
         }
