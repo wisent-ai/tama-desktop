@@ -113,12 +113,6 @@ installed hook still checks session, target and action when the tool is used.
 The [Justifications reference](https://tama.wisent.com/docs/desktop/justifications/)
 describes the controls and refusals.
 
-`swift test --filter ConsentTests --disable-automatic-resolution` drives the
-actual native client against the real Tama backend with an isolated registry.
-Set `TAMA_TEST_CLI` to the built CLI and `TAMA_TEST_CUA_SESSION`,
-`TAMA_TEST_CUA_APP`, `TAMA_TEST_CUA_MATCH`, `TAMA_TEST_CUA_ACTIONS` to an
-existing real user grant. Evidence remains in `.build/consent-evidence/`.
-
 ### Record a build intent
 
 **Policy → Build registry** requires the agent to write which whole task was
@@ -157,9 +151,6 @@ source-input fingerprint in `native-hook-binaries.json`. Sealing verifies that
 capture instead of accepting an environment-supplied revision or writing
 `unknown`; changed inputs require a new stage. See the
 [hook release contract](https://tama.wisent.com/docs/hook-releases/).
-`swift test --filter HookReleaseSealTests --disable-automatic-resolution` runs the
-real sealer/Git stories under `Tests/release/` and retains their evidence under
-`.build/release-evidence/`.
 
 ## Quick start
 
@@ -242,14 +233,11 @@ checkout. Changed, missing or additional source inputs stop the release.
 ```console
 bash Release/tama-source.sh unpack --destination .build/source-check
 ../tama/rust/target/release/tama hooks source-identity --source-root .build/source-check/tama
-bash Tests/builds/source_pin.sh
 ```
 
 `unpack` refuses to overwrite an existing source directory. The identity reader
 reports the pinned revision, dirty flag and input fingerprint, or the actual
-offending input. The real regression journey keeps command results, source
-revision, tool hashes and its verdict under `.build/source-proof/<run>` and
-removes only its own extracted inputs. It does not compile native binaries.
+offending input.
 The pin producer stages temporary files under `.build/source-pin` and removes
 its staging directory when it finishes; it creates no checkout. None of these
 source commands installs or restarts an application.

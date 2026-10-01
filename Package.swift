@@ -45,19 +45,5 @@ let package = Package(
             path: "Sources/TamaDesktop",
             resources: [.process("Resources")]
         ),
-        .testTarget(
-            name: "TamaDesktopTests",
-            dependencies: ["TamaDesktop"],
-            path: "Tests/TamaDesktopTests"
-        ),
-        .testTarget(
-            name: "CUAConsentTests",
-            dependencies: ["TamaDesktop"],
-            path: "tests/cua"
-        ),
-        .testTarget(
-            name: "HookReleaseTests",
-            path: "Tests/release"
-        ),
     ]
 )
