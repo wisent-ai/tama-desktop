@@ -4,11 +4,10 @@ import WisentDesignSystem
 extension HooksView {
     /// What this machine's gates cost to start, and the button that pays it.
     ///
-    /// The panel exists because that cost lands inside a live event: on
-    /// 2026-09-20 a stop hook's first execution spent 147 seconds in the
-    /// operating system's signature assessment, and back then the engine
-    /// killed it at ten seconds and called that a refusal. The engine waits
-    /// now, so the same first run would be 147 seconds somebody sits through.
+    /// The panel exists because that cost lands inside a live event: a hook's
+    /// first execution can spend minutes in the operating system's signature
+    /// assessment, and the engine waits for it, so that first run is minutes
+    /// somebody sits through.
     /// Running each binary once here moves that cost out of the next live
     /// event, and the measurements say which binary cost the most and which
     /// cannot run at all.
