@@ -3,11 +3,10 @@ import Foundation
 /// One linked worktree, exactly as git reports it.
 ///
 /// A linked worktree is a checkout whose `.git` is a file naming the owning
-/// repository: on this machine
-/// `~/Documents/CodingProjects/Wisent/.worktrees/brama-stub-purge/.git` reads
-/// `gitdir: /Users/lukaszbartoszcze/Documents/CodingProjects/Wisent/brama/.git/worktrees/brama-stub-purge`.
-/// That is the noun `git worktree list --porcelain` enumerates and the only
-/// noun this screen removes.
+/// repository: `<checkout>/.git` reads
+/// `gitdir: <repository>/.git/worktrees/<name>`. That is the noun
+/// `git worktree list --porcelain` enumerates and the only noun this screen
+/// removes.
 struct WorktreeRecord: Decodable, Identifiable, Sendable {
     let path: String
     let branch: String?
