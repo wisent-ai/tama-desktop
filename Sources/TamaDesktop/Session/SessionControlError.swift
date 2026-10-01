@@ -6,7 +6,7 @@ enum SessionControlError: LocalizedError {
     case invalidResponse
     case legacySessionRecords
     case requestRejected(String)
-    case requestTimedOut
+    case directoryUnwatchable(String, String)
     case sessionEnded
 
     var errorDescription: String? {
@@ -19,8 +19,8 @@ enum SessionControlError: LocalizedError {
             "Tama found only legacy v1 session records. Reinstall the verified bundled runtime, then stop or resume the affected agent session to publish v2 state."
         case let .requestRejected(reason):
             "The agent runtime rejected the session-control request: \(reason)"
-        case .requestTimedOut:
-            "The agent runtime did not acknowledge the session-control request before the deadline."
+        case let .directoryUnwatchable(path, reason):
+            "Tama could not watch the session-control directory \(path): \(reason)"
         case .sessionEnded:
             "The agent session ended before the session-control request completed."
         }

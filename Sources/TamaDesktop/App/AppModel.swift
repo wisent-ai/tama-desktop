@@ -41,6 +41,8 @@ final class AppModel: ObservableObject {
     let allowsControlAccess: Bool
     var isControlMonitoring = false
     var sessionPollingTask: Task<Void, Never>?
+    /// The watch the session task is blocked on, so stopping can release it.
+    private var sessionWatch: ControlDirectoryWatch?
 
     var hooks: [HookRecord] { snapshot?.catalog.hooks ?? [] }
 
@@ -108,6 +110,7 @@ final class AppModel: ObservableObject {
 
     deinit {
         sessionPollingTask?.cancel()
+        sessionWatch?.interrupt()
     }
 
     var allowsControl: Bool { allowsControlAccess }
@@ -117,10 +120,31 @@ final class AppModel: ObservableObject {
         isControlMonitoring = true
         refreshLocalPolicyState()
         Task { await refreshSystemPolicyStatus() }
+        // The list is read again when the session-control directory changes or
+        // a listed agent process exits, never on a clock.
         sessionPollingTask = Task { [weak self] in
             while !Task.isCancelled {
-                await self?.refreshAgentSessions()
-                try? await Task.sleep(for: .seconds(1))
+                guard let self else { return }
+                let watch: ControlDirectoryWatch
+                do {
+                    watch = try ControlDirectoryWatch(
+                        directory: SessionControlClient().sessionDirectory(),
+                        processes: self.agentSessions
+                            .filter { $0.livenessMode == "process" }
+                            .map(\.pid)
+                    )
+                } catch {
+                    self.sessionError = Self.sentence(error)
+                    return
+                }
+                self.sessionWatch = watch
+                await self.refreshAgentSessions()
+                await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                    DispatchQueue.global(qos: .utility).async {
+                        watch.next()
+                        continuation.resume()
+                    }
+                }
             }
         }
     }
@@ -129,6 +153,8 @@ final class AppModel: ObservableObject {
         isControlMonitoring = false
         sessionPollingTask?.cancel()
         sessionPollingTask = nil
+        sessionWatch?.interrupt()
+        sessionWatch = nil
         agentSessions = []
         selectedAgentSessionID = nil
         sessionError = nil

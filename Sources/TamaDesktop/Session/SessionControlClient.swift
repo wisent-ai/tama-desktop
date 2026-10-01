@@ -11,8 +11,6 @@ struct SessionControlClient: Sendable {
 
     private static let schema = "ai.wisent.tama.session-control.v2"
     private static let legacySchema = "ai.wisent.tama.session-control.v1"
-    private static let responsePollInterval = TimeInterval("0.05")!
-    private static let responseTimeout = TimeInterval("10")!
     private static let privateFilePermissions = NSNumber(value: S_IRUSR | S_IWUSR)
     private static let privateDirectoryPermissions = NSNumber(
         value: S_IRUSR | S_IWUSR | S_IXUSR
@@ -125,6 +123,12 @@ struct SessionControlClient: Sendable {
             hookId: hookId,
             enabled: enabled
         )
+        // Armed before the request is written, so the runtime's answer cannot
+        // land between writing and watching.
+        let watch = try ControlDirectoryWatch(
+            directory: root,
+            processes: session.livenessMode == "process" ? [session.pid] : []
+        )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
         try encoder.encode(request).write(to: requestURL, options: .atomic)
@@ -134,8 +138,7 @@ struct SessionControlClient: Sendable {
         )
 
         let decoder = JSONDecoder()
-        let deadline = Date().addingTimeInterval(Self.responseTimeout)
-        repeat {
+        while true {
             if manager.fileExists(atPath: responseURL.path) {
                 let response: SessionControlResponse
                 do {
@@ -174,9 +177,13 @@ struct SessionControlClient: Sendable {
             guard sessionIsLive(session, now: Date()) else {
                 throw SessionControlError.sessionEnded
             }
-            Thread.sleep(forTimeInterval: Self.responsePollInterval)
-        } while Date() < deadline
-        throw SessionControlError.requestTimedOut
+            watch.next()
+        }
+    }
+
+    /// The directory session records live in, for a caller that watches it.
+    func sessionDirectory() throws -> URL {
+        try controlRoot(manager: FileManager.default, create: true)
     }
 
     private func controlRoot(manager: FileManager, create: Bool) throws -> URL {

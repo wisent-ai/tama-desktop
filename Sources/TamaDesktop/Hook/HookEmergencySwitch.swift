@@ -3,12 +3,10 @@ import Foundation
 
 struct HookEmergencySwitch: @unchecked Sendable {
     private static let schema = "ai.wisent.tama.hook-emergency-state.v1"
-    /// The command's output is kept to its last 64 KiB; the switch waits at most five minutes for
-    /// it, polling ten times a second, and gives a signalled process or a stuck reader five seconds.
+    /// The command's output is kept to its last 64 KiB. The switch waits for
+    /// the command's own exit and for its output to close; its failure is its
+    /// exit status and what it printed.
     private static let retainedOutputBytes = 64 * 1024
-    private static let commandTimeoutSeconds = 300
-    private static let pollIntervalMilliseconds = 100
-    private static let graceSeconds = 5
     private let manager = FileManager.default
 
     var isDisabled: Bool {
@@ -53,27 +51,26 @@ struct HookEmergencySwitch: @unchecked Sendable {
         )
     }
     func installSessionController() throws {
-        guard
-            let installerURL = Bundle.main.url(
-                forResource: "install_hook_release",
-                withExtension: "py"
-            ),
-            let resourcesURL = Bundle.main.resourceURL
-        else {
+        guard let resourcesURL = Bundle.main.resourceURL else {
             throw HookEmergencyError.controllerInstallerMissing
         }
         let releaseURL = resourcesURL.appendingPathComponent(
             "hooks-release",
             isDirectory: true
         )
+        // The approved release's own `tama` is its installer.
+        let installerURL = releaseURL.appendingPathComponent("bin/tama")
+        guard manager.isExecutableFile(atPath: installerURL.path) else {
+            throw HookEmergencyError.controllerInstallerMissing
+        }
         guard manager.fileExists(atPath: releaseURL.appendingPathComponent("release.json").path) else {
             throw HookEmergencyError.controllerReleaseMissing
         }
 
         try runCommand(
-            executableURL: URL(fileURLWithPath: "/usr/bin/python3"),
+            executableURL: installerURL,
             arguments: [
-                installerURL.path,
+                "hooks", "install-release",
                 "--release", releaseURL.path,
                 "--home", NSHomeDirectory(),
                 "--session-control-only",
@@ -109,39 +106,8 @@ struct HookEmergencySwitch: @unchecked Sendable {
             drainGroup.leave()
         }
 
-        let deadline = DispatchTime.now() + .seconds(Self.commandTimeoutSeconds)
-        let pollInterval = DispatchTimeInterval.milliseconds(Self.pollIntervalMilliseconds)
-        while completed.wait(timeout: .now() + pollInterval) == .timedOut {
-            guard DispatchTime.now() < deadline else {
-                signalProcessTree(
-                    rootPID: process.processIdentifier,
-                    signal: SIGTERM
-                )
-                if completed.wait(
-                    timeout: .now() + .seconds(Self.graceSeconds)
-                ) == .timedOut {
-                    signalProcessTree(
-                        rootPID: process.processIdentifier,
-                        signal: SIGKILL
-                    )
-                    completed.wait()
-                }
-                if drainGroup.wait(
-                    timeout: .now() + .seconds(Self.graceSeconds)
-                ) == .timedOut {
-                    try? output.fileHandleForReading.close()
-                }
-                throw HookEmergencyError.commandTimedOut
-            }
-        }
-        if drainGroup.wait(
-            timeout: .now() + .seconds(Self.graceSeconds)
-        ) == .timedOut {
-            try? output.fileHandleForReading.close()
-            throw HookEmergencyError.commandOutputReadFailed(
-                "output pipe did not close after the command exited"
-            )
-        }
+        completed.wait()
+        drainGroup.wait()
         if let readError = outputBox.readError {
             throw HookEmergencyError.commandOutputReadFailed(readError)
         }
@@ -197,7 +163,6 @@ enum HookEmergencyError: LocalizedError {
     case controllerInstallerMissing
     case controllerReleaseMissing
     case commandFailed(String)
-    case commandTimedOut
     case commandOutputExceeded
     case commandOutputReadFailed(String)
 
@@ -215,8 +180,6 @@ enum HookEmergencyError: LocalizedError {
             message.isEmpty
                 ? "Tama could not update the installed hook configuration."
                 : message
-        case .commandTimedOut:
-            "The local policy command exceeded its bounded runtime and was terminated. Inspect local policy state before retrying."
         case .commandOutputExceeded:
             "The local policy command exceeded Tama's bounded output limit. Inspect local policy state before retrying."
         case let .commandOutputReadFailed(message):
