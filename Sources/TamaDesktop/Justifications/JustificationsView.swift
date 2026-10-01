@@ -108,7 +108,7 @@ struct JustificationsView: View {
         entries: [JustificationEntry]
     ) -> [WisentFacetGroup] {
         var groups: [WisentFacetGroup] = []
-        if collections.count > Int("1")! {
+        if collections.count > 1 {
             groups.append(
                 WisentFacetGroup(
                     "Policy",

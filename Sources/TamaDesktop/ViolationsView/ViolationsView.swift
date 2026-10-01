@@ -154,7 +154,7 @@ struct ViolationsView: View {
     }
 
     var repoGroup: WisentFacetGroup? {
-        guard let report, report.repos.count > Int("1")! else { return nil }
+        guard let report, report.repos.count > 1 else { return nil }
         return WisentFacetGroup(
             "Repository",
             facets: report.repos.map { repo in

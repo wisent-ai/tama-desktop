@@ -94,7 +94,7 @@ extension JustificationsView {
         requirement: JustificationRequirement
     ) -> some View {
         let holding = entries.lazy.filter { verdict($0, requirement: requirement).holds }.count
-        let chipsOnHolding = holding * Int("2")! <= entries.count
+        let chipsOnHolding = holding * 2 <= entries.count
         return WisentTableFrame {
             Table(visible, selection: $selection) {
                 TableColumn("TARGET") { entry in

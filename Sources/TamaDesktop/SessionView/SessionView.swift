@@ -225,7 +225,7 @@ struct SessionView: View {
                                 label: "Remaining uses",
                                 value: capability.remainingUses.map { $0.formatted(.number) }
                                     ?? "Not bounded by count",
-                                tone: (capability.remainingUses ?? Int.max) <= Int("1")!
+                                tone: (capability.remainingUses ?? Int.max) <= 1
                                     ? .warning
                                     : .neutral
                             )

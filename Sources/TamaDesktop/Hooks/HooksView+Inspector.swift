@@ -151,7 +151,7 @@ extension HooksView {
         Divider()
         let selected = machineSelection.selection?.includes(hook.id) ?? true
         let isLastSelection = machineSelection.selection?.mode == "only"
-            && machineSelection.selection?.enabled.count == Int("1")!
+            && machineSelection.selection?.enabled.count == 1
             && selected
         let status = machineStatus(hook)
         WisentField(label: "On this machine", value: status.0, tone: status.1)

@@ -120,7 +120,7 @@ final class AppModel: ObservableObject {
         sessionPollingTask = Task { [weak self] in
             while !Task.isCancelled {
                 await self?.refreshAgentSessions()
-                try? await Task.sleep(for: .seconds(Int("1")!))
+                try? await Task.sleep(for: .seconds(1))
             }
         }
     }

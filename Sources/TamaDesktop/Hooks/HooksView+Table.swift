@@ -68,7 +68,7 @@ extension HooksView {
     private var chipsBlocking: Bool {
         let hooks = model.hooks
         let blocking = hooks.lazy.filter(\.isBlocking).count
-        return blocking * Int("2")! <= hooks.count
+        return blocking * 2 <= hooks.count
     }
 
     private func table(visible: [HookRecord]) -> some View {

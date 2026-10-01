@@ -9,7 +9,7 @@ if [ -z "$NODE_BIN" ] || [ ! -x "$NODE_BIN" ]; then
     printf '%s\n' "A supported Node.js executable is required to export the bundled catalog."
     false
 fi
-if ! "$NODE_BIN" -e 'const major = Number.parseInt(process.versions.node.split(".")[Number("0")], Number("10")); process.exit(Number.isInteger(major) && major >= Number("20") ? Number("0") : Number("1"));'; then
+if ! "$NODE_BIN" -e 'const major = Number.parseInt(process.versions.node.split(".")[0], 10); process.exit(Number.isInteger(major) && major >= 20 ? 0 : 1);'; then
     printf '%s\n' "Node.js 20 or newer is required to export the bundled catalog."
     false
 fi
