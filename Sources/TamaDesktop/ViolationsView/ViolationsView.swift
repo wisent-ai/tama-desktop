@@ -94,10 +94,27 @@ struct ViolationsView: View {
     var report: ViolationReport? { model.report }
 
     var facetGroups: [WisentFacetGroup] {
-        var groups: [WisentFacetGroup] = []
+        var groups: [WisentFacetGroup] = [passGroup]
         if let ruleGroup { groups.append(ruleGroup) }
         if let repoGroup { groups.append(repoGroup) }
         return groups
+    }
+
+    /// Which question the next scan answers: every rule through the hooks,
+    /// or one of the in-process passes `tama find-violations` offers.
+    var passGroup: WisentFacetGroup {
+        WisentFacetGroup(
+            "Pass",
+            facets: ViolationScanMode.allCases.map { mode in
+                WisentFacet(
+                    id: "pass.\(mode.rawValue)",
+                    label: mode.title,
+                    isSelected: model.scanMode == mode
+                ) {
+                    model.select(mode: mode)
+                }
+            }
+        )
     }
 
     /// Rules ranked by how many files they hit, because that is the order an

@@ -22,6 +22,7 @@ final class ViolationsModel: ObservableObject {
     @Published private(set) var scanState: ScanState = .idle
     @Published private(set) var report: ViolationReport?
     @Published private(set) var cleanState: CleanState = .idle
+    @Published private(set) var scanMode: ViolationScanMode = .everyRule
 
     private let allowsOperations: Bool
     private var scanTask: Task<ViolationReport, Error>?
@@ -61,6 +62,15 @@ final class ViolationsModel: ObservableObject {
         select(repository: "")
     }
 
+    /// Choosing another pass discards the report for the same reason a new
+    /// scope does: its findings answer a different question.
+    func select(mode: ViolationScanMode) {
+        guard mode != scanMode, scanState != .scanning else { return }
+        scanMode = mode
+        report = nil
+        scanState = .idle
+    }
+
     func scan(preservingCleanState: Bool = false) async {
         guard allowsOperations, scanState != .scanning else { return }
         let path = repoPath.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -72,8 +82,9 @@ final class ViolationsModel: ObservableObject {
             cleanState = .idle
         }
         scanState = .scanning
+        let mode = scanMode
         let task = Task.detached(priority: .userInitiated) {
-            try await ViolationsClient().scan(repoPath: path)
+            try await ViolationsClient().scan(repoPath: path, mode: mode)
         }
         scanTask = task
         do {

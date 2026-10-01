@@ -93,11 +93,15 @@ struct ViolationsClient: Sendable {
     private static let scanOperation = "The violation scan"
     private static let cleanOperation = "The cleanup"
 
-    func scan(repoPath: String) async throws -> ViolationReport {
+    func scan(repoPath: String, mode: ViolationScanMode) async throws -> ViolationReport {
         let path = try validatedRepositoryPath(repoPath)
+        var body: [String: Any] = ["repo": path]
+        if let value = mode.requestValue {
+            body["mode"] = value
+        }
         let result = try await client().job(
             "violations/scan",
-            body: ["repo": path],
+            body: body,
             describing: Self.scanOperation
         )
         switch result.status {
