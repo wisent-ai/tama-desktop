@@ -26,13 +26,9 @@ struct HookWarmReport: Codable, Sendable, Equatable {
 
 /// Warming the machine's hook binaries from the window.
 ///
-/// A binary nobody has run yet still owes macOS its first-execution
-/// assessment, and a hook pays that debt inside a live event, where everybody
-/// waits it out: on 2026-09-20 a freshly installed
-/// `tama-block-delegating-own-work` spent 147 seconds there while the binary
-/// itself answers in four milliseconds. The terminal pays it with
-/// `tama hooks warm`; this is the same operation, over the same backend
-/// route, with the same measurements on screen.
+/// Warming pays macOS's first-execution assessment before a hook is needed
+/// inside a live event. This calls the same backend operation as
+/// `tama hooks warm` and displays its measurements.
 @MainActor
 final class HookWarmModel: ObservableObject {
     @Published private(set) var report: HookWarmReport?

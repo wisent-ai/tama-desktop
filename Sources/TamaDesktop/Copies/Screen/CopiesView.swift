@@ -7,10 +7,8 @@ import WisentDesignSystem
 ///
 /// Tama blocks `git clone` of a local path and a recursive copy of a
 /// checkout, so the copies that exist are the only ones there will be.
-/// Removing them is what reclaims disk: on 2026-09-09 this machine held 45
-/// nested checkouts worth 24 GiB under one project tree, an 8.4 GiB clone of
-/// one upstream among them. The screen carries the same capability as
-/// `tama copies`, and the same refusals.
+/// The screen lists and removes existing copies through the same capability
+/// and refusals as `tama copies`.
 struct CopiesView: View {
     @ObservedObject var model: CopiesModel
 

@@ -6,11 +6,8 @@ import WisentDesignSystem
 
 /// Guarantees a window exists, whatever AppKit restored.
 ///
-/// Measured here: launching the installed bundle after the interface changed left
-/// the process alive with zero windows, because restoration was keyed to the
-/// previous root view type and SwiftUI opens nothing once it fails. Rule 11 of
-/// the shared shell; the logic lives in `wisentEnsureWindow` so it is stated once
-/// for the whole pack.
+/// The shared `wisentEnsureWindow` guarantee opens the current content when
+/// restoration leaves no usable window after an interface update.
 @MainActor
 final class TamaAppDelegate: NSObject, NSApplicationDelegate {
     let auth = WisentAuthStore(productName: "Tama")
@@ -35,9 +32,7 @@ struct TamaDesktopApp: App {
         }
         // `.frame(minWidth:minHeight:)` on the content is a request; this is what
         // makes AppKit refuse a frame narrower than the three zones need. The
-        // setup gate is a separate compact window and is unaffected — it is
-        // deliberately small, and it opened at 520 × 504 both with and without a
-        // saved state on this machine.
+        // setup gate is a separate compact window and is unaffected.
         .windowResizability(.contentMinSize)
         .defaultSize(
             width: WisentAppLayout.minimumWindowWidth,
