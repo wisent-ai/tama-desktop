@@ -6,7 +6,6 @@
   "bundle_path": ".build/Tama.app",
   "build_command": "TAMA_HOOK_ROOT=\"${GITHUB_WORKSPACE:+$GITHUB_WORKSPACE/.release-source}\" TAMA_BUILD_CHANNEL=stable TAMA_CODESIGN_TIMESTAMP=--timestamp TAMA_INSTALL_AFTER_BUILD=no ./Scripts/build-app.sh",
   "archive_name": "Tama-{version}.zip",
-  "feed_url": "https://charless-mac-mini.tail6443b3.ts.net/api/release/appcast?product=tama-desktop",
   "minimum_system_version": "14.0",
   "backend": {
     "repository": "wisent-ai/tama",
