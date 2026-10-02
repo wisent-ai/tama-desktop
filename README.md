@@ -251,7 +251,8 @@ profiles, which the Stado release reads from the owner-vault item
 and stores them there:
 
 ```sh
-stado credentials item apple-profile --host <owner-vault-host> tama-desktop-signing \
+stado credentials item signing-profile --provider apple --host <owner-vault-host> tama-desktop-signing \
+  --credentials <App Store Connect key item> \
   --profile app_provisioning_profile_base64=ai.wisent.tama.desktop \
   --profile network_filter_provisioning_profile_base64=ai.wisent.tama.network-filter
 ```
