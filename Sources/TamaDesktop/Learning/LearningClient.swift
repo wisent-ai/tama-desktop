@@ -1,7 +1,13 @@
 import Foundation
 
-/// One thing Tama learned across sessions and wants decided: a hook the
-/// operator kept contesting, or a rule the frustration drafter recorded.
+struct LearningEvidence: Decodable, Identifiable, Sendable {
+    let id: String
+    let session: String
+    let quote: String
+    let cause: String
+}
+/// One thing Tama learned across sessions: a contested hook, a drafted rule,
+/// or an unresolved cause of operator corrections.
 struct LearningProposal: Decodable, Identifiable, Sendable {
     let id: String
     let kind: String
@@ -12,6 +18,7 @@ struct LearningProposal: Decodable, Identifiable, Sendable {
     let says: String?
     let quote: String?
     let action: String
+    let sources: [LearningEvidence]?
 }
 
 struct LearningSourceFailure: Decodable, Identifiable, Sendable {

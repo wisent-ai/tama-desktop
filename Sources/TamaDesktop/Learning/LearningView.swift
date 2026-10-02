@@ -1,9 +1,8 @@
 import SwiftUI
 import WisentDesignSystem
 
-/// What Tama learned across every session, one proposal per hook or drafted
-/// rule, with how often it happened and the command that acts on it. The same
-/// document `tama rules digest` prints.
+/// The same cross-session proposals `tama rules digest` prints, including
+/// source-backed lessons from Oko's unresolved operator corrections.
 struct LearningView: View {
     @State private var digest: LearningDigest?
     @State private var busy = false
@@ -15,7 +14,7 @@ struct LearningView: View {
             VStack(alignment: .leading, spacing: WisentDesign.Space.x4) {
                 HStack {
                     WisentSectionHeader("Learned",
-                        detail: "Every correction from every session, folded into one proposal per hook or rule.")
+                        detail: "Corrections and hook decisions across sessions, grouped by cause.")
                     Spacer()
                     Button(busy ? "Reading…" : "Refresh") { Task { await refresh() } }
                         .disabled(busy).accessibilityIdentifier("tama.learning.refresh")
@@ -42,9 +41,24 @@ struct LearningView: View {
             VStack(alignment: .leading, spacing: WisentDesign.Space.x2) {
                 Text(proposal.subject).font(WisentTypeScale.body()).bold()
                 if let says = proposal.says { Text(says) }
-                if let quote = proposal.quote { Text("“\(quote)”").textSelection(.enabled) }
+                if proposal.sources == nil, let quote = proposal.quote {
+                    Text("“\(quote)”").textSelection(.enabled)
+                }
                 Text("\(counted(Int(proposal.evidence), "piece")) of evidence, \(proposal.first ?? "?") – \(proposal.last ?? "?")")
                 Text(proposal.action).font(WisentTypeScale.identifierSmall()).textSelection(.enabled)
+                if let sources = proposal.sources {
+                    DisclosureGroup("Read \(counted(sources.count, "source"))") {
+                        VStack(alignment: .leading, spacing: WisentDesign.Space.x2) {
+                            ForEach(sources) { source in
+                                VStack(alignment: .leading) {
+                                    Text("Session \(source.session)").font(WisentTypeScale.identifierSmall())
+                                    Text("“\(source.quote)”").textSelection(.enabled)
+                                    Text("Cause: \(source.cause)").textSelection(.enabled)
+                                }
+                            }
+                        }
+                    }
+                }
                 Button("Dismiss until new evidence") { Task { await dismiss(proposal) } }
                     .disabled(busy).accessibilityIdentifier("tama.learning.dismiss.\(proposal.id)")
             }
