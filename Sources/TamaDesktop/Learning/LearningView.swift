@@ -14,7 +14,7 @@ struct LearningView: View {
             VStack(alignment: .leading, spacing: WisentDesign.Space.x4) {
                 HStack {
                     WisentSectionHeader("Learned",
-                        detail: "Corrections and hook decisions across sessions, grouped by cause.")
+                        detail: "Corrections and hook decisions across sessions, including causes not yet named.")
                     Spacer()
                     Button(busy ? "Reading…" : "Refresh") { Task { await refresh() } }
                         .disabled(busy).accessibilityIdentifier("tama.learning.refresh")
@@ -53,7 +53,8 @@ struct LearningView: View {
                                 VStack(alignment: .leading) {
                                     Text("Session \(source.session)").font(WisentTypeScale.identifierSmall())
                                     Text("“\(source.quote)”").textSelection(.enabled)
-                                    Text("Cause: \(source.cause)").textSelection(.enabled)
+                                    Text(source.cause.map { "Cause: \($0)" } ?? "Cause not yet named")
+                                        .textSelection(.enabled)
                                 }
                             }
                         }

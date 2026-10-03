@@ -4,10 +4,10 @@ struct LearningEvidence: Decodable, Identifiable, Sendable {
     let id: String
     let session: String
     let quote: String
-    let cause: String
+    let cause: String?
 }
 /// One thing Tama learned across sessions: a contested hook, a drafted rule,
-/// or an unresolved cause of operator corrections.
+/// or an operator correction, whether its cause has been named or not.
 struct LearningProposal: Decodable, Identifiable, Sendable {
     let id: String
     let kind: String
