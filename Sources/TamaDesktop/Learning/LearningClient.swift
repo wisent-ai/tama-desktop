@@ -5,6 +5,8 @@ struct LearningEvidence: Decodable, Identifiable, Sendable {
     let session: String
     let quote: String
     let cause: String?
+    let markers: [String]?
+    let repeats: Int?
 }
 /// One thing Tama learned across sessions: a contested hook, a drafted rule,
 /// or an operator correction, whether its cause has been named or not.

@@ -55,6 +55,12 @@ struct LearningView: View {
                                     Text("“\(source.quote)”").textSelection(.enabled)
                                     Text(source.cause.map { "Cause: \($0)" } ?? "Cause not yet named")
                                         .textSelection(.enabled)
+                                    if let markers = source.markers, !markers.isEmpty {
+                                        Text("Read as: \(markers.joined(separator: "; "))")
+                                    }
+                                    if let repeats = source.repeats, repeats > 0 {
+                                        Text("Earlier repeats: \(repeats)")
+                                    }
                                 }
                             }
                         }
