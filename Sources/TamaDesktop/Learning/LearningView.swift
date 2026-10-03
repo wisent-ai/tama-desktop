@@ -72,7 +72,10 @@ struct LearningView: View {
         do {
             digest = try await LearningClient().digest()
             failure = nil
-        } catch { failure = error.localizedDescription }
+        } catch {
+            digest = nil
+            failure = error.localizedDescription
+        }
     }
 
     @MainActor private func dismiss(_ proposal: LearningProposal) async {
@@ -83,6 +86,9 @@ struct LearningView: View {
         do {
             notice = try await LearningClient().dismiss(proposal).detail
             digest = try await LearningClient().digest()
-        } catch { failure = error.localizedDescription }
+        } catch {
+            digest = nil
+            failure = error.localizedDescription
+        }
     }
 }
