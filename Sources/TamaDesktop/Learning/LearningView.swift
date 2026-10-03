@@ -55,6 +55,9 @@ struct LearningView: View {
                                     Text("“\(source.quote)”").textSelection(.enabled)
                                     Text(source.cause.map { "Cause: \($0)" } ?? "Cause not yet named")
                                         .textSelection(.enabled)
+                                    if let defect = source.defect {
+                                        Text("Defect: \(defect)").textSelection(.enabled)
+                                    }
                                     if let markers = source.markers, !markers.isEmpty {
                                         Text("Read as: \(markers.joined(separator: "; "))")
                                     }

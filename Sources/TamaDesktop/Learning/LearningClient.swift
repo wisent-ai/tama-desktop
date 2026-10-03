@@ -5,6 +5,7 @@ struct LearningEvidence: Decodable, Identifiable, Sendable {
     let session: String
     let quote: String
     let cause: String?
+    let defect: String?
     let markers: [String]?
     let repeats: Int?
 }
