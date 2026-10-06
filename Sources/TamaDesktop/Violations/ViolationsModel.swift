@@ -23,6 +23,9 @@ final class ViolationsModel: ObservableObject {
     @Published private(set) var report: ViolationReport?
     @Published private(set) var cleanState: CleanState = .idle
     @Published private(set) var scanMode: ViolationScanMode = .everyRule
+    /// How many repair rounds the operator allows, as typed. `tama clean`
+    /// has no default for `--max-rounds`, so neither does this screen.
+    @Published var repairRounds: String = ""
 
     private let allowsOperations: Bool
     private var scanTask: Task<ViolationReport, Error>?
@@ -45,6 +48,15 @@ final class ViolationsModel: ObservableObject {
 
     var hasViolations: Bool {
         (report?.totals.violations ?? 0) > 0
+    }
+
+    /// The typed rounds as a whole number above zero, or nothing.
+    var repairRoundCount: Int? {
+        guard
+            let rounds = Int(repairRounds.trimmingCharacters(in: .whitespacesAndNewlines)),
+            rounds > .zero
+        else { return nil }
+        return rounds
     }
 
     /// Changing or clearing the scope discards the report: findings belong to
@@ -113,10 +125,14 @@ final class ViolationsModel: ObservableObject {
         else { return }
         let path = repoPath.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !path.isEmpty else { return }
+        guard let rounds = repairRoundCount else {
+            cleanState = .failed("Say how many repair rounds the run may take: a whole number above zero.")
+            return
+        }
         cleanState = .running
         cleanCancellationRequested = false
         let task = Task.detached(priority: .userInitiated) {
-            try await ViolationsClient().clean(repoPath: path)
+            try await ViolationsClient().clean(repoPath: path, maxRounds: rounds)
         }
         cleanTask = task
         let outcome: Result<String, Error>

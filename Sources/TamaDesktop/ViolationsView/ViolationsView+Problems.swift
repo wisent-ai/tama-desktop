@@ -131,28 +131,39 @@ extension ViolationsView {
     }
     /// A headless model agent editing a working tree is not undoable from here:
     /// the edits land in files the operator has open, and only the final rescan
-    /// says whether they were an improvement.
+    /// says whether they were an improvement. How many rounds it may take is
+    /// the operator's number, as it is for `tama clean --max-rounds`.
     var repairDecision: some View {
         let paths = Set((report?.allViolations ?? []).map(\.path)).sorted()
-        return WisentDecisionDialog(
-            tone: .danger,
-            title: "Repair findings in the selected repository",
-            lines: [
-                "An external agent may edit, move, or create files throughout the selected repository.",
-                "Tama will not commit or push the changes.",
-                "Review the changes after the final scan.",
-            ],
-            listing: paths,
-            actions: [
-                WisentAction("Cancel", kind: .plain) { isDecidingRepair = false },
-                WisentAction("Repair", kind: .destructive) {
-                    isDecidingRepair = false
-                    Task { await model.clean() }
-                },
-                WisentAction("Read the findings first", kind: .primary) {
-                    isDecidingRepair = false
-                },
-            ]
-        )
+        return VStack(alignment: .leading, spacing: WisentDesign.Space.x4) {
+            TextField("Repair rounds the agent may take", text: $model.repairRounds)
+                .textFieldStyle(.roundedBorder)
+                .padding(WisentDesign.Space.x5)
+            WisentDecisionDialog(
+                tone: .danger,
+                title: "Repair findings in the selected repository",
+                lines: [
+                    "An external agent may edit, move, or create files throughout the selected repository.",
+                    "Tama will not commit or push the changes.",
+                    "Review the changes after the final scan.",
+                ],
+                listing: paths,
+                actions: [
+                    WisentAction("Cancel", kind: .plain) { isDecidingRepair = false },
+                    WisentAction(
+                        "Repair",
+                        symbol: "wand.and.stars",
+                        kind: .destructive,
+                        isEnabled: model.repairRoundCount != nil
+                    ) {
+                        isDecidingRepair = false
+                        Task { await model.clean() }
+                    },
+                    WisentAction("Read the findings first", kind: .primary) {
+                        isDecidingRepair = false
+                    },
+                ]
+            )
+        }
     }
 }

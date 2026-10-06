@@ -127,12 +127,12 @@ struct ViolationsClient: Sendable {
         }
     }
 
-    func clean(repoPath: String) async throws -> String {
+    func clean(repoPath: String, maxRounds: Int) async throws -> String {
         let path = try validatedRepositoryPath(repoPath)
         try ensureCleanupAgentAvailable()
         let result = try await client().job(
             "violations/clean",
-            body: ["repo": path],
+            body: ["repo": path, "maxRounds": maxRounds],
             describing: Self.cleanOperation
         )
         switch result.status {
