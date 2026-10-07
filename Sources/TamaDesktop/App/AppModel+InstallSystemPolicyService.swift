@@ -88,6 +88,20 @@ extension AppModel {
             await self.refreshAgentSessions()
         }
     }
+    func reloadAdapter(in session: AgentSessionRecord) {
+        mutate("Reloading the adapter in session \(session.sessionId)…") {
+            let updated = try await Task.detached(priority: .userInitiated) {
+                try SessionControlClient().reloadAdapter(session: session)
+            }.value
+            self.merge(updated)
+            guard let digest = updated.runtime?.adapterDigest else {
+                throw SessionControlError.invalidResponse
+            }
+            return "Session \(session.sessionId) loaded adapter \(digest) without replacing its process."
+        } recover: {
+            await self.refreshAgentSessions()
+        }
+    }
     func clearMutation() {
         mutation = .idle
     }

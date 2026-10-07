@@ -30,6 +30,9 @@ struct SessionCapability: Codable, Sendable, Equatable {
 struct HookRuntimeStatus: Codable, Sendable, Equatable {
     let installedReleaseId: String?
     let loadedReleaseId: String
+    let adapterDigest: String?
+    let adapterReloadSupported: Bool?
+    let lastReloadError: String?
     let catalogChecksum: String?
     let registeredHookCount: Int
     let loadedHookCount: Int
