@@ -52,10 +52,11 @@ struct SessionView: View {
             )
         }
         if let session = model.selectedAgentSession, session.agentId == "omp" {
-            actions.append(WisentAction(
-                "Reload adapter", symbol: "arrow.clockwise", kind: .secondary,
-                isEnabled: !model.isPolicyMutationInProgress
-            ) { model.reloadAdapter(in: session) })
+            actions.append(
+                WisentAction(
+                    "Reload adapter", symbol: "arrow.clockwise", kind: .secondary,
+                    isEnabled: !model.isPolicyMutationInProgress
+                ) { model.reloadAdapter(in: session) })
         }
         return actions
     }

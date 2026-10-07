@@ -100,11 +100,14 @@ struct SessionControlClient: Sendable {
             throw SessionControlError.invalidSession
         }
         guard session.runtime?.adapterReloadSupported == true else {
-            throw SessionControlError.requestRejected("The loaded adapter does not support remote reload. Use tama_reload_hook_runtime in that existing OMP terminal and inspect its loaded adapter digest.")
+            throw SessionControlError.requestRejected(
+                "The loaded adapter does not support remote reload. Use tama_reload_hook_runtime in that existing OMP terminal and inspect its loaded adapter digest."
+            )
         }
         let updated = try performRequest(session: session, operation: "reload-adapter")
         guard updated.pid == session.pid,
-            let digest = updated.runtime?.adapterDigest, !digest.isEmpty else {
+            let digest = updated.runtime?.adapterDigest, !digest.isEmpty
+        else {
             throw SessionControlError.invalidResponse
         }
         return updated

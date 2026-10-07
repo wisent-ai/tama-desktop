@@ -97,7 +97,8 @@ extension AppModel {
             guard let digest = updated.runtime?.adapterDigest else {
                 throw SessionControlError.invalidResponse
             }
-            return "Session \(session.sessionId) loaded adapter \(digest) without replacing its process."
+            return
+                "Session \(session.sessionId) loaded adapter \(digest) without replacing its process."
         } recover: {
             await self.refreshAgentSessions()
         }
