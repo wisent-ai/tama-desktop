@@ -57,28 +57,32 @@ final class EnforcementSelectionModel: ObservableObject {
         )
     }
 
+    /// Turns one hook on or off against the selection as it is when Tama writes
+    /// it (`add`/`remove`), so a change another session made since this screen
+    /// read the selection is kept. Turning one hook off on a machine that runs
+    /// every hook is the one case that writes a whole list: every catalog hook
+    /// but this one.
     func setEnforced(_ enforced: Bool, hookID: String, catalogIDs: [String]) {
-        let current =
-            selection
-            ?? EnforcementSelection(
-                mode: "all",
-                enabled: [],
-                readError: nil,
-                emergencyDisabled: false
+        guard let current = selection else {
+            outcome = .failed(
+                "The machine-wide hook selection has not been read yet, so nothing was changed; refresh and try again."
             )
-        var enabled = current.mode == "all" ? Set(catalogIDs) : current.selectedIDs
-        if enforced {
-            enabled.insert(hookID)
-        } else {
-            enabled.remove(hookID)
+            return
         }
-        let sorted = enabled.sorted()
+        let success =
+            enforced
+            ? "\(hookID) is selected on this machine."
+            : "\(hookID) is not selected on this machine."
+        let body: [String: Any]
+        if current.mode == "all" && !enforced {
+            body = ["mode": "only", "enabled": catalogIDs.filter { $0 != hookID }.sorted()]
+        } else {
+            body = ["mode": enforced ? "add" : "remove", "enabled": [hookID]]
+        }
         mutate(
             working: "Changing the machine-wide hook selection…",
-            success: enforced
-                ? "\(hookID) is selected on this machine."
-                : "\(hookID) is not selected on this machine.",
-            body: ["mode": "only", "enabled": sorted]
+            success: success,
+            body: body
         )
     }
 
