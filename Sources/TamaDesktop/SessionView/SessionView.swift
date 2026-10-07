@@ -156,6 +156,25 @@ struct SessionView: View {
                 detail: (session.runtime?.unknownHookIds ?? []).joined(separator: ", ")
             )
         }
+        if let holder = session.runtime?.runtimeHolder {
+            WisentAlertPanel(
+                tone: .warning,
+                title: "Hook runtime held by \(holder.operation)",
+                detail:
+                    "Since \(holder.startedAt). Hook dispatches wait until it finishes; `tama hooks running` names the hook process."
+            )
+        }
+        if let dispatches = session.runtime?.inFlightDispatches, !dispatches.isEmpty {
+            WisentAlertPanel(
+                tone: .warning,
+                title: "Hook dispatches in flight",
+                detail: dispatches.map { dispatch in
+                    let event =
+                        dispatch.tool.map { "\(dispatch.event) for \($0)" } ?? dispatch.event
+                    return "\(event) since \(dispatch.startedAt), \(dispatch.runningMs) ms"
+                }.joined(separator: "\n")
+            )
+        }
     }
 
     func policyActions(_ session: AgentSessionRecord) -> [WisentAction] {

@@ -39,6 +39,25 @@ struct HookRuntimeStatus: Codable, Sendable, Equatable {
     let reloadRequired: Bool
     let reloadPending: Bool?
     let registryLoadError: String?
+    /// The queued runtime operation running now (a reload or close), absent
+    /// from a session whose adapter predates it.
+    let runtimeHolder: RuntimeHolder?
+    /// Every hook dispatch still waiting on the core.
+    let inFlightDispatches: [InFlightDispatch]?
+}
+
+/// What holds a session's hook runtime, as its adapter publishes it.
+struct RuntimeHolder: Codable, Sendable, Equatable {
+    let operation: String
+    let startedAt: String
+}
+
+/// One hook dispatch a session's adapter is still waiting on.
+struct InFlightDispatch: Codable, Sendable, Equatable {
+    let event: String
+    let tool: String?
+    let startedAt: String
+    let runningMs: Int
 }
 
 struct SemanticEventSummary: Codable, Sendable, Equatable, Identifiable {
