@@ -118,18 +118,22 @@ struct SystemPolicyServiceManager: Sendable {
             }
             if manager.isEnabled
                 || manager.providerConfiguration != nil
-                || systemExtensionInstalled {
+                || systemExtensionInstalled
+            {
                 return "Partial setup: \(daemonStatus); network policy remains configured"
             }
             if let systemExtensionStatusError {
-                return "\(daemonStatus); System Extension status unavailable: \(systemExtensionStatusError)"
+                return
+                    "\(daemonStatus); System Extension status unavailable: \(systemExtensionStatusError)"
             }
             return daemonStatus
         } catch {
-            let extensionDetail = systemExtensionStatusError.map {
-                "; System Extension status unavailable: \($0)"
-            } ?? ""
-            return "\(daemonStatus); network status unavailable: \(error.localizedDescription)\(extensionDetail)"
+            let extensionDetail =
+                systemExtensionStatusError.map {
+                    "; System Extension status unavailable: \($0)"
+                } ?? ""
+            return
+                "\(daemonStatus); network status unavailable: \(error.localizedDescription)\(extensionDetail)"
         }
     }
 
@@ -212,7 +216,8 @@ struct SystemPolicyServiceManager: Sendable {
         do {
             let activator = NetworkExtensionActivator()
             if try await activator.isInstalled() {
-                restartRequired = try await activator.deactivate()
+                restartRequired =
+                    try await activator.deactivate()
                     == .willCompleteAfterReboot
             }
         } catch {
@@ -237,21 +242,26 @@ struct SystemPolicyServiceManager: Sendable {
 
     @MainActor
     func openFullDiskAccessSettings() {
-        guard let url = URL(
-            string: "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_AllFiles"
-        ) else { return }
+        guard
+            let url = URL(
+                string:
+                    "x-apple.systempreferences:com.apple.settings.PrivacySecurity.extension?Privacy_AllFiles"
+            )
+        else { return }
         NSWorkspace.shared.open(url)
     }
 
     private func configureNetworkFilter() async throws {
         let manager = NEFilterManager.shared()
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+        try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<Void, Error>) in
             manager.loadFromPreferences { error in
                 if let error {
                     continuation.resume(throwing: error)
                     return
                 }
-                let configuration = manager.providerConfiguration
+                let configuration =
+                    manager.providerConfiguration
                     ?? NEFilterProviderConfiguration()
                 configuration.filterSockets = true
                 configuration.filterPackets = false
@@ -291,7 +301,7 @@ private enum SystemPolicyServiceError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case let .deactivationFailed(message):
+        case .deactivationFailed(let message):
             "Tama could not fully deactivate local policy components: \(message)"
         }
     }

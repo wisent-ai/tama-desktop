@@ -26,7 +26,8 @@ final class CopiesModel: ObservableObject {
     }
 
     typealias List = @Sendable ([String]) async throws -> CopyListing
-    typealias Remove = @Sendable ([String], [String], [String], Bool, Bool) async throws
+    typealias Remove =
+        @Sendable ([String], [String], [String], Bool, Bool) async throws
         -> CopyRemoval
 
     @Published private(set) var roots: [String] = []

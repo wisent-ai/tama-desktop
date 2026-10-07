@@ -29,7 +29,8 @@ extension AppModel {
         }
     }
     func setHooksDisabled(_ disabled: Bool) {
-        let verb = disabled
+        let verb =
+            disabled
             ? "Disabling every managed hook dispatcher…"
             : "Verifying the bundled release and restoring every managed dispatcher…"
         mutate(verb) {
@@ -67,7 +68,8 @@ extension AppModel {
                 try SessionControlClient().enableHook(hookId, session: session)
             }.value
             self.merge(updated)
-            return "\(hookId) is enabled in \(session.agentDisplayName) session \(session.sessionId)."
+            return
+                "\(hookId) is enabled in \(session.agentDisplayName) session \(session.sessionId)."
         } recover: {
             await self.refreshAgentSessions()
         }
@@ -80,7 +82,8 @@ extension AppModel {
             }.value
             self.merge(updated)
             let loaded = updated.runtime?.loadedHookCount ?? self.hooks.count
-            return "\(counted(loaded, "hook")) enabled in \(session.agentDisplayName) session \(session.sessionId)."
+            return
+                "\(counted(loaded, "hook")) enabled in \(session.agentDisplayName) session \(session.sessionId)."
         } recover: {
             await self.refreshAgentSessions()
         }

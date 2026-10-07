@@ -276,25 +276,10 @@ final class AppModel: ObservableObject {
         }
     }
 
-
-
-
-
-
     // MARK: - Session control
-
-
-
-
-
 
     // MARK: - Revealing
 
-
-
     // MARK: - Plumbing
-
-
-
 
 }

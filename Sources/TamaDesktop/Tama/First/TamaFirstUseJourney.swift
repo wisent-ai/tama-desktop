@@ -18,7 +18,9 @@ final class TamaFirstUseJourney: ObservableObject {
 
     var isAtSetup: Bool { currentScreen?.screenKind == "setup_handoff" }
     var isCompleted: Bool { status == .completed }
-    var isAwaitingFirstSession: Bool { currentScreen?.screenKind == "first_success" && !isCompleted }
+    var isAwaitingFirstSession: Bool {
+        currentScreen?.screenKind == "first_success" && !isCompleted
+    }
 
     /// The walkthrough owns the screens ahead of the setup handoff — the ones a
     /// first run put on screen before it handed over to the shell — so it closes
@@ -28,7 +30,8 @@ final class TamaFirstUseJourney: ObservableObject {
     }
 
     var currentTitle: String {
-        currentScreen?.presentation.text("title") ?? currentScreen?.titleKey ?? "Observe one supervised session"
+        currentScreen?.presentation.text("title") ?? currentScreen?.titleKey
+            ?? "Observe one supervised session"
     }
     var currentBody: String {
         currentScreen?.presentation.text("body") ?? currentScreen?.bodyKey ?? ""
@@ -44,7 +47,8 @@ final class TamaFirstUseJourney: ObservableObject {
             currentScreen = await client.currentScreen
             status = progress.status
         } catch {
-            errorMessage = "Tama could not load its signed first-use journey. \(error.localizedDescription)"
+            errorMessage =
+                "Tama could not load its signed first-use journey. \(error.localizedDescription)"
             isLoading = false
             return
         }
@@ -119,17 +123,20 @@ final class TamaFirstUseJourney: ObservableObject {
         do {
             try await client.expose(evidenceRevision: evidenceRevision)
         } catch {
-            errorMessage = "Tama could not record that this step was shown. \(error.localizedDescription)"
+            errorMessage =
+                "Tama could not record that this step was shown. \(error.localizedDescription)"
         }
     }
 
     func advance(evidence: [String: JSONValue] = [:]) async {
         guard let client else { return }
         do {
-            guard try await client.advance(
-                evidence: evidence,
-                evidenceRevision: evidenceRevision
-            ) != nil else { return }
+            guard
+                try await client.advance(
+                    evidence: evidence,
+                    evidenceRevision: evidenceRevision
+                ) != nil
+            else { return }
             await refresh()
         } catch {
             errorMessage = "The published journey could not advance. \(error.localizedDescription)"
@@ -141,15 +148,18 @@ final class TamaFirstUseJourney: ObservableObject {
         do {
             try await client.skip(evidenceRevision: evidenceRevision)
             while let screen = await client.currentScreen, !screen.transitions.isEmpty {
-                guard try await client.advance(
-                    evidence: [:],
-                    evidenceRevision: evidenceRevision
-                ) != nil else { break }
+                guard
+                    try await client.advance(
+                        evidence: [:],
+                        evidenceRevision: evidenceRevision
+                    ) != nil
+                else { break }
             }
             try await client.resume(evidenceRevision: evidenceRevision)
             await refresh()
         } catch {
-            errorMessage = "Tama could not preserve the skipped journey. \(error.localizedDescription)"
+            errorMessage =
+                "Tama could not preserve the skipped journey. \(error.localizedDescription)"
         }
     }
 
@@ -157,12 +167,15 @@ final class TamaFirstUseJourney: ObservableObject {
         guard let client else { return }
         do {
             while let screen = await client.currentScreen,
-                  screen.screenKind != "setup_handoff",
-                  !screen.transitions.isEmpty {
-                guard try await client.advance(
-                    evidence: [:],
-                    evidenceRevision: evidenceRevision
-                ) != nil else { return }
+                screen.screenKind != "setup_handoff",
+                !screen.transitions.isEmpty
+            {
+                guard
+                    try await client.advance(
+                        evidence: [:],
+                        evidenceRevision: evidenceRevision
+                    ) != nil
+                else { return }
             }
             if await client.currentScreen?.screenKind == "setup_handoff" {
                 _ = try await client.advance(
@@ -172,7 +185,8 @@ final class TamaFirstUseJourney: ObservableObject {
             }
             await refresh()
         } catch {
-            errorMessage = "Tama could not reconcile the existing setup. \(error.localizedDescription)"
+            errorMessage =
+                "Tama could not reconcile the existing setup. \(error.localizedDescription)"
         }
     }
 
@@ -181,14 +195,16 @@ final class TamaFirstUseJourney: ObservableObject {
         guard isAtSetup else { return false }
         guard let client else { return false }
         do {
-            let advanced = try await client.advance(
-                evidence: ["visible_matching_setup": .boolean(true)],
-                evidenceRevision: evidenceRevision
-            ) != nil
+            let advanced =
+                try await client.advance(
+                    evidence: ["visible_matching_setup": .boolean(true)],
+                    evidenceRevision: evidenceRevision
+                ) != nil
             await refresh()
             return advanced && isAwaitingFirstSession
         } catch {
-            errorMessage = "Tama could not record the verified setup handoff. \(error.localizedDescription)"
+            errorMessage =
+                "Tama could not record the verified setup handoff. \(error.localizedDescription)"
             return false
         }
     }
@@ -202,16 +218,19 @@ final class TamaFirstUseJourney: ObservableObject {
                 evidenceRevision: evidenceRevision
             )
         } catch {
-            errorMessage = "Tama observed the session but could not record first success. \(error.localizedDescription)"
+            errorMessage =
+                "Tama observed the session but could not record first success. \(error.localizedDescription)"
             return
         }
         await refresh()
         guard completed else {
-            errorMessage = "Tama observed the session but the first-use journey did not accept it as first success yet."
+            errorMessage =
+                "Tama observed the session but the first-use journey did not accept it as first success yet."
             return
         }
         do { try await client.flush() } catch {
-            errorMessage = "Tama recorded first success but couldn’t send its first-use events. \(error.localizedDescription)"
+            errorMessage =
+                "Tama recorded first success but couldn’t send its first-use events. \(error.localizedDescription)"
         }
     }
 

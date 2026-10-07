@@ -91,7 +91,6 @@ extension PostureView {
         return selection.mode == "only" ? .warning : .success
     }
 
-
     func counters(_ snapshot: CatalogSnapshot) -> some View {
         let hooks = snapshot.catalog.hooks
         let blocking = hooks.lazy.filter(\.isBlocking).count
@@ -117,7 +116,7 @@ extension PostureView {
                 value: snapshot.validation.warnings.count.formatted(.number),
                 detail: "Policy checks",
                 tone: snapshot.validation.warnings.isEmpty ? .neutral : .warning
-            )
+            ),
         ])
     }
 
@@ -137,7 +136,8 @@ extension PostureView {
                 VStack(alignment: .leading, spacing: WisentDesign.Space.x3) {
                     HStack(alignment: .top, spacing: WisentDesign.Space.x4) {
                         WisentField(label: "Product version", value: buildIdentity.productVersion)
-                        WisentField(label: "Source revision", value: buildIdentity.displayedRevision)
+                        WisentField(
+                            label: "Source revision", value: buildIdentity.displayedRevision)
                         WisentField(
                             label: "Target",
                             value: "\(buildIdentity.platform) · \(buildIdentity.architecture)"
@@ -195,7 +195,8 @@ extension PostureView {
         ) {
             WisentPanel(padding: 0) {
                 VStack(spacing: 0) {
-                    ForEach(Array(validation.warnings.enumerated()), id: \.offset) { index, warning in
+                    ForEach(Array(validation.warnings.enumerated()), id: \.offset) {
+                        index, warning in
                         if index > 0 { Divider() }
                         Text(warning)
                             .font(WisentTypeScale.body())

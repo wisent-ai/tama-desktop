@@ -26,5 +26,6 @@ struct WalkGap: Decodable, Identifiable, Sendable {
 func walkGapSummary(_ gaps: [WalkGap]) -> String {
     let count = gaps.count
     let plural = count == 1 ? "directory" : "directories"
-    return "This pass could not read \(count) \(plural) under the roots, so it cannot say what they hold; nothing was removed."
+    return
+        "This pass could not read \(count) \(plural) under the roots, so it cannot say what they hold; nothing was removed."
 }

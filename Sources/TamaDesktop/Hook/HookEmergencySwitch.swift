@@ -20,11 +20,13 @@ struct HookEmergencySwitch: @unchecked Sendable {
         return state.schema == Self.schema && state.disabled
     }
 
-    var installedRuntime: (
-        releaseID: String,
-        nodeExecutable: String?,
-        nodeVersion: String?
-    )? {
+    var installedRuntime:
+        (
+            releaseID: String,
+            nodeExecutable: String?,
+            nodeVersion: String?
+        )?
+    {
         guard
             let data = try? Data(contentsOf: installedReleaseURL),
             let release = try? JSONDecoder().decode(InstalledRelease.self, from: data)
@@ -35,10 +37,12 @@ struct HookEmergencySwitch: @unchecked Sendable {
     }
 
     func setDisabled(_ disabled: Bool) throws {
-        guard let scriptURL = Bundle.main.url(
-            forResource: "emergency_disable_hooks",
-            withExtension: nil
-        ) else {
+        guard
+            let scriptURL = Bundle.main.url(
+                forResource: "emergency_disable_hooks",
+                withExtension: nil
+            )
+        else {
             throw HookEmergencyError.scriptMissing
         }
 
@@ -63,7 +67,8 @@ struct HookEmergencySwitch: @unchecked Sendable {
         guard manager.isExecutableFile(atPath: installerURL.path) else {
             throw HookEmergencyError.controllerInstallerMissing
         }
-        guard manager.fileExists(atPath: releaseURL.appendingPathComponent("release.json").path) else {
+        guard manager.fileExists(atPath: releaseURL.appendingPathComponent("release.json").path)
+        else {
             throw HookEmergencyError.controllerReleaseMissing
         }
 
@@ -114,10 +119,11 @@ struct HookEmergencySwitch: @unchecked Sendable {
         guard !outputBox.wasTruncated else {
             throw HookEmergencyError.commandOutputExceeded
         }
-        let message = String(
-            data: outputBox.data,
-            encoding: .utf8
-        )?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let message =
+            String(
+                data: outputBox.data,
+                encoding: .utf8
+            )?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         guard process.terminationStatus == .zero else {
             throw HookEmergencyError.commandFailed(message)
         }
@@ -176,13 +182,13 @@ enum HookEmergencyError: LocalizedError {
             "The Tama bundle does not contain the agent session-controller installer."
         case .controllerReleaseMissing:
             "The Tama bundle does not contain an approved hook release for agent session control."
-        case let .commandFailed(message):
+        case .commandFailed(let message):
             message.isEmpty
                 ? "Tama could not update the installed hook configuration."
                 : message
         case .commandOutputExceeded:
             "The local policy command exceeded Tama's bounded output limit. Inspect local policy state before retrying."
-        case let .commandOutputReadFailed(message):
+        case .commandOutputReadFailed(let message):
             "Tama could not read bounded local policy output: \(message)"
         }
     }

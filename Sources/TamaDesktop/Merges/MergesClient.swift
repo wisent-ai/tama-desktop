@@ -49,7 +49,11 @@ struct MergesClient: Sendable {
 /// answered.
 @MainActor
 final class MergesModel: ObservableObject {
-    enum ReviewState: Equatable { case idle, reviewing, failed(String), done }
+    enum ReviewState: Equatable {
+        case idle, reviewing
+        case failed(String)
+        case done
+    }
 
     @Published var root: String = ""
     @Published var since: String = ""

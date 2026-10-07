@@ -71,17 +71,19 @@ struct CoverageView: View {
                     ) {
                         providerFacet = nil
                     }
-                ] + inspection.coverage.map { coverage in
-                    WisentFacet(
-                        id: "provider.\(coverage.provider)",
-                        label: coverage.provider,
-                        count: coverage.mappingCount,
-                        tone: coverage.isUncovered ? .warning : .neutral,
-                        isSelected: providerFacet == coverage.provider
-                    ) {
-                        providerFacet = providerFacet == coverage.provider ? nil : coverage.provider
+                ]
+                    + inspection.coverage.map { coverage in
+                        WisentFacet(
+                            id: "provider.\(coverage.provider)",
+                            label: coverage.provider,
+                            count: coverage.mappingCount,
+                            tone: coverage.isUncovered ? .warning : .neutral,
+                            isSelected: providerFacet == coverage.provider
+                        ) {
+                            providerFacet =
+                                providerFacet == coverage.provider ? nil : coverage.provider
+                        }
                     }
-                }
             )
         ]
     }
@@ -103,7 +105,7 @@ struct CoverageView: View {
                     tone: .danger,
                     title: "Coverage could not be read",
                     detail: coverageError,
-                                        actions: [
+                    actions: [
                         WisentAction("Retry", symbol: "arrow.clockwise", kind: .primary) {
                             Task { await inspection.loadCoverage(force: true) }
                         }
@@ -170,14 +172,13 @@ struct CoverageView: View {
                 value: uncovered.formatted(.number),
                 detail: "Providers without coverage",
                 tone: uncovered == .zero ? .neutral : .warning
-            )
-            ,
+            ),
             WisentCounterRow.Counter(
                 "Not installed",
                 value: partlyWired.formatted(.number),
                 detail: "Configs missing declared mappings",
                 tone: partlyWired == .zero ? .neutral : .warning
-            )
+            ),
         ])
     }
 
@@ -235,7 +236,8 @@ struct CoverageView: View {
                 title: coverage.provider,
                 badges: badges(coverage)
             ) {
-                WisentField(label: "Declared mappings", value: coverage.mappingCount.formatted(.number))
+                WisentField(
+                    label: "Declared mappings", value: coverage.mappingCount.formatted(.number))
                 WisentField(label: "Policies", value: coverage.hookCount.formatted(.number))
                 WisentField(label: "Events", value: coverage.eventCount.formatted(.number))
                 WisentField(

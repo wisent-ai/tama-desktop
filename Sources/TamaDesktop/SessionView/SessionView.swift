@@ -38,7 +38,8 @@ struct SessionView: View {
             }
         ]
         if let session = model.selectedAgentSession,
-           !model.areAllHooksEnabled(in: session) {
+            !model.areAllHooksEnabled(in: session)
+        {
             actions.append(
                 WisentAction(
                     "Enable all policies",
@@ -59,7 +60,8 @@ struct SessionView: View {
             facets: model.agentSessions.map { session in
                 WisentFacet(
                     id: session.id,
-                    label: "\(session.agentDisplayName) · \(URL(fileURLWithPath: session.cwd).lastPathComponent)",
+                    label:
+                        "\(session.agentDisplayName) · \(URL(fileURLWithPath: session.cwd).lastPathComponent)",
                     count: session.runtime?.loadedHookCount,
                     tone: session.runtime.map(TamaTone.runtime) ?? .neutral,
                     isSelected: model.selectedAgentSession?.id == session.id
@@ -82,7 +84,7 @@ struct SessionView: View {
                         tone: .danger,
                         title: "Session control unavailable",
                         detail: sessionError,
-                                                actions: [
+                        actions: [
                             WisentAction("Retry", symbol: "arrow.clockwise", kind: .primary) {
                                 Task { await model.refreshAgentSessions() }
                             }
@@ -120,7 +122,7 @@ struct SessionView: View {
                 tone: .danger,
                 title: "System policy error",
                 detail: error,
-                                actions: policyActions(session)
+                actions: policyActions(session)
             )
         }
         if let error = session.runtime?.registryLoadError {
@@ -134,7 +136,8 @@ struct SessionView: View {
             WisentAlertPanel(
                 tone: .warning,
                 title: "Policy update available",
-                detail: "This session uses \(runtime.loadedReleaseId) instead of \(runtime.installedReleaseId ?? "the installed release"). Enable all policies to update it.",
+                detail:
+                    "This session uses \(runtime.loadedReleaseId) instead of \(runtime.installedReleaseId ?? "the installed release"). Enable all policies to update it.",
                 actions: [
                     WisentAction(
                         "Enable all policies",
@@ -173,7 +176,8 @@ struct SessionView: View {
 
     func counters(_ session: AgentSessionRecord) -> some View {
         let runtime = session.runtime
-        let overrides = session.globallyDisabled
+        let overrides =
+            session.globallyDisabled
             ? session.enabledHookIds.count
             : session.disabledHookIds.count
         return WisentCounterRow(counters: [
@@ -186,20 +190,23 @@ struct SessionView: View {
                 "Enabled",
                 value: (runtime?.loadedHookCount ?? .zero).formatted(.number),
                 detail: "Policies active now",
-                tone: runtime.map { $0.loadedHookCount == $0.registeredHookCount ? .neutral : .warning }
+                tone: runtime.map {
+                    $0.loadedHookCount == $0.registeredHookCount ? .neutral : .warning
+                }
                     ?? .neutral
             ),
             WisentCounterRow.Counter(
                 "Overrides",
                 value: overrides.formatted(.number),
-                detail: session.globallyDisabled ? "Selected for this session" : "Disabled for this session",
+                detail: session.globallyDisabled
+                    ? "Selected for this session" : "Disabled for this session",
                 tone: overrides == .zero ? .neutral : .warning
             ),
             WisentCounterRow.Counter(
                 "Decisions",
                 value: (session.semanticRuntime?.eventSequence ?? .zero).formatted(.number),
                 detail: "Policy decisions recorded"
-            )
+            ),
         ])
     }
 
@@ -247,14 +254,8 @@ struct SessionView: View {
         }
     }
 
-
-
-
-
-
     // MARK: - Inspector
 
     // MARK: - Per-session hook summary
-
 
 }

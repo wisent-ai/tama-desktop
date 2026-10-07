@@ -11,7 +11,8 @@ extension JustificationsView {
     @ViewBuilder
     func inspector(collection: JustificationCollection?) -> some View {
         if let collection,
-           let entry = collection.entries.first(where: { $0.id == selection }) {
+            let entry = collection.entries.first(where: { $0.id == selection })
+        {
             let requirement = collection.requirement
             let verdict = verdict(entry, requirement: requirement)
             WisentInspector(

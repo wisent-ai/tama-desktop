@@ -66,9 +66,10 @@ struct HardcodesView: View {
         case .scanning:
             WisentProgressPanel(
                 title: "Reading every tracked line",
-                detail: "Host and vault names come live from Stado; numbers are what block-numeric-literals refuses."
+                detail:
+                    "Host and vault names come live from Stado; numbers are what block-numeric-literals refuses."
             )
-        case let .failed(sentence):
+        case .failed(let sentence):
             WisentAlertPanel(tone: .danger, title: "Scan refused", detail: sentence)
         case .done:
             VStack(alignment: .leading, spacing: WisentDesign.Space.x2) {
@@ -82,7 +83,8 @@ struct HardcodesView: View {
                 if model.rows.isEmpty {
                     WisentEmptyPanel(
                         title: "Nothing written down without a source",
-                        detail: "No tracked line under the root names a fleet host or a vault item, or writes a refused number or an address.",
+                        detail:
+                            "No tracked line under the root names a fleet host or a vault item, or writes a refused number or an address.",
                         symbol: "checkmark.seal"
                     )
                 } else {

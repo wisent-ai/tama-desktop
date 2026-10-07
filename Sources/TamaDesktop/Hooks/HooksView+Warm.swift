@@ -39,10 +39,12 @@ extension HooksView {
                         }
                     )
                 }
-                Text("A binary that has never run pays the operating system's first-run check inside the next hook event, where the whole turn waits for it. Running each one here pays that once and reports what it cost.")
-                    .font(WisentTypeScale.caption())
-                    .foregroundStyle(WisentDesign.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(
+                    "A binary that has never run pays the operating system's first-run check inside the next hook event, where the whole turn waits for it. Running each one here pays that once and reports what it cost."
+                )
+                .font(WisentTypeScale.caption())
+                .foregroundStyle(WisentDesign.secondary)
+                .fixedSize(horizontal: false, vertical: true)
                 ForEach(warmModel.attention) { row in
                     HStack(spacing: WisentDesign.Space.x2) {
                         Text(row.id)

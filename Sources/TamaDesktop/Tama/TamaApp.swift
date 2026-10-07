@@ -1,8 +1,8 @@
 import AppKit
 import SwiftUI
 import WisentAuth
-import WisentDesktopUpdate
 import WisentDesignSystem
+import WisentDesktopUpdate
 
 /// Guarantees a window exists, whatever AppKit restored.
 ///
@@ -103,17 +103,21 @@ struct TamaRootContent: View {
     }
 
     private static var testIdentityOverride: WisentIdentity? {
-#if DEBUG
-        guard ProcessInfo.processInfo.environment["TAMA_TEST_IDENTITY"] == "1" else { return nil }
-        return WisentIdentity(
-            userID: "tama-ui-tests",
-            email: "tama-ui-tests@wisent.test",
-            organization: WisentOrganization(id: "tama-ui-tests", slug: "tama-ui-tests", name: "Tama UI Tests", role: "owner"),
-            accessToken: "tama-ui-tests"
-        )
-#else
-        nil
-#endif
+        #if DEBUG
+            guard ProcessInfo.processInfo.environment["TAMA_TEST_IDENTITY"] == "1" else {
+                return nil
+            }
+            return WisentIdentity(
+                userID: "tama-ui-tests",
+                email: "tama-ui-tests@wisent.test",
+                organization: WisentOrganization(
+                    id: "tama-ui-tests", slug: "tama-ui-tests", name: "Tama UI Tests", role: "owner"
+                ),
+                accessToken: "tama-ui-tests"
+            )
+        #else
+            nil
+        #endif
     }
 }
 
@@ -149,7 +153,8 @@ struct TamaAuthorizedControlRootView: View {
     @ViewBuilder
     var body: some View {
         if let identity,
-           let authorization = ControlAuthorization(identity: identity) {
+            let authorization = ControlAuthorization(identity: identity)
+        {
             TamaAuthenticatedRootView(
                 authorization: authorization,
                 bypassesSetup: bypassesSetup
@@ -159,7 +164,8 @@ struct TamaAuthorizedControlRootView: View {
                 WisentCanvasBackground()
                 WisentEmptyState(
                     title: "Policy controls unavailable",
-                    detail: "A current owner, admin, or member role in the selected Wisent organization is required.",
+                    detail:
+                        "A current owner, admin, or member role in the selected Wisent organization is required.",
                     symbol: "person.badge.shield.checkmark"
                 )
             }

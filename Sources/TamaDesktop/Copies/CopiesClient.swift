@@ -36,7 +36,9 @@ struct CopyRecord: Decodable, Identifiable, Sendable {
     /// the command raises before deleting anything.
     var marks: [String] {
         var marks: [String] = []
-        if inspectionError != nil || dirty == nil || unpublished == nil { marks.append("Unreadable Git state") }
+        if inspectionError != nil || dirty == nil || unpublished == nil {
+            marks.append("Unreadable Git state")
+        }
         if dirty == true { marks.append("Uncommitted changes") }
         if unpublished == true && historyRetainedBy == nil { marks.append("History not retained") }
         if origin == nil && historyRetainedBy == nil { marks.append("No origin") }
@@ -50,7 +52,8 @@ struct CopyRecord: Decodable, Identifiable, Sendable {
     var isRefusedWithoutClaim: Bool { !marks.isEmpty }
 
     var carriesWorkNowhereElse: Bool {
-        inspectionError != nil || dirty != false || (historyRetainedBy == nil && (unpublished != false || origin == nil))
+        inspectionError != nil || dirty != false
+            || (historyRetainedBy == nil && (unpublished != false || origin == nil))
     }
 }
 
@@ -69,9 +72,11 @@ struct CopyTwin: Decodable, Identifiable, Sendable {
 
     var sentence: String {
         if basis == "first-commits" {
-            return "\(path) and \(twin) start from the same commits (\(origin)) under different origins, so they are one repository or a fork of it; this pass removes neither, because which one you keep is your call."
+            return
+                "\(path) and \(twin) start from the same commits (\(origin)) under different origins, so they are one repository or a fork of it; this pass removes neither, because which one you keep is your call."
         }
-        return "\(path) and \(twin) are both checkouts of \(origin); this pass removes neither, because which one you keep is your call."
+        return
+            "\(path) and \(twin) are both checkouts of \(origin); this pass removes neither, because which one you keep is your call."
     }
 }
 
@@ -239,7 +244,7 @@ enum CopiesError: LocalizedError {
         switch self {
         case .rootRequired:
             Self.rootRequiredSentence
-        case let .invalidRoot(path):
+        case .invalidRoot(let path):
             "Choose an existing absolute directory to scan for repository copies: \(path)"
         }
     }

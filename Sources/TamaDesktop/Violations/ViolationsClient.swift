@@ -183,9 +183,11 @@ struct ViolationsClient: Sendable {
 
     private func ensureCleanupAgentAvailable() throws {
         let manager = FileManager.default
-        guard executableCandidates(named: "codex").contains(where: {
-            manager.isExecutableFile(atPath: $0.path)
-        }) else {
+        guard
+            executableCandidates(named: "codex").contains(where: {
+                manager.isExecutableFile(atPath: $0.path)
+            })
+        else {
             throw ViolationsError.cleanupAgentUnavailable
         }
     }
@@ -204,9 +206,9 @@ enum ViolationsError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case let .invalidRepository(path):
+        case .invalidRepository(let path):
             "Choose an existing absolute Git repository directory: \(path)"
-        case let .repositoryNotOwned(path):
+        case .repositoryNotOwned(let path):
             "Tama refuses to mutate a repository not owned by the current user: \(path)"
         case .cleanupAgentUnavailable:
             "Codex is unavailable. Install and authenticate Codex before confirming cleanup."

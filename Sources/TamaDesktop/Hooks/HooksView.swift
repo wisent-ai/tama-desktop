@@ -81,7 +81,8 @@ struct HooksView: View {
                 WisentFacetRail(
                     groups: facetGroups(scope: scoped),
                     footerTitle: "Selection",
-                    footerDetail: "\(visible.count.formatted(.number)) of \(model.hooks.count.formatted(.number))"
+                    footerDetail:
+                        "\(visible.count.formatted(.number)) of \(model.hooks.count.formatted(.number))"
                 )
                 centre(visible: visible)
                 inspector
@@ -117,11 +118,12 @@ struct HooksView: View {
         return WisentFacetGroup(
             "Enforcement",
             facets: EnforcementFacet.allCases.map { facet in
-                let count = switch facet {
-                case .all: hooks.count
-                case .blocking: blocking
-                case .advisory: hooks.count - blocking
-                }
+                let count =
+                    switch facet {
+                    case .all: hooks.count
+                    case .blocking: blocking
+                    case .advisory: hooks.count - blocking
+                    }
                 return WisentFacet(
                     id: "enforcement.\(facet.rawValue)",
                     label: facet.label,
@@ -143,7 +145,8 @@ struct HooksView: View {
             counts[hook.category, default: .zero] += 1
         }
         guard !counts.isEmpty else { return nil }
-        let ranked = counts
+        let ranked =
+            counts
             .sorted { left, right in
                 left.value == right.value ? left.key < right.key : left.value > right.value
             }

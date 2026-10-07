@@ -40,7 +40,8 @@ struct ProviderCoverage: Decodable, Identifiable, Sendable {
 
     var wiringSummary: String? {
         guard let installedMappingCount else { return nil }
-        return "\(installedMappingCount.formatted(.number)) of \(mappingCount.formatted(.number)) installed"
+        return
+            "\(installedMappingCount.formatted(.number)) of \(mappingCount.formatted(.number)) installed"
     }
 }
 

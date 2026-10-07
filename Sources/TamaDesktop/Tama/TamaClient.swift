@@ -90,14 +90,14 @@ struct TamaClient: Sendable {
     ) async throws -> JobResult {
         let exchange = try await run(operation, body: body, describing: description)
         switch exchange.end {
-        case let .result(status, document):
+        case .result(let status, let document):
             return JobResult(
                 status: status,
                 document: document,
                 stdoutText: exchange.stdoutText,
                 stderrText: exchange.stderrText
             )
-        case let .response(status, document):
+        case .response(let status, let document):
             guard (200...299).contains(status) else {
                 throw Self.refusal(data: document, status: status)
             }
@@ -119,7 +119,7 @@ struct TamaClient: Sendable {
     ) async throws -> Data {
         let exchange = try await run(operation, body: body, describing: description)
         switch exchange.end {
-        case let .response(status, document):
+        case .response(let status, let document):
             guard (200...299).contains(status) else {
                 throw Self.refusal(data: document, status: status)
             }

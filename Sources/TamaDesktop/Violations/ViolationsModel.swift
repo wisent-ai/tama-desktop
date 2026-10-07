@@ -104,7 +104,7 @@ final class ViolationsModel: ObservableObject {
             scanState = .done
         } catch {
             let sentence =
-            (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             scanState = .failed(sentence)
             TamaFailureReporting.reportSurfaced(
                 failurePoint: "tama.violations.scan",
@@ -126,7 +126,8 @@ final class ViolationsModel: ObservableObject {
         let path = repoPath.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !path.isEmpty else { return }
         guard let rounds = repairRoundCount else {
-            cleanState = .failed("Say how many repair rounds the run may take: a whole number above zero.")
+            cleanState = .failed(
+                "Say how many repair rounds the run may take: a whole number above zero.")
             return
         }
         cleanState = .running
@@ -145,18 +146,19 @@ final class ViolationsModel: ObservableObject {
         let cancellationRequested = cleanCancellationRequested
         cleanState = .rescanning
         await scan(preservingCleanState: true)
-        if case let .failed(message) = scanState {
+        if case .failed(let message) = scanState {
             let commandMessage: String
             if cancellationRequested {
                 commandMessage = ViolationsError.cleanupCancelled
             } else {
-                commandMessage = switch outcome {
-                case .success:
-                    "Cleanup command completed."
-                case let .failure(error):
-                    (error as? LocalizedError)?.errorDescription
-                        ?? error.localizedDescription
-                }
+                commandMessage =
+                    switch outcome {
+                    case .success:
+                        "Cleanup command completed."
+                    case .failure(let error):
+                        (error as? LocalizedError)?.errorDescription
+                            ?? error.localizedDescription
+                    }
             }
             cleanState = .failed(
                 "\(commandMessage) Final rescan failed: \(message)"
@@ -172,7 +174,7 @@ final class ViolationsModel: ObservableObject {
         cleanCancellationRequested = false
 
         switch outcome {
-        case let .failure(error):
+        case .failure(let error):
             let sentence =
                 (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             cleanState = .failed(sentence)
@@ -181,7 +183,7 @@ final class ViolationsModel: ObservableObject {
                 error: error,
                 sentence: sentence
             )
-        case let .success(summary):
+        case .success(let summary):
             guard
                 let report,
                 report.totals.violations == .zero,
@@ -220,7 +222,8 @@ final class ViolationsModel: ObservableObject {
         }
         if cleanState == .running
             || cleanState == .cancelling
-            || cleanState == .rescanning {
+            || cleanState == .rescanning
+        {
             cleanCancellationRequested = true
         }
         cleanTask?.cancel()

@@ -213,29 +213,37 @@ extension SessionView {
                     Divider()
                     ForEach(model.agentSessions) { session in
                         HStack {
-                            Text("\(session.agentDisplayName) · \(URL(fileURLWithPath: session.cwd).lastPathComponent)")
-                                .font(WisentTypeScale.identifierSmall())
-                                .foregroundStyle(WisentDesign.ink)
-                                .lineLimit(1)
-                                .frame(width: 220, alignment: .leading)
+                            Text(
+                                "\(session.agentDisplayName) · \(URL(fileURLWithPath: session.cwd).lastPathComponent)"
+                            )
+                            .font(WisentTypeScale.identifierSmall())
+                            .foregroundStyle(WisentDesign.ink)
+                            .lineLimit(1)
+                            .frame(width: 220, alignment: .leading)
                             Text(session.globallyDisabled ? "Limited" : "Enabled")
                                 .font(WisentTypeScale.identifierSmall())
-                                .foregroundStyle(session.globallyDisabled ? WisentDesign.warning : WisentDesign.success)
+                                .foregroundStyle(
+                                    session.globallyDisabled
+                                        ? WisentDesign.warning : WisentDesign.success
+                                )
                                 .frame(width: 120, alignment: .leading)
                             Text("\(session.runtime?.loadedHookCount ?? 0)")
                                 .font(WisentTypeScale.identifierSmall())
                                 .foregroundStyle(WisentDesign.secondary)
                                 .monospacedDigit()
                                 .frame(width: 60, alignment: .leading)
-                            Text(session.globallyDisabled
-                                ? session.enabledHookIds.isEmpty
-                                    ? "None"
-                                    : session.enabledHookIds.joined(separator: ", ")
-                                : session.disabledHookIds.isEmpty ? "All" : "\(session.disabledHookIds.count) disabled")
-                                .font(WisentTypeScale.identifierSmall())
-                                .foregroundStyle(WisentDesign.secondary)
-                                .lineLimit(2)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                            Text(
+                                session.globallyDisabled
+                                    ? session.enabledHookIds.isEmpty
+                                        ? "None"
+                                        : session.enabledHookIds.joined(separator: ", ")
+                                    : session.disabledHookIds.isEmpty
+                                        ? "All" : "\(session.disabledHookIds.count) disabled"
+                            )
+                            .font(WisentTypeScale.identifierSmall())
+                            .foregroundStyle(WisentDesign.secondary)
+                            .lineLimit(2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .frame(height: WisentAppLayout.denseRowHeight)
                         Divider()
@@ -250,7 +258,9 @@ extension SessionView {
             badges.append(
                 policy.ready && policy.mode == "kernel-gated"
                     ? ("Protected", .success)
-                    : (policy.configured ? ("Protection unavailable", .warning) : ("Protection not set up", .neutral))
+                    : (policy.configured
+                        ? ("Protection unavailable", .warning)
+                        : ("Protection not set up", .neutral))
             )
         }
         if let capability = session.capability {

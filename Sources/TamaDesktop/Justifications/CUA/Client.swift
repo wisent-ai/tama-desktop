@@ -31,20 +31,25 @@ struct CUAConsentClient: Sendable {
     var command: TamaCommand?
 
     func list() async throws -> CUAListing {
-        try await client().request("justifications/cua", as: CUAListing.self, describing: "Reading CUA consent")
+        try await client().request(
+            "justifications/cua", as: CUAListing.self, describing: "Reading CUA consent")
     }
 
-    func record(session: String, app: String, actions: [String], quote: String, match: Bool) async throws -> CUARecording {
+    func record(session: String, app: String, actions: [String], quote: String, match: Bool)
+        async throws -> CUARecording
+    {
         let body: [String: Any] = [
             "sessionId": session, "app": app, "actions": actions,
             match ? "quoteMatch" : "quote": quote,
         ]
-        return try await client().request("justifications/cua/record", body: body,
+        return try await client().request(
+            "justifications/cua/record", body: body,
             as: CUARecording.self, describing: "Recording CUA consent")
     }
 
     func remove(quote: String) async throws -> CUARemoval {
-        try await client().request("justifications/cua/remove", body: ["quote": quote],
+        try await client().request(
+            "justifications/cua/remove", body: ["quote": quote],
             as: CUARemoval.self, describing: "Removing CUA consent")
     }
 

@@ -133,11 +133,12 @@ struct JustificationsView: View {
                 WisentFacetGroup(
                     "Verdict",
                     facets: VerdictFacet.allCases.map { facet in
-                        let count = switch facet {
-                        case .all: entries.count
-                        case .valid: holding
-                        case .issues: entries.count - holding
-                        }
+                        let count =
+                            switch facet {
+                            case .all: entries.count
+                            case .valid: holding
+                            case .issues: entries.count - holding
+                            }
                         return WisentFacet(
                             id: "verdict.\(facet.rawValue)",
                             label: facet.label,
@@ -195,7 +196,8 @@ struct JustificationsView: View {
                 WisentAlertPanel(
                     tone: .info,
                     title: "Recorded",
-                    detail: "\(lastRecorded) — the table shows it after the next read of the registries."
+                    detail:
+                        "\(lastRecorded) — the table shows it after the next read of the registries."
                 )
             }
             if let collection { contract(collection) }

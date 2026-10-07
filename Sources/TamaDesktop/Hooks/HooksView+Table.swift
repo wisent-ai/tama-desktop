@@ -25,7 +25,7 @@ extension HooksView {
                         tone: .danger,
                         title: "Policy unavailable",
                         detail: catalogError,
-                                                actions: [
+                        actions: [
                             WisentAction("Retry", symbol: "arrow.clockwise", kind: .primary) {
                                 Task { await model.refresh() }
                             }
@@ -50,7 +50,8 @@ extension HooksView {
             } else if visible.isEmpty {
                 WisentEmptyPanel(
                     title: "No policy matches this selection",
-                    detail: "\(counted(model.hooks.count, "policy")) available. Change or clear the filters.",
+                    detail:
+                        "\(counted(model.hooks.count, "policy")) available. Change or clear the filters.",
                     symbol: "line.3.horizontal.decrease.circle",
                     action: WisentAction("Clear filters", kind: .secondary) { clearFilters() }
                 )

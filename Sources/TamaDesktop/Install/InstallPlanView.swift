@@ -32,7 +32,7 @@ struct InstallPlanView: View {
                     tone: .danger,
                     title: "Install plan could not be read",
                     detail: planError,
-                                        actions: [
+                    actions: [
                         WisentAction("Retry", symbol: "arrow.clockwise", kind: .primary) {
                             Task { await inspection.loadPlan(force: true) }
                         }
@@ -51,7 +51,7 @@ struct InstallPlanView: View {
                     // The signal strip, then a section box per scope: a title
                     // and the block of label/value rows underneath it.
                     WisentSkeleton(.block, height: 56)
-                    ForEach(0 ..< 2, id: \.self) { _ in
+                    ForEach(0..<2, id: \.self) { _ in
                         WisentSkeleton(.heading, width: 180)
                         WisentSkeleton(.block, height: 132)
                     }
@@ -85,7 +85,7 @@ struct InstallPlanView: View {
                 "Additional setup",
                 value: plan.levels.allSatisfy(\.activeByArchiveAlone) ? "None" : "Required",
                 tone: .neutral
-            )
+            ),
         ])
     }
 
@@ -155,7 +155,7 @@ struct InstallPlanView: View {
                     tone: .warning,
                     title: "Configuration could not be read",
                     detail: mcpError,
-                                    )
+                )
             } else if let configuration = inspection.mcpConfiguration {
                 WisentPanel {
                     Text(configuration)

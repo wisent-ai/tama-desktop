@@ -35,7 +35,7 @@ extension JustificationsView {
                 "Minimum words",
                 value: requirement.minimumWords.formatted(.number),
                 detail: "Required length"
-            )
+            ),
         ])
     }
 
@@ -73,7 +73,8 @@ extension JustificationsView {
         } else if visible.isEmpty {
             WisentEmptyPanel(
                 title: "No record matches this selection",
-                detail: "\(counted(entries.count, "record")) available. Change or clear the filters.",
+                detail:
+                    "\(counted(entries.count, "record")) available. Change or clear the filters.",
                 symbol: "line.3.horizontal.decrease.circle",
                 action: WisentAction("Clear filters", kind: .secondary) {
                     verdictFacet = .all
@@ -108,21 +109,27 @@ extension JustificationsView {
                 }
                 .width(min: 130, ideal: 220)
                 TableColumn("WORDS") { entry in
-                    Text("\(entry.wordCount.formatted(.number))/\(requirement.minimumWords.formatted(.number))")
-                        .font(WisentTypeScale.identifierSmall())
-                        .foregroundStyle(
-                            entry.wordCount >= requirement.minimumWords
-                                ? WisentDesign.secondary
-                                : WisentDesign.warning
-                        )
-                        .monospacedDigit()
+                    Text(
+                        "\(entry.wordCount.formatted(.number))/\(requirement.minimumWords.formatted(.number))"
+                    )
+                    .font(WisentTypeScale.identifierSmall())
+                    .foregroundStyle(
+                        entry.wordCount >= requirement.minimumWords
+                            ? WisentDesign.secondary
+                            : WisentDesign.warning
+                    )
+                    .monospacedDigit()
                 }
                 .width(min: 54, ideal: 70)
                 TableColumn("EXPIRES") { entry in
-                    Text(entry.expiresAt.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—")
-                        .font(WisentTypeScale.identifierSmall())
-                        .foregroundStyle(entry.isExpired ? WisentDesign.warning : WisentDesign.secondary)
-                        .monospacedDigit()
+                    Text(
+                        entry.expiresAt.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—"
+                    )
+                    .font(WisentTypeScale.identifierSmall())
+                    .foregroundStyle(
+                        entry.isExpired ? WisentDesign.warning : WisentDesign.secondary
+                    )
+                    .monospacedDigit()
                 }
                 .width(min: 66, ideal: 86)
                 TableColumn("VERDICT") { entry in

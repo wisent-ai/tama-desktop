@@ -44,7 +44,8 @@ struct LearningDismissal: Decodable, Sendable {
 
 struct LearningClient: Sendable {
     func digest() async throws -> LearningDigest {
-        try await TamaClient().request("rules/digest", as: LearningDigest.self,
+        try await TamaClient().request(
+            "rules/digest", as: LearningDigest.self,
             describing: "Reading what Tama learned across sessions")
     }
 
@@ -54,9 +55,11 @@ struct LearningClient: Sendable {
         let bundled = try TamaCommand.bundled()
         var environment = bundled.environment
         environment["DEVICE_HOOK_EDIT_APPROVED"] = "1"
-        let command = TamaCommand(executable: bundled.executable, root: bundled.root,
-                                  environment: environment)
-        return try await TamaClient(command: command).request("rules/dismiss",
+        let command = TamaCommand(
+            executable: bundled.executable, root: bundled.root,
+            environment: environment)
+        return try await TamaClient(command: command).request(
+            "rules/dismiss",
             body: ["id": proposal.id], as: LearningDismissal.self,
             describing: "Dismissing \(proposal.id)")
     }

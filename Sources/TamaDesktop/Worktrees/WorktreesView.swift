@@ -34,7 +34,8 @@ struct WorktreesView: View {
                 WisentFacetRail(
                     groups: facetGroups,
                     footerTitle: "Selection",
-                    footerDetail: "\(visible.count.formatted(.number)) of \(model.worktreeCount.formatted(.number))"
+                    footerDetail:
+                        "\(visible.count.formatted(.number)) of \(model.worktreeCount.formatted(.number))"
                 )
                 centre(visible: visible)
                 inspector
@@ -122,21 +123,23 @@ struct WorktreesView: View {
                     ) {
                         repositoryFacet = nil
                     }
-                ] + model.repositories.map { repository in
-                    WisentFacet(
-                        id: "repository.\(repository.repository)",
-                        label: repository.name,
-                        count: repository.worktrees.count,
-                        tone: repository.dirtyCount + repository.lockedCount > .zero
-                            ? .warning
-                            : .neutral,
-                        isSelected: repositoryFacet == repository.repository
-                    ) {
-                        repositoryFacet = repositoryFacet == repository.repository
-                            ? nil
-                            : repository.repository
+                ]
+                    + model.repositories.map { repository in
+                        WisentFacet(
+                            id: "repository.\(repository.repository)",
+                            label: repository.name,
+                            count: repository.worktrees.count,
+                            tone: repository.dirtyCount + repository.lockedCount > .zero
+                                ? .warning
+                                : .neutral,
+                            isSelected: repositoryFacet == repository.repository
+                        ) {
+                            repositoryFacet =
+                                repositoryFacet == repository.repository
+                                ? nil
+                                : repository.repository
+                        }
                     }
-                }
             )
         ]
     }

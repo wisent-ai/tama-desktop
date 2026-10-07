@@ -37,7 +37,8 @@ struct SessionControlClient: Sendable {
         for url in urls where url.lastPathComponent.hasSuffix(".session.json") {
             guard let data = try? Data(contentsOf: url) else { continue }
             if let envelope = try? decoder.decode(SessionControlSchemaEnvelope.self, from: data),
-               envelope.schema == Self.legacySchema {
+                envelope.schema == Self.legacySchema
+            {
                 hasLegacySession = true
                 continue
             }
@@ -197,7 +198,8 @@ struct SessionControlClient: Sendable {
                 appropriateFor: nil,
                 create: create
             )
-            root = support
+            root =
+                support
                 .appendingPathComponent("Tama", isDirectory: true)
                 .appendingPathComponent("session-control", isDirectory: true)
         }
@@ -221,7 +223,9 @@ struct SessionControlClient: Sendable {
             return processIsAlive(session.pid)
         case "heartbeat":
             guard let updated = Self.date(from: session.updatedAt) else { return false }
-            let ttl = min(max(session.heartbeatTTLSeconds, Self.minimumHeartbeatTTLSeconds), Self.maximumHeartbeatTTLSeconds)
+            let ttl = min(
+                max(session.heartbeatTTLSeconds, Self.minimumHeartbeatTTLSeconds),
+                Self.maximumHeartbeatTTLSeconds)
             return updated.addingTimeInterval(TimeInterval(ttl)) >= now
         default:
             return false
@@ -241,7 +245,9 @@ struct SessionControlClient: Sendable {
     }
 
     private func isSafeAgentId(_ value: String) -> Bool {
-        guard let first = value.first, first.isASCII, first.isLetter, value.count <= Self.maximumAgentIdLength else {
+        guard let first = value.first, first.isASCII, first.isLetter,
+            value.count <= Self.maximumAgentIdLength
+        else {
             return false
         }
         return value.allSatisfy { character in

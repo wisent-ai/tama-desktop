@@ -17,22 +17,28 @@ struct CUAGrantsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: WisentDesign.Space.x4) {
             HStack {
-                WisentSectionHeader("CUA consent", detail: "Record a grant already spoken in an OMP session.")
+                WisentSectionHeader(
+                    "CUA consent", detail: "Record a grant already spoken in an OMP session.")
                 Spacer()
                 Button("Close") { dismiss() }.disabled(busy)
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: WisentDesign.Space.x4) {
                     form
-                    if let failure { WisentAlertPanel(tone: .danger, title: "Refused", detail: failure) }
-                    if let notice { WisentAlertPanel(tone: .info, title: "Recorded", detail: notice) }
+                    if let failure {
+                        WisentAlertPanel(tone: .danger, title: "Refused", detail: failure)
+                    }
+                    if let notice {
+                        WisentAlertPanel(tone: .info, title: "Recorded", detail: notice)
+                    }
                     HStack {
                         Text("Recorded grants").font(WisentTypeScale.body()).bold()
                         Spacer()
                         Button("Refresh") { Task { await refresh() } }.disabled(busy)
                     }
                     if let listing {
-                        Text(listing.registry).font(WisentTypeScale.identifierSmall()).textSelection(.enabled)
+                        Text(listing.registry).font(WisentTypeScale.identifierSmall())
+                            .textSelection(.enabled)
                         if listing.authorizations.isEmpty { Text("No CUA grants recorded.") }
                         ForEach(listing.authorizations) { grant in record(grant) }
                     }
@@ -42,9 +48,12 @@ struct CUAGrantsView: View {
         .padding(WisentDesign.Space.x5)
         .frame(minWidth: WisentAppLayout.inspectorWidth)
         .task { await refresh() }
-        .confirmationDialog("Remove this recorded consent?", isPresented: Binding(
-            get: { removing != nil }, set: { if !$0 { removing = nil } }
-        ), presenting: removing) { grant in
+        .confirmationDialog(
+            "Remove this recorded consent?",
+            isPresented: Binding(
+                get: { removing != nil }, set: { if !$0 { removing = nil } }
+            ), presenting: removing
+        ) { grant in
             Button("Remove consent", role: .destructive) {
                 Task { await remove(grant) }
             }
@@ -63,11 +72,15 @@ struct CUAGrantsView: View {
                 TextField("Actions, separated by commas", text: $actions, axis: .vertical)
                     .accessibilityLabel("Allowed CUA actions")
                 Toggle("Find the original user message from matching text", isOn: $match)
-                TextField(match ? "Text found in exactly one user message" : "Verbatim user consent",
-                    text: $quote, axis: .vertical)
-                    .accessibilityLabel(match ? "User message match" : "Verbatim user consent")
-                Text("The message must name CUA, the application and every requested action. Recording does not start the driver or prove that an action ran.")
-                    .font(WisentTypeScale.caption()).foregroundStyle(WisentDesign.secondary)
+                TextField(
+                    match ? "Text found in exactly one user message" : "Verbatim user consent",
+                    text: $quote, axis: .vertical
+                )
+                .accessibilityLabel(match ? "User message match" : "Verbatim user consent")
+                Text(
+                    "The message must name CUA, the application and every requested action. Recording does not start the driver or prove that an action ran."
+                )
+                .font(WisentTypeScale.caption()).foregroundStyle(WisentDesign.secondary)
                 Button(busy ? "Recording…" : "Record consent") { Task { await save() } }
                     .disabled(busy)
             }
@@ -109,11 +122,14 @@ struct CUAGrantsView: View {
         notice = nil
         defer { busy = false }
         do {
-            let result = try await CUAConsentClient().record(session: session, app: app,
-                actions: actions.split(separator: ",", omittingEmptySubsequences: false).map(String.init),
+            let result = try await CUAConsentClient().record(
+                session: session, app: app,
+                actions: actions.split(separator: ",", omittingEmptySubsequences: false).map(
+                    String.init),
                 quote: quote, match: match)
             listing = try await CUAConsentClient().list()
-            notice = "\(result.authorization.allowedAppName): the original user grant is recorded. The hook checks the current session, action and target on each use."
+            notice =
+                "\(result.authorization.allowedAppName): the original user grant is recorded. The hook checks the current session, action and target on each use."
         } catch { failure = error.localizedDescription }
     }
 

@@ -1,8 +1,8 @@
 import AppKit
 import SwiftUI
 import WisentAuth
-import WisentDesktopUpdate
 import WisentDesignSystem
+import WisentDesktopUpdate
 
 struct TamaAuthenticatedRootView: View {
     @StateObject private var model: AppModel
@@ -30,11 +30,11 @@ struct TamaAuthenticatedRootView: View {
                     journey: firstUseJourney,
                     continueToSignIn: nil
                 )
-                    .overlay(alignment: .bottom) {
-                        if firstUseJourney.isAwaitingFirstSession {
-                            firstSessionHint
-                        }
+                .overlay(alignment: .bottom) {
+                    if firstUseJourney.isAwaitingFirstSession {
+                        firstSessionHint
                     }
+                }
             } else if firstUseJourney.isLoading {
                 ZStack {
                     WisentCanvasBackground()
@@ -67,16 +67,17 @@ struct TamaAuthenticatedRootView: View {
                     journey: firstUseJourney,
                     continueToSignIn: nil
                 )
-                    .task(id: firstUseJourney.currentScreen?.screenId) {
-                        guard firstUseJourney.isAtSetup,
-                              await firstUseJourney.completeSetup() else { return }
-                        hasCompletedSetup = true
+                .task(id: firstUseJourney.currentScreen?.screenId) {
+                    guard firstUseJourney.isAtSetup,
+                        await firstUseJourney.completeSetup()
+                    else { return }
+                    hasCompletedSetup = true
+                }
+                .overlay(alignment: .bottom) {
+                    if firstUseJourney.isAwaitingFirstSession {
+                        firstSessionHint
                     }
-                    .overlay(alignment: .bottom) {
-                        if firstUseJourney.isAwaitingFirstSession {
-                            firstSessionHint
-                        }
-                    }
+                }
             }
         }
         .task {

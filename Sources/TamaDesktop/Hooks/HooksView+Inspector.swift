@@ -118,10 +118,12 @@ extension HooksView {
                         )
                     }
                 }
-                Text("This selection is machine-wide and operator-owned. A session can only add a hook for itself; it cannot remove one from this selection.")
-                    .font(WisentTypeScale.caption())
-                    .foregroundStyle(WisentDesign.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(
+                    "This selection is machine-wide and operator-owned. A session can only add a hook for itself; it cannot remove one from this selection."
+                )
+                .font(WisentTypeScale.caption())
+                .foregroundStyle(WisentDesign.secondary)
+                .fixedSize(horizontal: false, vertical: true)
                 if let error = machineSelection.readError {
                     Text(error)
                         .font(WisentTypeScale.caption())
@@ -150,7 +152,8 @@ extension HooksView {
     private func machineControl(_ hook: HookRecord) -> some View {
         Divider()
         let selected = machineSelection.selection?.includes(hook.id) ?? true
-        let isLastSelection = machineSelection.selection?.mode == "only"
+        let isLastSelection =
+            machineSelection.selection?.mode == "only"
             && machineSelection.selection?.enabled.count == 1
             && selected
         let status = machineStatus(hook)
@@ -171,14 +174,15 @@ extension HooksView {
                 }
             )
             if isLastSelection {
-                Text("At least one hook must remain selected. Choose Select all hooks, or add another hook first.")
-                    .font(WisentTypeScale.caption())
-                    .foregroundStyle(WisentDesign.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(
+                    "At least one hook must remain selected. Choose Select all hooks, or add another hook first."
+                )
+                .font(WisentTypeScale.caption())
+                .foregroundStyle(WisentDesign.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
-
 
     /// The one decision this screen owns: is this policy live in the session in
     /// front of the operator. Enabling restores policy, so it needs no dialog;

@@ -58,12 +58,14 @@ final class EnforcementSelectionModel: ObservableObject {
     }
 
     func setEnforced(_ enforced: Bool, hookID: String, catalogIDs: [String]) {
-        let current = selection ?? EnforcementSelection(
-            mode: "all",
-            enabled: [],
-            readError: nil,
-            emergencyDisabled: false
-        )
+        let current =
+            selection
+            ?? EnforcementSelection(
+                mode: "all",
+                enabled: [],
+                readError: nil,
+                emergencyDisabled: false
+            )
         var enabled = current.mode == "all" ? Set(catalogIDs) : current.selectedIDs
         if enforced {
             enabled.insert(hookID)

@@ -5,7 +5,7 @@ let package = Package(
     name: "TamaDesktop",
     platforms: [.macOS(.v14)],
     products: [
-        .executable(name: "Tama", targets: ["TamaDesktop"]),
+        .executable(name: "Tama", targets: ["TamaDesktop"])
     ],
     dependencies: [
         // By version now that its own dependencies are tagged: 0.3.6 names
@@ -44,6 +44,6 @@ let package = Package(
             ],
             path: "Sources/TamaDesktop",
             resources: [.process("Resources")]
-        ),
+        )
     ]
 )

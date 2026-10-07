@@ -9,10 +9,10 @@ extension CopiesView {
         VStack(alignment: .leading, spacing: WisentDesign.Space.x4) {
             removalBar
             roots
-            if case let .failed(message) = model.scanState {
+            if case .failed(let message) = model.scanState {
                 WisentAlertPanel(tone: .danger, title: "Scan refused", detail: message)
             }
-            if case let .failed(message) = model.removalState {
+            if case .failed(let message) = model.removalState {
                 WisentAlertPanel(tone: .danger, title: "Removal refused", detail: message)
             }
             marked
@@ -32,7 +32,7 @@ extension CopiesView {
             WisentMutationBar(outcome: .working("Reading what removal would do."), clear: {})
         case .applying:
             WisentMutationBar(outcome: .working("Removing copies."), clear: {})
-        case let .applied(summary):
+        case .applied(let summary):
             WisentMutationBar(outcome: .succeeded(summary), clear: {})
         case .idle, .previewed, .failed:
             EmptyView()
@@ -101,7 +101,8 @@ extension CopiesView {
         if !claimed.isEmpty {
             WisentSectionBox(
                 title: "Claimed",
-                detail: "Sent as --only: the pass is narrowed to these, and every refusal that protects history still applies.",
+                detail:
+                    "Sent as --only: the pass is narrowed to these, and every refusal that protects history still applies.",
                 trailing: counted(claimed.count, "copy")
             ) {
                 ForEach(claimed, id: \.self) { path in
@@ -180,7 +181,8 @@ extension CopiesView {
             WisentAlertPanel(
                 tone: .warning,
                 title: "Skipped: \(URL(fileURLWithPath: path).lastPathComponent)",
-                detail: "\(path): git does not answer for it as a repository, so this pass reports it instead of reading it."
+                detail:
+                    "\(path): git does not answer for it as a repository, so this pass reports it instead of reading it."
             )
         }
         if !model.walkGaps.isEmpty {
@@ -205,7 +207,8 @@ extension CopiesView {
             WisentCounterRow.Counter(
                 "Removable",
                 value: model.removableCount.formatted(.number),
-                detail: "Of \(counted(model.copyCount, "copy")) found, \(copiedSize(model.removableBytes))",
+                detail:
+                    "Of \(counted(model.copyCount, "copy")) found, \(copiedSize(model.removableBytes))",
                 tone: model.removableCount == .zero ? .success : .warning
             ),
             WisentCounterRow.Counter(

@@ -7,9 +7,10 @@ extension ViolationsView {
         ForEach(Array((report?.problems ?? []).enumerated()), id: \.offset) { _, problem in
             WisentAlertPanel(
                 tone: .warning,
-                title: "The scanner could not enumerate \([problem.owner, problem.repo].compactMap { $0 }.joined(separator: "/"))",
+                title:
+                    "The scanner could not enumerate \([problem.owner, problem.repo].compactMap { $0 }.joined(separator: "/"))",
                 detail: problem.error,
-                            )
+            )
         }
     }
     @ViewBuilder
@@ -47,7 +48,8 @@ extension ViolationsView {
         } else if visible.isEmpty {
             WisentEmptyPanel(
                 title: "No finding matches this selection",
-                detail: "\(counted(model.report?.totals.violations ?? .zero, "finding")) available. Clear the filters to see all findings.",
+                detail:
+                    "\(counted(model.report?.totals.violations ?? .zero, "finding")) available. Clear the filters to see all findings.",
                 symbol: "line.3.horizontal.decrease.circle",
                 action: WisentAction("Clear filters", kind: .secondary) {
                     ruleFacet = nil

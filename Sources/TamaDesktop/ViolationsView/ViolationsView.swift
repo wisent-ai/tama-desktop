@@ -31,7 +31,8 @@ struct ViolationsView: View {
                 WisentFacetRail(
                     groups: facetGroups,
                     footerTitle: "Selection",
-                    footerDetail: "\(visible.count.formatted(.number)) of \((model.report?.totals.violations ?? .zero).formatted(.number))"
+                    footerDetail:
+                        "\(visible.count.formatted(.number)) of \((model.report?.totals.violations ?? .zero).formatted(.number))"
                 )
                 centre(visible: visible)
                 inspector
@@ -140,16 +141,17 @@ struct ViolationsView: View {
                 ) {
                     ruleFacet = nil
                 }
-            ] + ranked.map { rule, count in
-                WisentFacet(
-                    id: "rule.\(rule)",
-                    label: rule,
-                    count: count,
-                    isSelected: ruleFacet == rule
-                ) {
-                    ruleFacet = ruleFacet == rule ? nil : rule
+            ]
+                + ranked.map { rule, count in
+                    WisentFacet(
+                        id: "rule.\(rule)",
+                        label: rule,
+                        count: count,
+                        isSelected: ruleFacet == rule
+                    ) {
+                        ruleFacet = ruleFacet == rule ? nil : rule
+                    }
                 }
-            }
         )
     }
 
@@ -172,7 +174,8 @@ struct ViolationsView: View {
 
     var filtered: [ViolationRecord] {
         guard let report else { return [] }
-        let scoped = repoFacet
+        let scoped =
+            repoFacet
             .flatMap { path in report.repos.first { $0.repo == path }?.violations }
             ?? report.allViolations
         guard let ruleFacet else { return scoped }
@@ -185,7 +188,7 @@ struct ViolationsView: View {
     func centre(visible: [ViolationRecord]) -> some View {
         VStack(alignment: .leading, spacing: WisentDesign.Space.x4) {
             cleanBar
-            if case let .failed(message) = model.scanState {
+            if case .failed(let message) = model.scanState {
                 // A scan that failed keeps the previous report on screen when
                 // there is one: the findings the operator was reading are still
                 // the findings that were true a minute ago.
@@ -193,7 +196,7 @@ struct ViolationsView: View {
                     tone: .danger,
                     title: "Scan failed",
                     detail: message,
-                                        actions: [
+                    actions: [
                         WisentAction(
                             "Scan again",
                             symbol: "arrow.clockwise",
@@ -205,12 +208,12 @@ struct ViolationsView: View {
                     ]
                 )
             }
-            if case let .failed(message) = model.cleanState {
+            if case .failed(let message) = model.cleanState {
                 WisentAlertPanel(
                     tone: .danger,
                     title: "Repair failed",
                     detail: message,
-                                    )
+                )
             }
             if let report { counters(report) }
             problems
@@ -242,7 +245,7 @@ struct ViolationsView: View {
                 outcome: .working("Checking the repaired files."),
                 clear: {}
             )
-        case let .done(summary):
+        case .done(let summary):
             WisentMutationBar(outcome: .succeeded(summary), clear: {})
         case .failed:
             EmptyView()
@@ -272,16 +275,11 @@ struct ViolationsView: View {
                 value: report.scanErrors.formatted(.number),
                 detail: "Files the scanner could not read",
                 tone: report.scanErrors == .zero ? .neutral : .warning
-            )
+            ),
         ])
     }
 
-
-
-
     // MARK: - Inspector
-
-
 
     // MARK: - The decision
 

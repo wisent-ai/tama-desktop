@@ -121,7 +121,8 @@ struct SettingsView: View {
                         }
                         Spacer(minLength: WisentDesign.Space.x2)
                         if model.installedHookReleaseID != nil
-                            || model.systemPolicyServiceStatus != "Not registered" {
+                            || model.systemPolicyServiceStatus != "Not registered"
+                        {
                             WisentActionButton(
                                 action: WisentAction(
                                     "Deactivate",
@@ -143,7 +144,8 @@ struct SettingsView: View {
     var policyBundles: some View {
         WisentSectionBox(
             title: "Policy bundles",
-            detail: "Adopt an existing self-contained Tama policy bundle or sealed release without installing or enabling it.",
+            detail:
+                "Adopt an existing self-contained Tama policy bundle or sealed release without installing or enabling it.",
             trailing: "\(model.policyBundles?.bundles.count ?? 0) inactive"
         ) {
             WisentPanel {
@@ -168,7 +170,8 @@ struct SettingsView: View {
                             Button("Replace these reviewed bundle files") {
                                 Task {
                                     _ = await model.importPolicyBundle(
-                                        from: URL(fileURLWithPath: result.sourcePath, isDirectory: true),
+                                        from: URL(
+                                            fileURLWithPath: result.sourcePath, isDirectory: true),
                                         replace: true
                                     )
                                 }
@@ -198,15 +201,19 @@ struct SettingsView: View {
                             VStack(alignment: .leading, spacing: WisentDesign.Space.x1) {
                                 Text(bundle.sourcePath)
                                     .font(.system(size: 11, design: .monospaced))
-                                Text("\(bundle.hookCount) hooks · \(bundle.fileCount) files · SHA-256 \(bundle.sourceDigest.prefix(12))… · inactive")
-                                    .font(WisentTypeScale.caption())
-                                    .foregroundStyle(WisentDesign.secondary)
+                                Text(
+                                    "\(bundle.hookCount) hooks · \(bundle.fileCount) files · SHA-256 \(bundle.sourceDigest.prefix(12))… · inactive"
+                                )
+                                .font(WisentTypeScale.caption())
+                                .foregroundStyle(WisentDesign.secondary)
                             }
                         }
                     } else if model.policyBundlesError == nil {
-                        Text("No policy bundle imported. Tama remains empty and usable; the bundled release is unchanged.")
-                            .font(WisentTypeScale.caption())
-                            .foregroundStyle(WisentDesign.secondary)
+                        Text(
+                            "No policy bundle imported. Tama remains empty and usable; the bundled release is unchanged."
+                        )
+                        .font(WisentTypeScale.caption())
+                        .foregroundStyle(WisentDesign.secondary)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -217,7 +224,8 @@ struct SettingsView: View {
     func choosePolicyBundle() {
         let panel = NSOpenPanel()
         panel.title = "Choose a Tama policy bundle"
-        panel.message = "Choose a self-contained Tama policy bundle or sealed release containing shared-hooks/registry.json. Import does not install or enable hooks."
+        panel.message =
+            "Choose a self-contained Tama policy bundle or sealed release containing shared-hooks/registry.json. Import does not install or enable hooks."
         panel.prompt = "Import"
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
@@ -238,7 +246,8 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: WisentDesign.Space.x3) {
                     HStack(alignment: .top, spacing: WisentDesign.Space.x4) {
                         WisentField(label: "Version", value: buildIdentity.productVersion)
-                        WisentField(label: "Source revision", value: buildIdentity.displayedRevision)
+                        WisentField(
+                            label: "Source revision", value: buildIdentity.displayedRevision)
                     }
                     Divider()
                     HStack(alignment: .top, spacing: WisentDesign.Space.x4) {
@@ -253,7 +262,8 @@ struct SettingsView: View {
                                     ? "\(release.sourceRevision) (dirty source)"
                                     : release.sourceRevision
                             } ?? "Not recorded",
-                            tone: buildIdentity.hookRelease?.sourceDirty == true ? .warning : .neutral
+                            tone: buildIdentity.hookRelease?.sourceDirty == true
+                                ? .warning : .neutral
                         )
                     }
                     Divider()
@@ -270,8 +280,6 @@ struct SettingsView: View {
     }
 
     // MARK: - First-run walkthrough
-
-
 
     // MARK: - The decision
 

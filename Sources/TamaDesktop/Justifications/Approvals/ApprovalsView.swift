@@ -18,14 +18,18 @@ struct TestApprovalsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: WisentDesign.Space.x4) {
             HStack {
-                WisentSectionHeader("Test approvals", detail: "Test code is written only under a path approved here.")
+                WisentSectionHeader(
+                    "Test approvals",
+                    detail: "Test code is written only under a path approved here.")
                 Spacer()
                 Button("Close") { dismiss() }.disabled(busy)
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: WisentDesign.Space.x4) {
                     form
-                    if let failure { WisentAlertPanel(tone: .danger, title: "Refused", detail: failure) }
+                    if let failure {
+                        WisentAlertPanel(tone: .danger, title: "Refused", detail: failure)
+                    }
                     if let notice { WisentAlertPanel(tone: .info, title: "Saved", detail: notice) }
                     HStack {
                         Text("Approved paths").font(WisentTypeScale.body()).bold()
@@ -33,7 +37,8 @@ struct TestApprovalsView: View {
                         Button("Refresh") { Task { await refresh() } }.disabled(busy)
                     }
                     if let listing {
-                        Text(listing.record).font(WisentTypeScale.identifierSmall()).textSelection(.enabled)
+                        Text(listing.record).font(WisentTypeScale.identifierSmall()).textSelection(
+                            .enabled)
                         if listing.approved.isEmpty { Text("No test code is approved.") }
                         ForEach(listing.approved) { approval in row(approval) }
                     }
@@ -44,9 +49,12 @@ struct TestApprovalsView: View {
         .padding(WisentDesign.Space.x5)
         .frame(minWidth: WisentAppLayout.inspectorWidth)
         .task { await refresh() }
-        .confirmationDialog("Revoke this approval?", isPresented: Binding(
-            get: { revoking != nil }, set: { if !$0 { revoking = nil } }
-        ), presenting: revoking) { approval in
+        .confirmationDialog(
+            "Revoke this approval?",
+            isPresented: Binding(
+                get: { revoking != nil }, set: { if !$0 { revoking = nil } }
+            ), presenting: revoking
+        ) { approval in
             Button("Revoke", role: .destructive) {
                 Task { await revoke(approval) }
             }
@@ -60,8 +68,10 @@ struct TestApprovalsView: View {
             VStack(alignment: .leading, spacing: WisentDesign.Space.x3) {
                 TextField("Absolute path of a test file or directory", text: $path)
                     .accessibilityLabel("Path to approve for test code")
-                Text("An approved directory covers everything below it. Approve only a test you asked for.")
-                    .font(WisentTypeScale.caption()).foregroundStyle(WisentDesign.secondary)
+                Text(
+                    "An approved directory covers everything below it. Approve only a test you asked for."
+                )
+                .font(WisentTypeScale.caption()).foregroundStyle(WisentDesign.secondary)
                 Button(busy ? "Approving…" : "Approve") { Task { await approve() } }
                     .disabled(busy)
             }

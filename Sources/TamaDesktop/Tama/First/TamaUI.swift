@@ -86,7 +86,9 @@ enum SidebarDestination: String, Identifiable, CaseIterable {
     /// authorization boundary rather than appearing as dead rows.
     var requiresControl: Bool {
         switch self {
-        case .session, .violations, .worktrees, .copies, .merges, .hardcodes, .justifications, .builds, .learning: true
+        case .session, .violations, .worktrees, .copies, .merges, .hardcodes, .justifications,
+            .builds, .learning:
+            true
         case .posture, .hooks, .coverage, .installPlan, .settings: false
         }
     }

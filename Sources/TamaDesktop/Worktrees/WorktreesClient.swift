@@ -199,7 +199,7 @@ enum WorktreesError: LocalizedError {
         switch self {
         case .rootRequired:
             Self.rootRequiredSentence
-        case let .invalidRoot(path):
+        case .invalidRoot(let path):
             "Choose an existing absolute directory to scan for worktrees: \(path)"
         }
     }

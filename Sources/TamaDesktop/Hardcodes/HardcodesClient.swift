@@ -43,7 +43,9 @@ struct HardcodeRow: Identifiable, Sendable {
     let repository: String
     let finding: HardcodeFinding
 
-    var id: String { "\(repository)/\(finding.path):\(finding.line)/\(finding.kind)/\(finding.value)" }
+    var id: String {
+        "\(repository)/\(finding.path):\(finding.line)/\(finding.kind)/\(finding.value)"
+    }
 
     var origin: String {
         guard let commit = finding.commit else { return "" }
@@ -69,7 +71,11 @@ struct HardcodesClient: Sendable {
 /// document the inventory answered.
 @MainActor
 final class HardcodesModel: ObservableObject {
-    enum ScanState: Equatable { case idle, scanning, failed(String), done }
+    enum ScanState: Equatable {
+        case idle, scanning
+        case failed(String)
+        case done
+    }
 
     @Published var root: String = ""
     @Published var origins: Bool = false
@@ -82,7 +88,9 @@ final class HardcodesModel: ObservableObject {
 
     var rows: [HardcodeRow] {
         (document?.repositories ?? []).flatMap { repository in
-            (repository.findings ?? []).map { HardcodeRow(repository: repository.repo, finding: $0) }
+            (repository.findings ?? []).map {
+                HardcodeRow(repository: repository.repo, finding: $0)
+            }
         }
     }
 

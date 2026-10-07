@@ -4,10 +4,12 @@ struct HookCatalogClient: Sendable {
     private var manager: FileManager { .default }
 
     func load(includeLocalJustifications: Bool = true) throws -> CatalogSnapshot {
-        guard let catalogURL = Bundle.main.url(
-            forResource: "tama-catalog",
-            withExtension: "json"
-        ) else {
+        guard
+            let catalogURL = Bundle.main.url(
+                forResource: "tama-catalog",
+                withExtension: "json"
+            )
+        else {
             throw ClientError.bundledCatalogMissing
         }
         let catalog = try JSONDecoder().decode(
@@ -24,20 +26,23 @@ struct HookCatalogClient: Sendable {
     }
 
     func hookReleaseRoot() throws -> URL {
-#if DEBUG
-        if let override = ProcessInfo.processInfo.environment["TAMA_HOOK_ROOT"], !override.isEmpty {
-            let root = URL(fileURLWithPath: override, isDirectory: true).standardizedFileURL
-            guard manager.fileExists(atPath: root.path) else {
-                throw ClientError.invalidRepositoryRoot(root.path)
+        #if DEBUG
+            if let override = ProcessInfo.processInfo.environment["TAMA_HOOK_ROOT"],
+                !override.isEmpty
+            {
+                let root = URL(fileURLWithPath: override, isDirectory: true).standardizedFileURL
+                guard manager.fileExists(atPath: root.path) else {
+                    throw ClientError.invalidRepositoryRoot(root.path)
+                }
+                return root
             }
-            return root
-        }
-#endif
+        #endif
 
         guard let resources = Bundle.main.resourceURL else {
             throw ClientError.repositoryNotFound
         }
-        let root = resources
+        let root =
+            resources
             .appendingPathComponent("hooks-release", isDirectory: true)
             .standardizedFileURL
         guard manager.fileExists(atPath: root.path) else {
@@ -62,7 +67,8 @@ struct HookCatalogClient: Sendable {
             do {
                 let registryURL = resolvedURL(requirement.registryPath, homeDirectory: home)
                 let data = try Data(contentsOf: registryURL)
-                guard let registry = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                guard let registry = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+                else {
                     throw JustificationRegistryError.invalidRoot(registryURL.path)
                 }
                 let entries = registry.keys.sorted().map { key in
@@ -146,13 +152,12 @@ struct HookCatalogClient: Sendable {
     }
 }
 
-
 private enum JustificationRegistryError: LocalizedError {
     case invalidRoot(String)
 
     var errorDescription: String? {
         switch self {
-        case let .invalidRoot(path):
+        case .invalidRoot(let path):
             "Justification registry must contain a JSON object: \(path)"
         }
     }
@@ -167,7 +172,7 @@ enum ClientError: LocalizedError {
         switch self {
         case .repositoryNotFound:
             "The Tama bundle does not contain its approved hook release."
-        case let .invalidRepositoryRoot(path):
+        case .invalidRepositoryRoot(let path):
             "TAMA_HOOK_ROOT does not exist: \(path)"
         case .bundledCatalogMissing:
             "The Tama bundle does not contain its catalog snapshot. Rebuild with Scripts/build-app.sh."

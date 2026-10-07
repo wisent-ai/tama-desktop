@@ -93,7 +93,8 @@ extension CopiesView {
     }
 
     private func badges(for record: CopyRecord) -> [(String, WisentTone)] {
-        let marks: [(String, WisentTone)] = record.marks.isEmpty
+        let marks: [(String, WisentTone)] =
+            record.marks.isEmpty
             ? [("Clean", .success)]
             : record.marks.map { ($0, .warning) }
         if model.isKept(record) { return [("Kept", .info)] + marks }
@@ -117,10 +118,12 @@ extension CopiesView {
                 badges: badges(for: record)
             ) {
                 if model.isKept(record) {
-                    Text("Kept out of this pass as --except: not removed, not counted as removable, never refused.")
-                        .font(WisentTypeScale.body())
-                        .foregroundStyle(WisentDesign.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(
+                        "Kept out of this pass as --except: not removed, not counted as removable, never refused."
+                    )
+                    .font(WisentTypeScale.body())
+                    .foregroundStyle(WisentDesign.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                     Divider()
                 }
                 if let refusal = model.refusals.first(where: { $0.path == record.path }) {

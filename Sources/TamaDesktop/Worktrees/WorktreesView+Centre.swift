@@ -9,10 +9,10 @@ extension WorktreesView {
         VStack(alignment: .leading, spacing: WisentDesign.Space.x4) {
             removalBar
             roots
-            if case let .failed(message) = model.scanState {
+            if case .failed(let message) = model.scanState {
                 WisentAlertPanel(tone: .danger, title: "Scan refused", detail: message)
             }
-            if case let .failed(message) = model.removalState {
+            if case .failed(let message) = model.removalState {
                 WisentAlertPanel(tone: .danger, title: "Removal refused", detail: message)
             }
             keptOut
@@ -32,7 +32,7 @@ extension WorktreesView {
             WisentMutationBar(outcome: .working("Reading what removal would do."), clear: {})
         case .applying:
             WisentMutationBar(outcome: .working("Removing worktrees."), clear: {})
-        case let .applied(summary):
+        case .applied(let summary):
             WisentMutationBar(outcome: .succeeded(summary), clear: {})
         case .idle, .previewed, .failed:
             EmptyView()
@@ -165,7 +165,8 @@ extension WorktreesView {
             WisentCounterRow.Counter(
                 "Removable",
                 value: model.removableCount.formatted(.number),
-                detail: "Of \(counted(model.worktreeCount, "linked checkout")) in \(counted(model.repositories.count, "repository"))",
+                detail:
+                    "Of \(counted(model.worktreeCount, "linked checkout")) in \(counted(model.repositories.count, "repository"))",
                 tone: model.removableCount == .zero ? .success : .warning
             ),
             WisentCounterRow.Counter(
@@ -230,7 +231,8 @@ extension WorktreesView {
         } else if visible.isEmpty {
             WisentEmptyPanel(
                 title: "No worktree in this repository",
-                detail: "\(counted(model.worktreeCount, "worktree")) available. Clear the filter to see all of them.",
+                detail:
+                    "\(counted(model.worktreeCount, "worktree")) available. Clear the filter to see all of them.",
                 symbol: "line.3.horizontal.decrease.circle",
                 action: WisentAction("Show every repository", kind: .secondary) {
                     repositoryFacet = nil

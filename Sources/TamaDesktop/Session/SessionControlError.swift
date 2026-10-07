@@ -17,9 +17,9 @@ enum SessionControlError: LocalizedError {
             "The agent runtime returned an invalid session-control response."
         case .legacySessionRecords:
             "Tama found only legacy v1 session records. Reinstall the verified bundled runtime, then stop or resume the affected agent session to publish v2 state."
-        case let .requestRejected(reason):
+        case .requestRejected(let reason):
             "The agent runtime rejected the session-control request: \(reason)"
-        case let .directoryUnwatchable(path, reason):
+        case .directoryUnwatchable(let path, let reason):
             "Tama could not watch the session-control directory \(path): \(reason)"
         case .sessionEnded:
             "The agent session ended before the session-control request completed."

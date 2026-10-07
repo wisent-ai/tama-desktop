@@ -33,17 +33,19 @@ struct TamaCommand: Sendable {
 
     private static func executableURL(root: URL) throws -> URL {
         let manager = FileManager.default
-#if DEBUG
-        if let override = ProcessInfo.processInfo.environment["TAMA_CLI"],
-           !override.isEmpty {
-            let url = URL(fileURLWithPath: override).standardizedFileURL
-            guard manager.isExecutableFile(atPath: url.path) else {
-                throw TamaBackendError.backendMissing(url.path)
+        #if DEBUG
+            if let override = ProcessInfo.processInfo.environment["TAMA_CLI"],
+                !override.isEmpty
+            {
+                let url = URL(fileURLWithPath: override).standardizedFileURL
+                guard manager.isExecutableFile(atPath: url.path) else {
+                    throw TamaBackendError.backendMissing(url.path)
+                }
+                return url
             }
-            return url
-        }
-#endif
-        let bundled = root
+        #endif
+        let bundled =
+            root
             .appendingPathComponent("bin", isDirectory: true)
             .appendingPathComponent("tama")
         guard manager.isExecutableFile(atPath: bundled.path) else {
@@ -93,7 +95,9 @@ struct TamaExchange: Sendable {
 /// ends the process and everything it started, because nobody is left to read
 /// its answer.
 enum TamaRequestProcess {
-    static func run(_ command: TamaCommand, operation: String, body: Data) async throws -> TamaExchange {
+    static func run(_ command: TamaCommand, operation: String, body: Data) async throws
+        -> TamaExchange
+    {
         let process = Process()
         let input = Pipe()
         let output = Pipe()
@@ -246,7 +250,7 @@ private final class RequestRun: @unchecked Sendable {
     /// Called with the lock held.
     private func handle(_ line: Data) {
         guard let event = try? JSONSerialization.jsonObject(with: line) as? [String: Any],
-              let type = event["type"] as? String
+            let type = event["type"] as? String
         else { return }
         switch type {
         case "log":
@@ -258,10 +262,12 @@ private final class RequestRun: @unchecked Sendable {
             }
         case "response", "result":
             let status = (event["status"] as? NSNumber)?.intValue ?? .zero
-            let document = event["json"].flatMap {
-                try? JSONSerialization.data(withJSONObject: $0, options: [.fragmentsAllowed])
-            } ?? Data()
-            end = type == "response"
+            let document =
+                event["json"].flatMap {
+                    try? JSONSerialization.data(withJSONObject: $0, options: [.fragmentsAllowed])
+                } ?? Data()
+            end =
+                type == "response"
                 ? .response(status: status, document: document)
                 : .result(status: status, document: document)
         default:
@@ -272,17 +278,21 @@ private final class RequestRun: @unchecked Sendable {
     /// The run is over once the process exited and both pipes reached end of
     /// file, so no event written just before the exit is lost.
     private func finishIfDone(_ change: () -> Void) {
-        let ready = lock.withLock { () -> (CheckedContinuation<TamaExchange, Error>, TamaExchange)? in
+        let ready = lock.withLock {
+            () -> (CheckedContinuation<TamaExchange, Error>, TamaExchange)? in
             change()
             guard open.isEmpty, let exitStatus, let waiting = continuation else { return nil }
             continuation = nil
-            return (waiting, TamaExchange(
-                end: end,
-                stdoutText: stdoutText,
-                stderrText: stderrText,
-                processError: processError.trimmingCharacters(in: .whitespacesAndNewlines),
-                exitStatus: exitStatus
-            ))
+            return (
+                waiting,
+                TamaExchange(
+                    end: end,
+                    stdoutText: stdoutText,
+                    stderrText: stderrText,
+                    processError: processError.trimmingCharacters(in: .whitespacesAndNewlines),
+                    exitStatus: exitStatus
+                )
+            )
         }
         guard let ready else { return }
         ready.0.resume(returning: ready.1)

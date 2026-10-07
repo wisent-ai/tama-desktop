@@ -30,7 +30,7 @@ extension SettingsView {
                         Text("The walkthrough is on screen.")
                             .font(WisentTypeScale.caption())
                             .foregroundStyle(WisentDesign.success)
-                    case let .failed(reason):
+                    case .failed(let reason):
                         Text(reason)
                             .font(WisentTypeScale.caption())
                             .foregroundStyle(WisentDesign.danger)

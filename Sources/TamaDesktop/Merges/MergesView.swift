@@ -32,7 +32,8 @@ struct MergesView: View {
         case .idle: model.root.isEmpty ? "no root selected" : "not reviewed"
         case .reviewing: "reviewing now"
         case .failed: "review refused"
-        case .done: "\(counted(model.records.count, "merge")) · \(counted(model.damagedCount, "damaged merge"))"
+        case .done:
+            "\(counted(model.records.count, "merge")) · \(counted(model.damagedCount, "damaged merge"))"
         }
     }
 
@@ -59,7 +60,8 @@ struct MergesView: View {
         case .idle:
             WisentEmptyPanel(
                 title: model.root.isEmpty ? "No root selected" : "Not reviewed",
-                detail: "Choose the directory holding the checkouts and the first day whose merges are read.",
+                detail:
+                    "Choose the directory holding the checkouts and the first day whose merges are read.",
                 symbol: "arrow.triangle.merge"
             )
         case .reviewing:
@@ -67,12 +69,13 @@ struct MergesView: View {
                 title: "Reviewing merges",
                 detail: "Reading main's merges in every checkout under the root."
             )
-        case let .failed(sentence):
+        case .failed(let sentence):
             WisentAlertPanel(tone: .danger, title: "Review refused", detail: sentence)
         case .done where model.records.isEmpty:
             WisentEmptyPanel(
                 title: "No branch merges since that day",
-                detail: "No checkout under the root has a 'Merge <branch> into main' commit in that window.",
+                detail:
+                    "No checkout under the root has a 'Merge <branch> into main' commit in that window.",
                 symbol: "checkmark.seal"
             )
         case .done:
@@ -95,7 +98,8 @@ struct MergesView: View {
                 TableColumn("LEFT ON MAIN") { record in
                     WisentStatusChip(
                         text: record.findings,
-                        tone: record.error != nil ? .warning : (record.isDamaged ? .danger : .success)
+                        tone: record.error != nil
+                            ? .warning : (record.isDamaged ? .danger : .success)
                     )
                     .help(record.findings)
                 }

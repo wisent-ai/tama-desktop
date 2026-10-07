@@ -32,7 +32,8 @@ struct TamaOnboardingView: View {
                             } ?? journey.currentScreen?.titleKey ?? "Welcome to Tama",
                             detail: journey.currentScreen.flatMap {
                                 $0.presentation.text("body")
-                            } ?? journey.currentScreen?.bodyKey ?? "Prepare local policy enforcement for your coding agents.",
+                            } ?? journey.currentScreen?.bodyKey
+                                ?? "Prepare local policy enforcement for your coding agents.",
                             symbol: "checkmark.shield.fill"
                         )
 
@@ -78,7 +79,10 @@ struct TamaOnboardingView: View {
                                 }
                             }
                             .buttonStyle(WisentPrimaryButtonStyle())
-                            .disabled(isPolicyImport && (!model.allowsControl || model.isImportingPolicyBundle))
+                            .disabled(
+                                isPolicyImport
+                                    && (!model.allowsControl || model.isImportingPolicyBundle)
+                            )
                             .keyboardShortcut(.defaultAction)
                         }
                     }
@@ -156,7 +160,8 @@ struct TamaOnboardingView: View {
     private func choosePolicyBundle() {
         let panel = NSOpenPanel()
         panel.title = "Choose a Tama policy bundle"
-        panel.message = "Choose a self-contained policy bundle or sealed release containing shared-hooks/registry.json. Import installs and enables zero hooks."
+        panel.message =
+            "Choose a self-contained policy bundle or sealed release containing shared-hooks/registry.json. Import installs and enables zero hooks."
         panel.prompt = "Import"
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
@@ -171,7 +176,7 @@ struct TamaOnboardingView: View {
 
 extension Dictionary where Key == String, Value == JSONValue {
     func text(_ key: String) -> String? {
-        guard case let .string(value)? = self[key] else { return nil }
+        guard case .string(let value)? = self[key] else { return nil }
         return value
     }
 }

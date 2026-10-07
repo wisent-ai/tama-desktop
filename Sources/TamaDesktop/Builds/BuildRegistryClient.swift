@@ -6,7 +6,10 @@ struct BuildApproval: Decodable, Sendable {
     let capturedAt: String
     let quote: String
     enum CodingKeys: String, CodingKey {
-        case sessionID = "session_id", turnDigest = "turn_digest", capturedAt = "captured_at", quote
+        case sessionID = "session_id"
+        case turnDigest = "turn_digest"
+        case capturedAt = "captured_at"
+        case quote
     }
 }
 
@@ -24,7 +27,8 @@ struct BuildIntent: Decodable, Identifiable, Sendable {
     enum CodingKeys: String, CodingKey {
         case kind, target, reason, revision
         case completedTask = "completed_task"
-        case recordedAt = "recorded_at_epoch", expiresAt = "expires_at_epoch"
+        case recordedAt = "recorded_at_epoch"
+        case expiresAt = "expires_at_epoch"
         case usedAt = "used_at_epoch"
         case userApproval = "user_approval"
     }
@@ -69,22 +73,29 @@ struct BuildClosing: Decodable, Sendable { let closed: String }
 
 struct BuildRegistryClient: Sendable {
     func list() async throws -> BuildListing {
-        try await client().request("builds", as: BuildListing.self, describing: "Reading build registry")
+        try await client().request(
+            "builds", as: BuildListing.self, describing: "Reading build registry")
     }
 
-    func record(target: String, revision: String, reason: String, repository: String,
-                completedTask: String, session: String?, quote: String?) async throws -> BuildRecording {
-        var body: [String: Any] = ["kind": "build", "target": target,
+    func record(
+        target: String, revision: String, reason: String, repository: String,
+        completedTask: String, session: String?, quote: String?
+    ) async throws -> BuildRecording {
+        var body: [String: Any] = [
+            "kind": "build", "target": target,
             "revision": revision, "reason": reason, "repository": repository,
-            "completedTask": completedTask]
+            "completedTask": completedTask,
+        ]
         if let session { body["approvalSession"] = session }
         if let quote { body["approvalQuote"] = quote }
-        return try await client().request("builds/record", body: body,
+        return try await client().request(
+            "builds/record", body: body,
             as: BuildRecording.self, describing: "Recording build intent and consent")
     }
 
     func close(kind: String, target: String) async throws -> BuildClosing {
-        try await client().request("builds/close", body: ["kind": kind, "target": target],
+        try await client().request(
+            "builds/close", body: ["kind": kind, "target": target],
             as: BuildClosing.self, describing: "Closing build authorization")
     }
 

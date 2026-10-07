@@ -13,21 +13,21 @@ enum TamaBackendError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case let .backendMissing(path):
+        case .backendMissing(let path):
             "The Tama backend is missing from this build at \(path). Rebuild with Scripts/build-app.sh."
-        case let .startFailed(detail):
+        case .startFailed(let detail):
             detail.isEmpty
                 ? "The Tama backend did not start."
                 : "The Tama backend did not start: \(detail)"
-        case let .endedWithoutAnswer(status, detail):
+        case .endedWithoutAnswer(let status, let detail):
             detail.isEmpty
                 ? "The Tama backend ended with status \(status) before it answered."
                 : "The Tama backend ended with status \(status) before it answered: \(detail)"
-        case let .refused(message):
+        case .refused(let message):
             message
-        case let .unreadableOutput(operation, reason):
+        case .unreadableOutput(let operation, let reason):
             "\(operation) produced an answer Tama could not parse: \(reason)"
-        case let .cancelled(operation):
+        case .cancelled(let operation):
             "\(operation) was cancelled."
         }
     }
@@ -49,7 +49,8 @@ func executableCandidates(named name: String) -> [URL] {
     ])
     var seen = Set<String>()
     return directories.compactMap { directory in
-        let candidate = directory
+        let candidate =
+            directory
             .appendingPathComponent(name)
             .standardizedFileURL
         return seen.insert(candidate.path).inserted ? candidate : nil

@@ -61,7 +61,6 @@ struct SemanticRuntimeStatus: Codable, Sendable, Equatable {
     let recentEvents: [SemanticEventSummary]
 }
 
-
 struct SystemPolicyStatus: Codable, Sendable, Equatable {
     let schema: String
     let configured: Bool
@@ -140,13 +139,15 @@ struct AgentSessionRecord: Decodable, Identifiable, Sendable {
         pid = try values.decode(Int32.self, forKey: .pid)
         cwd = try values.decode(String.self, forKey: .cwd)
         livenessMode = try values.decodeIfPresent(String.self, forKey: .livenessMode) ?? "process"
-        heartbeatTTLSeconds = try values.decodeIfPresent(Int.self, forKey: .heartbeatTTLSeconds) ?? 900
+        heartbeatTTLSeconds =
+            try values.decodeIfPresent(Int.self, forKey: .heartbeatTTLSeconds) ?? 900
         globallyDisabled = try values.decode(Bool.self, forKey: .globallyDisabled)
         disabledHookIds = try values.decode([String].self, forKey: .disabledHookIds)
         enabledHookIds = try values.decode([String].self, forKey: .enabledHookIds)
         capability = try values.decodeIfPresent(SessionCapability.self, forKey: .capability)
         runtime = try values.decodeIfPresent(HookRuntimeStatus.self, forKey: .runtime)
-        semanticRuntime = try values.decodeIfPresent(SemanticRuntimeStatus.self, forKey: .semanticRuntime)
+        semanticRuntime = try values.decodeIfPresent(
+            SemanticRuntimeStatus.self, forKey: .semanticRuntime)
         systemPolicy = try values.decodeIfPresent(SystemPolicyStatus.self, forKey: .systemPolicy)
         updatedAt = try values.decode(String.self, forKey: .updatedAt)
     }

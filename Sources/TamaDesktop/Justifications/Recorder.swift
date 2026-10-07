@@ -165,7 +165,8 @@ struct JustificationRecordingClient {
             "file": request.target,
             "justification": request.justification,
         ]
-        _ = try await client.request("justifications/record", body: body,
+        _ = try await client.request(
+            "justifications/record", body: body,
             as: Recorded.self, describing: "Recording a justification")
     }
 }

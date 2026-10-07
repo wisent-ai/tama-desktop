@@ -70,23 +70,28 @@ struct TestApprovalClient: Sendable {
     var command: TamaCommand?
 
     func list() async throws -> TestApprovalListing {
-        try await client().request("tests/approvals", as: TestApprovalListing.self,
+        try await client().request(
+            "tests/approvals", as: TestApprovalListing.self,
             describing: "Reading test approvals")
     }
 
     func approve(paths: [String]) async throws -> TestApprovalChange {
-        try await client().request("tests/approve", body: ["paths": paths],
+        try await client().request(
+            "tests/approve", body: ["paths": paths],
             as: TestApprovalChange.self, describing: "Approving test code")
     }
 
     func revoke(paths: [String]) async throws -> TestApprovalChange {
-        try await client().request("tests/revoke", body: ["paths": paths],
+        try await client().request(
+            "tests/revoke", body: ["paths": paths],
             as: TestApprovalChange.self, describing: "Revoking a test approval")
     }
 
     func audit(roots: [String], remove: Bool) async throws -> TestAudit {
-        try await client().request("tests/audit", body: ["roots": roots, "remove": remove],
-            as: TestAudit.self, describing: remove ? "Removing unapproved test files" : "Auditing test code")
+        try await client().request(
+            "tests/audit", body: ["roots": roots, "remove": remove],
+            as: TestAudit.self,
+            describing: remove ? "Removing unapproved test files" : "Auditing test code")
     }
 
     private func client() -> TamaClient {

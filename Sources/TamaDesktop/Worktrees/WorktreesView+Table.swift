@@ -89,7 +89,8 @@ extension WorktreesView {
     /// The kept badge comes first: it is the reason the git marks beside it do
     /// not decide anything for this pass.
     private func badges(for record: WorktreeRecord) -> [(String, WisentTone)] {
-        let marks: [(String, WisentTone)] = record.marks.isEmpty
+        let marks: [(String, WisentTone)] =
+            record.marks.isEmpty
             ? [("Clean", .success)]
             : record.marks.map { ($0, .warning) }
         return model.isKept(record) ? [("Kept", .info)] + marks : marks
@@ -111,10 +112,12 @@ extension WorktreesView {
                 badges: badges(for: record)
             ) {
                 if model.isKept(record) {
-                    Text("Kept out of this pass as --except: not removed, not counted as removable, never refused.")
-                        .font(WisentTypeScale.body())
-                        .foregroundStyle(WisentDesign.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    Text(
+                        "Kept out of this pass as --except: not removed, not counted as removable, never refused."
+                    )
+                    .font(WisentTypeScale.body())
+                    .foregroundStyle(WisentDesign.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                     Divider()
                 }
                 if let refusal = model.refusals.first(where: { $0.path == record.path }) {
@@ -145,10 +148,12 @@ extension WorktreesView {
                     ? "Nothing scanned yet"
                     : "No worktree selected"
             ) {
-                Text("Select a worktree to see the repository that owns it and what removal would do.")
-                    .font(WisentTypeScale.caption())
-                    .foregroundStyle(WisentDesign.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(
+                    "Select a worktree to see the repository that owns it and what removal would do."
+                )
+                .font(WisentTypeScale.caption())
+                .foregroundStyle(WisentDesign.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

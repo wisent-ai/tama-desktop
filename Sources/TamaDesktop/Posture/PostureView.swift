@@ -49,7 +49,7 @@ struct PostureView: View {
                     tone: .danger,
                     title: "Policy unavailable",
                     detail: catalogError,
-                                        actions: [
+                    actions: [
                         WisentAction("Retry", symbol: "arrow.clockwise", kind: .primary) {
                             Task { await model.refresh() }
                         }
@@ -64,7 +64,7 @@ struct PostureView: View {
                     // section boxes the snapshot fills below them.
                     WisentSkeleton(.block, height: 56)
                     HStack(spacing: WisentDesign.Space.x3) {
-                        ForEach(0 ..< 4, id: \.self) { _ in
+                        ForEach(0..<4, id: \.self) { _ in
                             WisentSkeleton(.block, height: 76)
                         }
                     }
@@ -115,7 +115,7 @@ struct PostureView: View {
                     isEnabled: !model.isPolicyMutationInProgress
                 ) {
                     isDecidingBypass = true
-                }
+                },
         ]
     }
 
@@ -146,7 +146,7 @@ struct PostureView: View {
                 tone: .danger,
                 title: "Policy validation failed",
                 detail: error,
-                            )
+            )
         }
     }
 
@@ -158,7 +158,7 @@ struct PostureView: View {
                 tone: .danger,
                 title: "Session control unavailable",
                 detail: sessionError,
-                                actions: [
+                actions: [
                     WisentAction("Open Session", symbol: "person.badge.key", kind: .secondary) {
                         onNavigate(.session)
                     }
@@ -171,14 +171,14 @@ struct PostureView: View {
                     tone: .danger,
                     title: "System policy error in \(session.agentDisplayName) session",
                     detail: error,
-                                    )
+                )
             }
             if let error = session.runtime?.registryLoadError {
                 WisentAlertPanel(
                     tone: .danger,
                     title: "Session policy unavailable in \(session.agentDisplayName)",
                     detail: error,
-                                    )
+                )
             }
         }
     }
@@ -195,7 +195,7 @@ struct PostureView: View {
                 title: blockingTitle(decision.event),
                 detail: decision.event.reason
                     ?? "No reason was recorded.",
-                                actions: [
+                actions: [
                     WisentAction("Open Session", symbol: "person.badge.key", kind: .secondary) {
                         onNavigate(.session)
                     }
