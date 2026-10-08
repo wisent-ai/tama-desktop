@@ -134,7 +134,7 @@ extension ViolationsView {
     /// A headless model agent editing a working tree is not undoable from here:
     /// the edits land in files the operator has open, and only the final rescan
     /// says whether they were an improvement. How many rounds it may take is
-    /// the operator's number, as it is for `tama clean --max-rounds`.
+    /// the operator's number, as it is for `tama violations clean --max-rounds`.
     var repairDecision: some View {
         let paths = Set((report?.allViolations ?? []).map(\.path)).sorted()
         return VStack(alignment: .leading, spacing: WisentDesign.Space.x4) {

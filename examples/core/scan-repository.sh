@@ -5,9 +5,9 @@ set -eu
 
 : "${REPOSITORY:?set REPOSITORY to an existing Git working tree}"
 
-tama find-violations --repo "$REPOSITORY" || SCAN=$?
+tama violations find --repo "$REPOSITORY" || SCAN=$?
 
 # Use JSON for automation or archival evidence.
-tama find-violations --repo "$REPOSITORY" --json > /dev/null || SCAN=$?
+tama violations find --repo "$REPOSITORY" --json > /dev/null || SCAN=$?
 
 exit "${SCAN:-0}"

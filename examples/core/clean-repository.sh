@@ -7,10 +7,10 @@ set -eu
 TAMA_MODEL=${TAMA_MODEL:-codex}
 MAX_ROUNDS=${MAX_ROUNDS:?set MAX_ROUNDS to the allowed repair-round limit}
 
-tama clean \
+tama violations clean \
   --repo "$REPOSITORY" \
   --model "$TAMA_MODEL" \
   --max-rounds "$MAX_ROUNDS"
 
 # Prove the final observable state with an independent read-only scan.
-tama find-violations --repo "$REPOSITORY"
+tama violations find --repo "$REPOSITORY"

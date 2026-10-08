@@ -1,4 +1,4 @@
-/// Which pass of `tama find-violations` a scan runs: the hook replay, or one
+/// Which pass of `tama violations find` a scan runs: the hook replay, or one
 /// of the in-process passes the CLI offers as `--size-only`, `--duplicates`,
 /// `--internal-names` and `--time-limits`. The screen offers every pass the
 /// command has, and `requestValue` is the `mode` the `violations/scan`

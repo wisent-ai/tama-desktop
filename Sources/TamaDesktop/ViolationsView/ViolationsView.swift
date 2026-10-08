@@ -102,7 +102,7 @@ struct ViolationsView: View {
     }
 
     /// Which question the next scan answers: every rule through the hooks,
-    /// or one of the in-process passes `tama find-violations` offers.
+    /// or one of the in-process passes `tama violations find` offers.
     var passGroup: WisentFacetGroup {
         WisentFacetGroup(
             "Pass",

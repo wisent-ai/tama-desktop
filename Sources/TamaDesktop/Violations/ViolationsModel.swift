@@ -23,7 +23,7 @@ final class ViolationsModel: ObservableObject {
     @Published private(set) var report: ViolationReport?
     @Published private(set) var cleanState: CleanState = .idle
     @Published private(set) var scanMode: ViolationScanMode = .everyRule
-    /// How many repair rounds the operator allows, as typed. `tama clean`
+    /// How many repair rounds the operator allows, as typed. `tama violations clean`
     /// has no default for `--max-rounds`, so neither does this screen.
     @Published var repairRounds: String = ""
 
