@@ -77,7 +77,7 @@ struct BuildsView: View {
                     "tama.build.repository")
                 TextField("Reason for this build", text: $reason, axis: .vertical)
                 TextField(
-                    "Completed whole task and result (at least eight words)", text: $completedTask,
+                    "Completed whole task and result", text: $completedTask,
                     axis: .vertical
                 )
                 .accessibilityIdentifier("tama.build.completed-task")
