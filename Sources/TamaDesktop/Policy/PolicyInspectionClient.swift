@@ -212,6 +212,18 @@ struct PolicyInspectionClient: Sendable {
                     guard let sentence = targets[target] as? String else { continue }
                     notes.append("\(target): \(sentence)")
                 }
+            case "dispatcherStates":
+                // One row per managed Git hook, carrying the sentence the CLI
+                // prints for it: a dispatcher held aside or a foreign hook in
+                // its place means the push-time formatting gate does not run.
+                guard let states = value as? [[String: Any]] else { continue }
+                for state in states {
+                    guard
+                        let hook = state["hook"] as? String,
+                        let description = state["description"] as? String
+                    else { continue }
+                    fields.append(InstallPlanField(label: "Git hook \(hook)", value: description))
+                }
             default:
                 fields.append(contentsOf: flatten(name: name, value: value))
             }
