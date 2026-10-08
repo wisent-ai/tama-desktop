@@ -9,7 +9,8 @@ if [ -z "${TAMA_HOOK_RELEASE_ROOT:-}" ]; then
         TAMA_HOOK_RELEASE_ROOT="$SCRIPT_DIR/../.build/Tama.app/Contents/Resources/hooks-release"
     fi
 fi
-TAMA_HOOK_INSTALLER=${TAMA_HOOK_INSTALLER:-"$SCRIPT_DIR/install_hook_release.py"}
+# The approved release's own tama is its installer (`tama hooks install-release`).
+TAMA_HOOK_INSTALLER=${TAMA_HOOK_INSTALLER:-"$TAMA_HOOK_RELEASE_ROOT/bin/tama"}
 export TAMA_HOOK_RELEASE_ROOT TAMA_HOOK_INSTALLER
 
 ACTION=${TAMA_EMERGENCY_ACTION:-disable}
@@ -18,35 +19,6 @@ case "$ACTION" in
     *) printf '%s\n' "Unsupported Tama emergency action: $ACTION" >&2; exit 2 ;;
 esac
 export TAMA_EMERGENCY_ACTION="$ACTION"
-export TAMA_SKIP_SESSION_RESTART=${TAMA_SKIP_SESSION_RESTART:-0}
-TAMA_SESSION_SUPERVISOR=${TAMA_SESSION_SUPERVISOR:-"$TAMA_HOOK_RELEASE_ROOT/shared-hooks/agent-session-supervisor.py"}
-TAMA_SUPERVISOR_HOME=${TAMA_HOME:-"$HOME"}
-export TAMA_SESSION_SUPERVISOR TAMA_SUPERVISOR_HOME
-export PYTHONDONTWRITEBYTECODE=1
-
-supervisor_paused=0
-resume_supervised_sessions() {
-    if [ "$supervisor_paused" = 1 ]; then
-        python3 "$TAMA_SESSION_SUPERVISOR" control resume \
-            --home "$TAMA_SUPERVISOR_HOME" >/dev/null \
-            || printf '%s\n' "Tama could not resume one or more supervised agent sessions." >&2
-    fi
-}
-
-if [ "$TAMA_SKIP_SESSION_RESTART" != 1 ]; then
-    [ -f "$TAMA_SESSION_SUPERVISOR" ] || {
-        printf 'Tama session supervisor is missing: %s\n' "$TAMA_SESSION_SUPERVISOR" >&2
-        exit 66
-    }
-    supervisor_paused=1
-    trap resume_supervised_sessions EXIT
-    trap 'exit 129' HUP
-    trap 'exit 130' INT
-    trap 'exit 143' TERM
-    python3 "$TAMA_SESSION_SUPERVISOR" control pause \
-        --home "$TAMA_SUPERVISOR_HOME" \
-        --require-all >/dev/null
-fi
 
 python3 - <<'PY'
 from pathlib import Path
@@ -141,8 +113,9 @@ if action == "disable":
     release_root = Path(os.environ["TAMA_HOOK_RELEASE_ROOT"])
     install = subprocess.run(
         [
-            sys.executable,
             str(installer),
+            "hooks",
+            "install-release",
             "--release",
             str(release_root),
             "--home",
@@ -198,8 +171,9 @@ else:
         raise SystemExit(f"Tama approved hook release is missing: {release_root}")
     install = subprocess.run(
         [
-            sys.executable,
             str(installer),
+            "hooks",
+            "install-release",
             "--release",
             str(release_root),
             "--home",
@@ -239,7 +213,7 @@ if action == "disable":
             "changedAt": datetime.now(timezone.utc).isoformat(),
         },
     )
-    print("Disabled hooks. Supervised agent sessions will resume without an editor restart.")
+    print("Disabled hooks. Running agent sessions read the emergency state at once and keep running.")
 else:
     state_path.unlink(missing_ok=True)
     manifest_path.unlink(missing_ok=True)
@@ -247,7 +221,7 @@ else:
     (backup / "codex-hooks.json").unlink(missing_ok=True)
     print(
         f"Enabled approved hook release {installed_release['releaseId'][:12]}. "
-        "Supervised agent sessions will resume without an editor restart."
+        "Running agent sessions read the cleared emergency state at once and keep running."
     )
 
 
@@ -257,9 +231,3 @@ shutil.rmtree(
     ignore_errors=True,
 )
 PY
-if [ "$supervisor_paused" = 1 ]; then
-    python3 "$TAMA_SESSION_SUPERVISOR" control resume \
-        --home "$TAMA_SUPERVISOR_HOME" >/dev/null
-    supervisor_paused=0
-    trap - EXIT HUP INT TERM
-fi
