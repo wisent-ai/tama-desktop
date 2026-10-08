@@ -131,7 +131,7 @@ final class AppModel: ObservableObject {
                         directory: SessionControlClient().sessionDirectory(),
                         processes: self.agentSessions
                             .filter { $0.livenessMode == "process" }
-                            .map(\.pid)
+                            .compactMap(\.pid)
                     )
                 } catch {
                     self.sessionError = Self.sentence(error)

@@ -166,6 +166,10 @@ extension SessionView {
             ) {
                 WisentField(label: "Project", value: session.cwd)
                 WisentField(label: "Updated at", value: session.updatedAt)
+                WisentField(label: "Liveness", value: session.livenessMode)
+                if let reason = session.livenessError {
+                    WisentField(label: "Liveness unknown", value: reason)
+                }
                 if let policy = session.systemPolicy {
                     Divider()
                     WisentField(label: "Policy mode", value: policy.mode)

@@ -100,10 +100,14 @@ struct AgentSessionRecord: Decodable, Identifiable, Sendable {
     let agentId: String
     let sessionId: String
     let controlKey: String
-    let pid: Int32
+    /// The live owner process, present only in `process` mode.
+    let pid: Int32?
     let cwd: String
     let livenessMode: String
-    let heartbeatTTLSeconds: Int
+    /// The heartbeat the launcher stated, present only in `heartbeat` mode.
+    let heartbeatTTLSeconds: Int?
+    /// Why liveness cannot be told, present in `unknown` mode.
+    let livenessError: String?
     let globallyDisabled: Bool
     let disabledHookIds: [String]
     let enabledHookIds: [String]
@@ -142,6 +146,7 @@ struct AgentSessionRecord: Decodable, Identifiable, Sendable {
         case cwd
         case livenessMode
         case heartbeatTTLSeconds
+        case livenessError
         case globallyDisabled
         case disabledHookIds
         case enabledHookIds
@@ -158,11 +163,11 @@ struct AgentSessionRecord: Decodable, Identifiable, Sendable {
         agentId = try values.decode(String.self, forKey: .agentId)
         sessionId = try values.decode(String.self, forKey: .sessionId)
         controlKey = try values.decode(String.self, forKey: .controlKey)
-        pid = try values.decode(Int32.self, forKey: .pid)
+        pid = try values.decodeIfPresent(Int32.self, forKey: .pid)
         cwd = try values.decode(String.self, forKey: .cwd)
-        livenessMode = try values.decodeIfPresent(String.self, forKey: .livenessMode) ?? "process"
-        heartbeatTTLSeconds =
-            try values.decodeIfPresent(Int.self, forKey: .heartbeatTTLSeconds) ?? 900
+        livenessMode = try values.decode(String.self, forKey: .livenessMode)
+        heartbeatTTLSeconds = try values.decodeIfPresent(Int.self, forKey: .heartbeatTTLSeconds)
+        livenessError = try values.decodeIfPresent(String.self, forKey: .livenessError)
         globallyDisabled = try values.decode(Bool.self, forKey: .globallyDisabled)
         disabledHookIds = try values.decode([String].self, forKey: .disabledHookIds)
         enabledHookIds = try values.decode([String].self, forKey: .enabledHookIds)

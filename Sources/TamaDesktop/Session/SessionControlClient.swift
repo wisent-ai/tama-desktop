@@ -2,9 +2,6 @@ import Darwin
 import Foundation
 
 struct SessionControlClient: Sendable {
-    /// A heartbeat TTL is honoured between five seconds and an hour, whatever the record claims.
-    private static let minimumHeartbeatTTLSeconds = 5
-    private static let maximumHeartbeatTTLSeconds = 3_600
     /// An agent id is a short lowercase word; a control key is a 256-bit hex string.
     private static let maximumAgentIdLength = 32
     private static let controlKeyHexLength = 64
@@ -50,7 +47,10 @@ struct SessionControlClient: Sendable {
             else {
                 continue
             }
-            if sessionIsLive(session, now: now) {
+            // A record whose liveness cannot be told is listed with its reason
+            // rather than dropped, so a launcher that states neither an owner
+            // process nor a heartbeat is visible.
+            if sessionIsLive(session, now: now) || session.livenessMode == "unknown" {
                 sessions.append(session)
             }
         }
@@ -146,7 +146,7 @@ struct SessionControlClient: Sendable {
         // land between writing and watching.
         let watch = try ControlDirectoryWatch(
             directory: root,
-            processes: session.livenessMode == "process" ? [session.pid] : []
+            processes: session.livenessMode == "process" ? [session.pid].compactMap { $0 } : []
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
@@ -238,12 +238,12 @@ struct SessionControlClient: Sendable {
     private func sessionIsLive(_ session: AgentSessionRecord, now: Date) -> Bool {
         switch session.livenessMode {
         case "process":
-            return processIsAlive(session.pid)
+            guard let pid = session.pid else { return false }
+            return processIsAlive(pid)
         case "heartbeat":
-            guard let updated = Self.date(from: session.updatedAt) else { return false }
-            let ttl = min(
-                max(session.heartbeatTTLSeconds, Self.minimumHeartbeatTTLSeconds),
-                Self.maximumHeartbeatTTLSeconds)
+            guard let updated = Self.date(from: session.updatedAt),
+                let ttl = session.heartbeatTTLSeconds
+            else { return false }
             return updated.addingTimeInterval(TimeInterval(ttl)) >= now
         default:
             return false
