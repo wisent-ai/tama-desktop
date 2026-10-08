@@ -68,9 +68,9 @@ struct InstallPlan: Sendable {
 }
 
 /// The read-only half of the Tama backend: coverage the registry declares,
-/// the install plan, and the MCP snippet.
+/// the install plan, the MCP snippet, and the model service Tama asks.
 ///
-/// These three reads exist in the core and had no surface at all, so the
+/// These reads exist in the core and had no surface at all, so the
 /// operator had to leave the application to answer "which provider is covered"
 /// and "where would an install write". Nothing here mutates: every read is a
 /// request with an empty body, and each failure carries the backend's own
@@ -79,6 +79,7 @@ struct PolicyInspectionClient: Sendable {
     private static let coverageOperation = "The provider coverage read"
     private static let planOperation = "The install plan read"
     private static let mcpOperation = "The MCP snippet read"
+    private static let modelServiceOperation = "The model service read"
 
     func providerCoverage() async throws -> [ProviderCoverage] {
         try await client().request(
@@ -98,6 +99,61 @@ struct PolicyInspectionClient: Sendable {
 
     func mcpConfiguration() async throws -> String {
         try await client().prettyText("mcp-config", describing: Self.mcpOperation)
+    }
+
+    /// Which model service Tama asks and whether it accepts this machine's
+    /// credential: `tama model-provider show` and `check` as one read, shaped
+    /// as the label/value rows the install levels already render.
+    func modelService() async throws -> InstallPlanLevel {
+        let document = try await client().document(
+            "model-provider",
+            describing: Self.modelServiceOperation
+        )
+        return try Self.decodeModelService(document)
+    }
+
+    static func decodeModelService(_ data: Data) throws -> InstallPlanLevel {
+        let parsed: Any
+        do {
+            parsed = try JSONSerialization.jsonObject(with: data)
+        } catch {
+            throw TamaBackendError.unreadableOutput(
+                modelServiceOperation, error.localizedDescription)
+        }
+        guard
+            let root = parsed as? [String: Any],
+            let choice = root["choice"] as? [String: Any],
+            var check = root["check"] as? [String: Any]
+        else {
+            throw TamaBackendError.unreadableOutput(
+                modelServiceOperation,
+                "the answer carries no choice and check objects"
+            )
+        }
+        if let refusal = check["error"] as? String {
+            return InstallPlanLevel(
+                key: "model-service",
+                level: "Model service",
+                activeByArchiveAlone: false,
+                fields: flatten(name: "service", value: choice),
+                notes: ["The check could not run: \(refusal)"]
+            )
+        }
+        guard let verdict = check.removeValue(forKey: "verdict") as? String else {
+            throw TamaBackendError.unreadableOutput(
+                modelServiceOperation,
+                "the check carries no verdict sentence"
+            )
+        }
+        return InstallPlanLevel(
+            key: "model-service",
+            level: "Model service",
+            activeByArchiveAlone: check["accepted"] as? Bool == true
+                && check["endpoint_allowed"] as? Bool == true,
+            fields: flatten(name: "service", value: choice)
+                + flatten(name: "check", value: check),
+            notes: [verdict]
+        )
     }
 
     private func client() -> TamaClient {

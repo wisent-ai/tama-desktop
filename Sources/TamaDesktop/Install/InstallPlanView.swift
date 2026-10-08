@@ -1,13 +1,14 @@
 import SwiftUI
 import WisentDesignSystem
 
-/// Where an install would write, scope by scope, and the MCP snippet that goes
-/// with it.
+/// Where an install would write, scope by scope, the MCP snippet that goes
+/// with it, and the model service Tama's reviewers ask.
 ///
 /// The install plan and the MCP snippet had no surface, so an operator
 /// approving a privileged install could not see which files it would touch. The
 /// plan is read-only: this screen states target paths, and performs none of
-/// the changes.
+/// the changes. The model service row is `tama model-provider show` and
+/// `check`: which service is asked and whether it accepts this machine.
 struct InstallPlanView: View {
     @ObservedObject var inspection: InspectionModel
 
@@ -43,6 +44,7 @@ struct InstallPlanView: View {
                 signals(plan)
                 ForEach(plan.levels) { level($0) }
                 mcpSection
+                modelServiceSection
             } else if inspection.isReadingPlan {
                 WisentSkeletonGroup(
                     label: "Reading the install plan",
@@ -167,6 +169,26 @@ struct InstallPlanView: View {
             } else if inspection.isReadingMCP {
                 WisentSkeletonText(lines: 6, label: "Reading configuration")
             }
+        }
+    }
+
+    @ViewBuilder
+    private var modelServiceSection: some View {
+        if let modelServiceError = inspection.modelServiceError {
+            WisentAlertPanel(
+                tone: .warning,
+                title: "Model service could not be read",
+                detail: modelServiceError,
+                actions: [
+                    WisentAction("Check again", symbol: "arrow.clockwise", kind: .secondary) {
+                        Task { await inspection.loadModelService() }
+                    }
+                ]
+            )
+        } else if let modelService = inspection.modelService {
+            level(modelService)
+        } else if inspection.isReadingModelService {
+            WisentSkeletonText(label: "Checking the model service")
         }
     }
 }

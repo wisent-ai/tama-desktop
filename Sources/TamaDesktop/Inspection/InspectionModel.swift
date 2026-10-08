@@ -21,6 +21,10 @@ final class InspectionModel: ObservableObject {
     @Published private(set) var mcpError: String?
     @Published private(set) var isReadingMCP = false
 
+    @Published private(set) var modelService: InstallPlanLevel?
+    @Published private(set) var modelServiceError: String?
+    @Published private(set) var isReadingModelService = false
+
     private var hasRequestedCoverage = false
     private var hasRequestedPlan = false
 
@@ -66,6 +70,7 @@ final class InspectionModel: ObservableObject {
         }
         isReadingPlan = false
         await loadMCPConfiguration()
+        await loadModelService()
     }
 
     /// The MCP snippet is read beside the plan because it is the plan's `mcp`
@@ -88,6 +93,28 @@ final class InspectionModel: ObservableObject {
             )
         }
         isReadingMCP = false
+    }
+
+    /// The model service Tama's reviewers ask is read beside the plan because
+    /// an install without one that answers leaves every model-backed hook
+    /// refusing; the read asks the service itself, never spending quota.
+    func loadModelService() async {
+        guard !isReadingModelService else { return }
+        isReadingModelService = true
+        do {
+            modelService = try await Task.detached(priority: .userInitiated) {
+                try await PolicyInspectionClient().modelService()
+            }.value
+            modelServiceError = nil
+        } catch {
+            modelServiceError = Self.sentence(error)
+            TamaFailureReporting.reportSurfaced(
+                failurePoint: "tama.inspection.model-service",
+                error: error,
+                sentence: modelServiceError ?? Self.sentence(error)
+            )
+        }
+        isReadingModelService = false
     }
 
     private static func sentence(_ error: Error) -> String {
