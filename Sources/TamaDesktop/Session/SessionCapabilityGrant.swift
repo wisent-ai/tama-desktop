@@ -47,6 +47,33 @@ struct HookRuntimeStatus: Codable, Sendable, Equatable {
     let runtimeHolder: RuntimeHolder?
     /// Every hook dispatch still waiting on the core.
     let inFlightDispatches: [InFlightDispatch]?
+    let hookProgress: String?
+    let runningHooks: RunningHookInspection?
+}
+
+struct RunningHookInspection: Codable, Sendable, Equatable {
+    let running: [RunningHookRecord]
+    let errors: [String]?
+}
+
+struct RunningHookRecord: Codable, Sendable, Equatable {
+    let hookId: String
+    let hookPid: Int
+    let corePid: Int
+    let coreAlive: Bool
+    let hookAlive: Bool
+    let waitingOn: [HookDescendant]
+    let orphanTermination: OrphanTermination?
+}
+
+struct HookDescendant: Codable, Sendable, Equatable {
+    let pid: Int
+    let command: String
+}
+
+struct OrphanTermination: Codable, Sendable, Equatable {
+    let sent: Bool
+    let error: String?
 }
 
 /// What holds a session's hook runtime, as its adapter publishes it.

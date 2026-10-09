@@ -183,6 +183,7 @@ struct SessionView: View {
                 }.joined(separator: "\n")
             )
         }
+        hookInspection(session)
     }
 
     func policyActions(_ session: AgentSessionRecord) -> [WisentAction] {

@@ -103,6 +103,20 @@ extension AppModel {
             await self.refreshAgentSessions()
         }
     }
+    func inspectRuntime(in session: AgentSessionRecord) {
+        mutate("Inspecting hook ownership in session \(session.sessionId)…") {
+            let updated = try await Task.detached(priority: .userInitiated) {
+                try SessionControlClient().inspectRuntime(session: session)
+            }.value
+            self.merge(updated)
+            guard let inspection = updated.runtime?.runningHooks else {
+                throw SessionControlError.invalidResponse
+            }
+            return "Inspected \(inspection.running.count) hook records; orphan termination outcomes are shown in Session."
+        } recover: {
+            await self.refreshAgentSessions()
+        }
+    }
     func clearMutation() {
         mutation = .idle
     }

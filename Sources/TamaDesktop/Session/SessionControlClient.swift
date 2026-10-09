@@ -113,6 +113,13 @@ struct SessionControlClient: Sendable {
         return updated
     }
 
+    func inspectRuntime(session: AgentSessionRecord) throws -> AgentSessionRecord {
+        guard isSafeControlKey(session.controlKey), isSafeAgentId(session.agentId) else {
+            throw SessionControlError.invalidSession
+        }
+        return try performRequest(session: session, operation: "runtime-status")
+    }
+
     private func performRequest(
         session: AgentSessionRecord,
         operation: String,
