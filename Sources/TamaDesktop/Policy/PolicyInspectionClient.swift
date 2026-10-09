@@ -206,12 +206,6 @@ struct PolicyInspectionClient: Sendable {
                 continue
             case "note":
                 if let note = value as? String { notes.append(note) }
-            case "unsupportedTargets":
-                guard let targets = value as? [String: Any] else { continue }
-                for target in targets.keys.sorted() {
-                    guard let sentence = targets[target] as? String else { continue }
-                    notes.append("\(target): \(sentence)")
-                }
             case "dispatcherStates":
                 // One row per managed Git hook, carrying the sentence the CLI
                 // prints for it: a dispatcher held aside or a foreign hook in
