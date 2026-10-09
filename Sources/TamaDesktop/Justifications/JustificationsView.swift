@@ -27,6 +27,7 @@ struct JustificationsView: View {
     @State var query = ""
     @State private var isRecordingSheetOpen = false
     @State private var isCUASheetOpen = false
+    @State private var isSSHSheetOpen = false
     @State private var isTestApprovalSheetOpen = false
     @State private var lastRecorded: String?
 
@@ -73,6 +74,9 @@ struct JustificationsView: View {
                 Button("CUA consent") { isCUASheetOpen = true }
             }
             ToolbarItem(placement: .primaryAction) {
+                Button("SSH consent") { isSSHSheetOpen = true }
+            }
+            ToolbarItem(placement: .primaryAction) {
                 Button("Test approvals") { isTestApprovalSheetOpen = true }
             }
             ToolbarItem(placement: .primaryAction) {
@@ -85,6 +89,7 @@ struct JustificationsView: View {
             }
         }
         .sheet(isPresented: $isCUASheetOpen) { CUAGrantsView() }
+        .sheet(isPresented: $isSSHSheetOpen) { SSHGrantsView() }
         .sheet(isPresented: $isTestApprovalSheetOpen) { TestApprovalsView() }
         .sheet(isPresented: $isRecordingSheetOpen) {
             JustificationRecorder(collections: collections) { path in
