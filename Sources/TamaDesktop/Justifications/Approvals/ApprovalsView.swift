@@ -43,6 +43,7 @@ struct TestApprovalsView: View {
                         ForEach(listing.approved) { approval in row(approval) }
                     }
                     TestAuditPanel()
+                    TestReviewPanel()
                 }
             }
         }

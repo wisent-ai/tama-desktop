@@ -63,6 +63,10 @@ struct TestAudit: Decodable, Sendable {
     }
 }
 
+struct TestReview: Decodable, Sendable {
+    let message: String
+}
+
 /// `tama request tests/approvals|approve|revoke|audit`: the same record and
 /// the same change `tama tests` makes in the operator's terminal.
 struct TestApprovalClient: Sendable {
@@ -92,6 +96,12 @@ struct TestApprovalClient: Sendable {
             "tests/audit", body: ["roots": roots, "remove": remove],
             as: TestAudit.self,
             describing: remove ? "Removing unapproved test files" : "Auditing test code")
+    }
+
+    func review(root: String) async throws -> TestReview {
+        try await client().request(
+            "tests/review", body: ["root": root],
+            as: TestReview.self, describing: "Reviewing tracked test files")
     }
 
     private func client() -> TamaClient {
