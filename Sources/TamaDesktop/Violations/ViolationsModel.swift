@@ -187,7 +187,8 @@ final class ViolationsModel: ObservableObject {
             guard
                 let report,
                 report.totals.violations == .zero,
-                report.totals.problems == .zero
+                report.totals.problems == .zero,
+                report.scanErrors == .zero
             else {
                 let sentence =
                     "Cleanup finished but the final scan is not clean. "
