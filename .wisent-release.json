@@ -59,12 +59,6 @@
     }
   },
   "inputs": {
-    "wisent-desktop-update": {
-      "uri": "stado://sources/wisent-desktop-update/sha256/1f3c919e7e15ef6736a7c9c841ca185cb487e502c0da39be68aa1aa8b487af47/source.tar.gz",
-      "sha256": "1f3c919e7e15ef6736a7c9c841ca185cb487e502c0da39be68aa1aa8b487af47",
-      "mount": "wisent-desktop-update.tar.gz",
-      "extract": false
-    },
     "swiftpm-cache": {
       "uri": "stado://sources/tama-desktop/dependencies/swiftpm-cache/sha256/bc57786e80f67fa7008a94fbc4bfc51b3fe0d3c25d84d1a1d12f7d5b54973c31/source.tar.gz",
       "sha256": "bc57786e80f67fa7008a94fbc4bfc51b3fe0d3c25d84d1a1d12f7d5b54973c31",

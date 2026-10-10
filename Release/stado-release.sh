@@ -1,7 +1,6 @@
 #!/bin/bash
 set -euo pipefail
 
-UPDATER_SHA256="1f3c919e7e15ef6736a7c9c841ca185cb487e502c0da39be68aa1aa8b487af47"
 PRODUCT="Tama"
 PRODUCT_SLUG="tama-desktop"
 
@@ -21,12 +20,10 @@ verify_input() {
 
 prepare_source() {
   source="$WISENT_SOURCE_DIR"
-  updater="$WISENT_INPUTS_DIR/wisent-desktop-update.tar.gz"
   hooks="$(bash "$source/Release/tama-source.sh" verify)"
   TAMA_SOURCE_SHA256="$(shasum -a 256 "$hooks" | awk '{print $1}')"
   swiftpm="$WISENT_INPUTS_DIR/swiftpm-cache.tar.gz"
   SWIFTPM_SHA256="$(plutil -extract inputs.swiftpm-cache.sha256 raw -o - "$source/.wisent-release.json")"
-  verify_input "$updater" "$UPDATER_SHA256"
   verify_input "$swiftpm" "$SWIFTPM_SHA256"
   work="$WISENT_OUTPUT_DIR/work"
   rm -rf "$work"
@@ -130,7 +127,7 @@ build_release() {
   archive_sha="$(shasum -a 256 "$archive" | awk '{print $1}')"
   appcast_sha="$(shasum -a 256 "$release/appcast.xml" | awk '{print $1}')"
   signature_sha="$(shasum -a 256 "$archive.sparkle-signature" | awk '{print $1}')"
-  printf '{"schema_version":1,"product":"%s","version":"%s","platform":"%s","archive_sha256":"%s","appcast_sha256":"%s","signature_sha256":"%s","updater_source_sha256":"%s","hooks_source_sha256":"%s","swiftpm_cache_sha256":"%s","notarized":true}\n' "$PRODUCT_SLUG" "$WISENT_VERSION" "$WISENT_PLATFORM" "$archive_sha" "$appcast_sha" "$signature_sha" "$UPDATER_SHA256" "$TAMA_SOURCE_SHA256" "$SWIFTPM_SHA256" > "$evidence/release.json"
+  printf '{"schema_version":1,"product":"%s","version":"%s","platform":"%s","archive_sha256":"%s","appcast_sha256":"%s","signature_sha256":"%s","hooks_source_sha256":"%s","swiftpm_cache_sha256":"%s","notarized":true}\n' "$PRODUCT_SLUG" "$WISENT_VERSION" "$WISENT_PLATFORM" "$archive_sha" "$appcast_sha" "$signature_sha" "$TAMA_SOURCE_SHA256" "$SWIFTPM_SHA256" > "$evidence/release.json"
   shasum -a 256 "$archive" "$archive.sparkle-signature" "$release/appcast.xml" > "$evidence/DIGESTS"
 }
 
