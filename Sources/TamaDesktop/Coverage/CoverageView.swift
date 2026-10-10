@@ -240,10 +240,9 @@ struct CoverageView: View {
                     label: "Declared mappings", value: coverage.mappingCount.formatted(.number))
                 WisentField(label: "Policies", value: coverage.hookCount.formatted(.number))
                 WisentField(label: "Events", value: coverage.eventCount.formatted(.number))
-                WisentField(
-                    label: "Installed in its config",
-                    value: coverage.wiringSummary ?? "no config Tama writes"
-                )
+                if let summary = coverage.wiringSummary {
+                    WisentField(label: "Installed in its config", value: summary)
+                }
                 WisentField(
                     label: "Adapter path",
                     value: coverage.adapterPath ?? "No adapter declared"

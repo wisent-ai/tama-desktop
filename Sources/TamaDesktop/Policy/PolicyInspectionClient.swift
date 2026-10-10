@@ -17,7 +17,7 @@ struct ProviderCoverage: Decodable, Identifiable, Sendable {
     let eventCount: Int
     let adapterPath: String?
     /// How many declared mappings the provider's own config really installs.
-    /// `nil` for providers whose config Tama does not write.
+    /// `nil` when configuration inspection is unavailable; `note` explains why.
     let installedMappingCount: Int?
     let requiredLiveCoverage: Bool?
     let evidence: String
