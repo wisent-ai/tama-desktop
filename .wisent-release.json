@@ -11,7 +11,14 @@
     "darwin-arm64": {
       "runner_platform": "darwin-arm64",
       "quality": [
-        {"name": "fmt", "argv": ["bash", "release/fmt.sh", "--check"]},
+        {
+          "name": "fmt",
+          "argv": [
+            "bash",
+            "release/fmt.sh",
+            "--check"
+          ]
+        },
         {
           "name": "compile",
           "argv": [
@@ -59,8 +66,8 @@
       "extract": false
     },
     "swiftpm-cache": {
-      "uri": "stado://sources/tama-swiftpm-cache/sha256/69afd7557e507caa16f64ac96a723c5daa74091bbe3417e423409634b670ada3/source.tar.gz",
-      "sha256": "69afd7557e507caa16f64ac96a723c5daa74091bbe3417e423409634b670ada3",
+      "uri": "stado://sources/tama-desktop/dependencies/swiftpm-cache/sha256/bc57786e80f67fa7008a94fbc4bfc51b3fe0d3c25d84d1a1d12f7d5b54973c31/source.tar.gz",
+      "sha256": "bc57786e80f67fa7008a94fbc4bfc51b3fe0d3c25d84d1a1d12f7d5b54973c31",
       "mount": "swiftpm-cache.tar.gz",
       "extract": false
     }

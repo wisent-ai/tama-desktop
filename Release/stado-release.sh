@@ -2,7 +2,6 @@
 set -euo pipefail
 
 UPDATER_SHA256="1f3c919e7e15ef6736a7c9c841ca185cb487e502c0da39be68aa1aa8b487af47"
-SWIFTPM_SHA256="69afd7557e507caa16f64ac96a723c5daa74091bbe3417e423409634b670ada3"
 PRODUCT="Tama"
 PRODUCT_SLUG="tama-desktop"
 
@@ -26,6 +25,7 @@ prepare_source() {
   hooks="$(bash "$source/Release/tama-source.sh" verify)"
   TAMA_SOURCE_SHA256="$(shasum -a 256 "$hooks" | awk '{print $1}')"
   swiftpm="$WISENT_INPUTS_DIR/swiftpm-cache.tar.gz"
+  SWIFTPM_SHA256="$(plutil -extract inputs.swiftpm-cache.sha256 raw -o - "$source/.wisent-release.json")"
   verify_input "$updater" "$UPDATER_SHA256"
   verify_input "$swiftpm" "$SWIFTPM_SHA256"
   work="$WISENT_OUTPUT_DIR/work"
@@ -35,10 +35,7 @@ prepare_source() {
   trap 'rm -rf "$work"' EXIT
   mkdir -p "$work"
   hooks_root="$(bash "$source/Release/tama-source.sh" unpack --destination "$work")"
-  tar -xzf "$swiftpm" -C "$source"
-  # Swift module caches contain absolute paths from the archive's producer.
-  # Keep downloaded dependencies, but compile artifacts in this source checkout.
-  swift package --package-path "$source" clean
+  stado product swift --package-path "$source" --archive "$swiftpm" restore
   [ -f "$hooks_root/package.json" ] || { printf 'immutable hook source is incomplete\n' >&2; exit 1; }
 }
 
