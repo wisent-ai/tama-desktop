@@ -19,6 +19,7 @@ struct RootView: View {
     @StateObject private var worktrees = WorktreesModel()
     @StateObject private var copies = CopiesModel()
     @StateObject private var merges = MergesModel()
+    @StateObject private var reviews = ReviewsModel()
     @State var selection: SidebarDestination = .posture
 
     var body: some View {
@@ -108,6 +109,8 @@ struct RootView: View {
             CopiesView(model: copies)
         case .merges:
             MergesView(model: merges)
+        case .reviews:
+            ReviewsView(model: reviews)
         case .builds:
             BuildsView()
         case .learning:
