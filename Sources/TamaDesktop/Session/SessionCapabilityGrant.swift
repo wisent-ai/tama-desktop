@@ -60,9 +60,10 @@ struct RunningHookRecord: Codable, Sendable, Equatable {
     let hookId: String
     let hookPid: Int
     let corePid: Int
-    let coreAlive: Bool
-    let hookAlive: Bool
-    let waitingOn: [HookDescendant]
+    let coreAlive: Bool?
+    let hookAlive: Bool?
+    let waitingOn: [HookDescendant]?
+    let ownershipState: String?
     let orphanTermination: OrphanTermination?
 }
 
