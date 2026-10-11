@@ -18,7 +18,9 @@ struct CopyRecord: Decodable, Identifiable, Sendable {
     let unpublished: Bool?
     let inspectionError: String?
     let historyRetainedBy: String?
-    let ownsWorktrees: Bool
+    /// `nil` when the checkout's worktree records could not be read; the
+    /// command then names the cause and removes nothing.
+    let ownsWorktrees: Bool?
     /// Echoed back by a pass the operator narrowed with `--only`.
     let named: Bool
 
@@ -36,14 +38,14 @@ struct CopyRecord: Decodable, Identifiable, Sendable {
     /// the command raises before deleting anything.
     var marks: [String] {
         var marks: [String] = []
-        if inspectionError != nil || dirty == nil || unpublished == nil {
+        if inspectionError != nil || dirty == nil || unpublished == nil || ownsWorktrees == nil {
             marks.append("Unreadable Git state")
         }
         if dirty == true { marks.append("Uncommitted changes") }
         if unpublished == true && historyRetainedBy == nil { marks.append("History not retained") }
         if origin == nil && historyRetainedBy == nil { marks.append("No origin") }
         if owner == nil { marks.append("Only checkout here") }
-        if ownsWorktrees { marks.append("Owns worktrees") }
+        if ownsWorktrees == true { marks.append("Owns worktrees") }
         return marks
     }
 
