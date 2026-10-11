@@ -30,6 +30,30 @@ extension SessionView {
                     detail: error
                 )
             }
+            if let editors = session.runtime?.gitEditors, !editors.configured {
+                if let error = editors.error {
+                    WisentAlertPanel(
+                        tone: .danger,
+                        title: "Agent Git editors not configured",
+                        detail:
+                            "\(error) Ordinary tool calls are refused until `tama hook pre-bash --git-environment` succeeds for this session."
+                    )
+                } else {
+                    WisentAlertPanel(
+                        tone: .danger,
+                        title: "Agent Git editors not configured",
+                        detail:
+                            "The adapter reported a failed Git editor configuration without its cause, which breaks its status contract; `tama sessions --json` shows the record it published."
+                    )
+                }
+            } else if session.runtime?.gitEditors == nil {
+                WisentAlertPanel(
+                    tone: .warning,
+                    title: "Agent Git editors not reported",
+                    detail:
+                        "This session's adapter predates managed Git editors, so a Git command that opens an editor can wait for a keyboard. Reload adapter (`tama sessions reload --session ID`) loads the installed one."
+                )
+            }
         }
     }
 }

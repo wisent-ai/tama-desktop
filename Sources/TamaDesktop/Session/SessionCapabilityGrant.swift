@@ -49,6 +49,20 @@ struct HookRuntimeStatus: Codable, Sendable, Equatable {
     let inFlightDispatches: [InFlightDispatch]?
     let hookProgress: String?
     let runningHooks: RunningHookInspection?
+    /// The agent-process Git editors the adapter configured, or why it could
+    /// not; absent from a session whose adapter predates them.
+    let gitEditors: AgentGitEditors?
+}
+
+/// `core.editor` and `sequence.editor` the adapter sets for the agent's own
+/// processes to `tama --git-editor`, which refuses instead of waiting for a
+/// keyboard; `error` carries the cause when configuration failed.
+struct AgentGitEditors: Codable, Sendable, Equatable {
+    let configured: Bool
+    let scope: String?
+    let coreEditor: String?
+    let sequenceEditor: String?
+    let error: String?
 }
 
 struct RunningHookInspection: Codable, Sendable, Equatable {
