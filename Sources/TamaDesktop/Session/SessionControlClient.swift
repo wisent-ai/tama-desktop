@@ -44,15 +44,30 @@ struct SessionControlClient: Sendable {
                 unreadable.append("\(url.path): \(error.localizedDescription)")
                 continue
             }
-            if let envelope = try? decoder.decode(SessionControlSchemaEnvelope.self, from: data),
-                envelope.schema == Self.legacySchema
-            {
+            // A record that is not JSON with a schema, or that declares this
+            // schema and does not decode, is named like one that cannot be
+            // read, rather than a session that silently is not there. A record
+            // of another schema is not this client's to show.
+            let envelope: SessionControlSchemaEnvelope
+            do {
+                envelope = try decoder.decode(SessionControlSchemaEnvelope.self, from: data)
+            } catch {
+                unreadable.append("\(url.path): \(error)")
+                continue
+            }
+            if envelope.schema == Self.legacySchema {
                 hasLegacySession = true
                 continue
             }
+            guard envelope.schema == Self.schema else { continue }
+            let session: AgentSessionRecord
+            do {
+                session = try decoder.decode(AgentSessionRecord.self, from: data)
+            } catch {
+                unreadable.append("\(url.path): \(error)")
+                continue
+            }
             guard
-                let session = try? decoder.decode(AgentSessionRecord.self, from: data),
-                session.schema == Self.schema,
                 isSafeAgentId(session.agentId),
                 isSafeControlKey(session.controlKey)
             else {
