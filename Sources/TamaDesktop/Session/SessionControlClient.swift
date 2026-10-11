@@ -30,9 +30,20 @@ struct SessionControlClient: Sendable {
         let decoder = JSONDecoder()
         var sessions: [AgentSessionRecord] = []
         var hasLegacySession = false
+        var unreadable: [String] = []
         sessions.reserveCapacity(urls.count)
         for url in urls where url.lastPathComponent.hasSuffix(".session.json") {
-            guard let data = try? Data(contentsOf: url) else { continue }
+            // A record removed since the listing is a session that ended; one
+            // that exists but cannot be read is a session Tama cannot show.
+            let data: Data
+            do {
+                data = try Data(contentsOf: url)
+            } catch CocoaError.fileReadNoSuchFile {
+                continue
+            } catch {
+                unreadable.append("\(url.path): \(error.localizedDescription)")
+                continue
+            }
             if let envelope = try? decoder.decode(SessionControlSchemaEnvelope.self, from: data),
                 envelope.schema == Self.legacySchema
             {
@@ -53,6 +64,9 @@ struct SessionControlClient: Sendable {
             if sessionIsLive(session, now: now) || session.livenessMode == "unknown" {
                 sessions.append(session)
             }
+        }
+        if !unreadable.isEmpty {
+            throw SessionControlError.recordsUnreadable(unreadable)
         }
         if sessions.isEmpty, hasLegacySession {
             throw SessionControlError.legacySessionRecords
