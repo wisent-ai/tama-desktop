@@ -9,31 +9,50 @@ struct HookEmergencySwitch: @unchecked Sendable {
     private static let retainedOutputBytes = 64 * 1024
     private let manager = FileManager.default
 
-    var isDisabled: Bool {
-        guard
-            manager.fileExists(atPath: manifestURL.path),
-            let data = try? Data(contentsOf: stateURL),
-            let state = try? JSONDecoder().decode(State.self, from: data)
-        else {
-            return false
+    /// Whether the emergency switch is set. No manifest or no state file is
+    /// "not disabled"; a state file that exists but cannot be read or decoded
+    /// throws, since protection that may be off must not be shown as on.
+    func disabledState() throws -> Bool {
+        guard manager.fileExists(atPath: manifestURL.path) else { return false }
+        guard let data = try Self.contents(of: stateURL) else { return false }
+        let state: State
+        do {
+            state = try JSONDecoder().decode(State.self, from: data)
+        } catch {
+            throw HookEmergencyError.localStateUnreadable(stateURL.path, error.localizedDescription)
         }
         return state.schema == Self.schema && state.disabled
     }
 
-    var installedRuntime:
-        (
+    /// The installed hook release, or nil when none is installed; a record that
+    /// exists but cannot be read or decoded throws instead of reading as none.
+    func installedRuntime() throws
+        -> (
             releaseID: String,
             nodeExecutable: String?,
             nodeVersion: String?
         )?
     {
-        guard
-            let data = try? Data(contentsOf: installedReleaseURL),
-            let release = try? JSONDecoder().decode(InstalledRelease.self, from: data)
-        else {
-            return nil
+        guard let data = try Self.contents(of: installedReleaseURL) else { return nil }
+        let release: InstalledRelease
+        do {
+            release = try JSONDecoder().decode(InstalledRelease.self, from: data)
+        } catch {
+            throw HookEmergencyError.localStateUnreadable(
+                installedReleaseURL.path, error.localizedDescription)
         }
         return (release.releaseId, release.nodeExecutable, release.nodeVersion)
+    }
+
+    /// The bytes at `url`, nil when the file does not exist.
+    private static func contents(of url: URL) throws -> Data? {
+        do {
+            return try Data(contentsOf: url)
+        } catch CocoaError.fileReadNoSuchFile {
+            return nil
+        } catch {
+            throw HookEmergencyError.localStateUnreadable(url.path, error.localizedDescription)
+        }
     }
 
     func setDisabled(_ disabled: Bool) throws {
@@ -171,6 +190,7 @@ enum HookEmergencyError: LocalizedError {
     case commandFailed(String)
     case commandOutputExceeded
     case commandOutputReadFailed(String)
+    case localStateUnreadable(String, String)
 
     var errorDescription: String? {
         switch self {
@@ -190,6 +210,8 @@ enum HookEmergencyError: LocalizedError {
             "The local policy command exceeded Tama's bounded output limit. Inspect local policy state before retrying."
         case .commandOutputReadFailed(let message):
             "Tama could not read bounded local policy output: \(message)"
+        case .localStateUnreadable(let path, let cause):
+            "Tama cannot read the local policy state \(path): \(cause)"
         }
     }
 }

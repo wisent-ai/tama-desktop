@@ -122,7 +122,13 @@ struct PostureView: View {
     // MARK: - Failures
 
     @ViewBuilder private var bypassAlert: some View {
-        if model.areHooksDisabled {
+        if let failure = model.localPolicyStateError {
+            WisentAlertPanel(
+                tone: .danger,
+                title: "Policy protection cannot be confirmed",
+                detail: failure
+            )
+        } else if model.areHooksDisabled {
             WisentAlertPanel(
                 tone: .danger,
                 title: "Policy protection is off",

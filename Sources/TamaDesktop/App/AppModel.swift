@@ -28,6 +28,8 @@ final class AppModel: ObservableObject {
     @Published var isImportingPolicyBundle = false
 
     @Published var areHooksDisabled = false
+    /// Why the emergency switch or installed release record could not be read.
+    @Published var localPolicyStateError: String?
     @Published var installedHookReleaseID: String?
     @Published var installedNodeExecutable: String?
     @Published var installedNodeVersion: String?
@@ -163,6 +165,7 @@ final class AppModel: ObservableObject {
         installedHookReleaseID = nil
         installedNodeExecutable = nil
         installedNodeVersion = nil
+        localPolicyStateError = nil
     }
 
     func refresh() async {

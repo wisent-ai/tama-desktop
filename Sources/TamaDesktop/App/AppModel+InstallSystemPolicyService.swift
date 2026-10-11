@@ -38,6 +38,9 @@ extension AppModel {
                 try HookEmergencySwitch().setDisabled(disabled)
             }.value
             self.refreshLocalPolicyState()
+            if let failure = self.localPolicyStateError {
+                throw HookEmergencyError.commandFailed(failure)
+            }
             guard self.areHooksDisabled == disabled else {
                 throw HookEmergencyError.stateDidNotPersist
             }
@@ -112,7 +115,8 @@ extension AppModel {
             guard let inspection = updated.runtime?.runningHooks else {
                 throw SessionControlError.invalidResponse
             }
-            return "Inspected \(inspection.running.count) hook records; orphan termination outcomes are shown in Session."
+            return
+                "Inspected \(inspection.running.count) hook records; orphan termination outcomes are shown in Session."
         } recover: {
             await self.refreshAgentSessions()
         }
@@ -162,12 +166,29 @@ extension AppModel {
             agentSessions.append(session)
         }
     }
+    /// The emergency switch and the installed release as recorded on disk. A
+    /// record that exists but cannot be read is named in `localPolicyStateError`,
+    /// and protection whose state cannot be read is not shown as on.
     func refreshLocalPolicyState() {
-        let installedRuntime = emergencySwitch.installedRuntime
-        areHooksDisabled = emergencySwitch.isDisabled
-        installedHookReleaseID = installedRuntime?.releaseID
-        installedNodeExecutable = installedRuntime?.nodeExecutable
-        installedNodeVersion = installedRuntime?.nodeVersion
+        var failures: [String] = []
+        do {
+            areHooksDisabled = try emergencySwitch.disabledState()
+        } catch {
+            areHooksDisabled = true
+            failures.append(Self.sentence(error))
+        }
+        do {
+            let installedRuntime = try emergencySwitch.installedRuntime()
+            installedHookReleaseID = installedRuntime?.releaseID
+            installedNodeExecutable = installedRuntime?.nodeExecutable
+            installedNodeVersion = installedRuntime?.nodeVersion
+        } catch {
+            installedHookReleaseID = nil
+            installedNodeExecutable = nil
+            installedNodeVersion = nil
+            failures.append(Self.sentence(error))
+        }
+        localPolicyStateError = failures.isEmpty ? nil : failures.joined(separator: "\n")
     }
     static func sentence(_ error: Error) -> String {
         (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
