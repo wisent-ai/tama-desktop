@@ -159,12 +159,26 @@ struct TamaClient: Sendable {
     }
 
     /// The refusal envelope is {"error": "<one sentence>"} — the product's own
-    /// refusal, surfaced verbatim.
+    /// refusal, surfaced verbatim. A body that is not that envelope (not JSON,
+    /// or JSON without a sentence) is shown as it came with the parser's
+    /// reason: "answered with status N" alone dropped the only words that
+    /// said what went wrong.
     private static func refusal(data: Data, status: Int) -> TamaBackendError {
-        let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        let message =
-            (object?["error"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-            ?? "The Tama backend answered with status \(status)."
+        let body = String(decoding: data, as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let message: String
+        do {
+            let envelope = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+            if let sentence = envelope?["error"] as? String, !sentence.isEmpty {
+                message = sentence
+            } else {
+                message = "The Tama backend answered with status \(status) without an error sentence: \(body)"
+            }
+        } catch {
+            message = body.isEmpty
+                ? "The Tama backend answered with status \(status) and an empty body."
+                : "The Tama backend answered with status \(status) and a body that is not JSON (\(error)): \(body)"
+        }
         TamaFailureReporting.report(
             failurePoint: "tama.backend.refusal",
             code: TamaFailureReporting.code(forRefusalStatus: status),
