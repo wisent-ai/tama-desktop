@@ -65,17 +65,17 @@ struct TamaClient: Sendable {
     /// into a client configuration.
     func prettyText(_ operation: String, describing description: String) async throws -> String {
         let data = try await answer(operation, body: [:], describing: description)
-        guard
-            let object = try? JSONSerialization.jsonObject(with: data),
-            let pretty = try? JSONSerialization.data(
-                withJSONObject: object,
+        let pretty: Data
+        do {
+            pretty = try JSONSerialization.data(
+                withJSONObject: try JSONSerialization.jsonObject(with: data),
                 options: [.prettyPrinted, .sortedKeys]
-            ),
-            let text = String(data: pretty, encoding: .utf8)
-        else {
-            throw TamaBackendError.unreadableOutput(description, "not a JSON document")
+            )
+        } catch {
+            throw TamaBackendError.unreadableOutput(
+                description, "not a JSON document: \(error.localizedDescription)")
         }
-        return text
+        return String(decoding: pretty, as: UTF8.self)
     }
 
     // MARK: - Jobs
@@ -106,8 +106,23 @@ struct TamaClient: Sendable {
                 "\(operation) answered instead of running a job"
             )
         case nil:
-            throw TamaBackendError.endedWithoutAnswer(exchange.exitStatus, exchange.processError)
+            throw Self.unanswered(exchange, describing: description)
         }
+    }
+
+    /// Why a request ended with no answer: the stdout lines that could not be
+    /// read as events when there were any - the answer may be among them -
+    /// else the process's exit status and its own stderr.
+    private static func unanswered(
+        _ exchange: TamaExchange, describing description: String
+    ) -> TamaBackendError {
+        guard exchange.unreadableEvents.isEmpty else {
+            return .unreadableOutput(
+                description,
+                "events that could not be read: "
+                    + exchange.unreadableEvents.joined(separator: "; "))
+        }
+        return .endedWithoutAnswer(exchange.exitStatus, exchange.processError)
     }
 
     // MARK: - Transport
@@ -130,7 +145,7 @@ struct TamaClient: Sendable {
                 "\(operation) ran a job instead of answering"
             )
         case nil:
-            throw TamaBackendError.endedWithoutAnswer(exchange.exitStatus, exchange.processError)
+            throw Self.unanswered(exchange, describing: description)
         }
     }
 
