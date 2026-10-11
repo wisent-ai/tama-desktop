@@ -22,17 +22,27 @@ struct BuildIdentity: Decodable, Sendable {
     let productVersion: String
     let sourceDirty: Bool
     let sourceRevision: String
+    /// Why the bundled `tama-build.json` could not be read, when it exists
+    /// and cannot be read or decoded. It used to read as an unbuilt
+    /// development build, which a release with a damaged record is not.
+    var readFailure: String? = nil
 
     static var current: BuildIdentity {
-        guard
-            let url = Bundle.main.url(forResource: "tama-build", withExtension: "json"),
-            let data = try? Data(contentsOf: url),
-            let identity = try? JSONDecoder().decode(BuildIdentity.self, from: data)
-        else {
-            return BuildIdentity(
+        var readFailure: String?
+        if let url = Bundle.main.url(forResource: "tama-build", withExtension: "json") {
+            do {
+                return try JSONDecoder().decode(BuildIdentity.self, from: Data(contentsOf: url))
+            } catch {
+                readFailure = "\(url.path(percentEncoded: false)) cannot be read: \(error)"
+            }
+        }
+        // No readable record: a development build when none is bundled, or
+        // a build whose bundled record failed, which says so.
+        do {
+            var identity = BuildIdentity(
                 architecture: "unknown",
                 builtAt: "unknown",
-                channel: "development",
+                channel: readFailure == nil ? "development" : "unreadable build record",
                 hookRelease: nil,
                 platform: "macOS",
                 productVersion: Bundle.main.infoDictionary?["TamaProductVersion"] as? String
@@ -41,8 +51,9 @@ struct BuildIdentity: Decodable, Sendable {
                 sourceDirty: true,
                 sourceRevision: "unavailable"
             )
+            identity.readFailure = readFailure
+            return identity
         }
-        return identity
     }
 
     var displayedRevision: String {
@@ -178,7 +189,23 @@ struct PolicyBundleImportResult: Decodable, Sendable {
     let installedHooks: Int
     let enabledHooks: Int
 
-    var accepted: Bool { status != "conflict" && status != "rejected" }
+    /// The import statuses `tama policy import` answers with.
+    enum ImportStatus: String {
+        case unchanged
+        case replaced
+        case imported
+        case rejected
+        case conflict
+    }
+
+    /// An import is accepted when it changed or confirmed the bundle; a
+    /// conflict, a rejection or a status this app does not know is not.
+    var accepted: Bool {
+        switch ImportStatus(rawValue: status) {
+        case .unchanged?, .replaced?, .imported?: true
+        case .rejected?, .conflict?, nil: false
+        }
+    }
 
     var summary: String {
         switch status {

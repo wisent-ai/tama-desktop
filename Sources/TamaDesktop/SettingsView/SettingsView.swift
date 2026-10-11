@@ -244,6 +244,9 @@ struct SettingsView: View {
         ) {
             WisentPanel {
                 VStack(alignment: .leading, spacing: WisentDesign.Space.x3) {
+                    if let failure = buildIdentity.readFailure {
+                        WisentField(label: "Build record", value: failure, tone: .warning)
+                    }
                     HStack(alignment: .top, spacing: WisentDesign.Space.x4) {
                         WisentField(label: "Version", value: buildIdentity.productVersion)
                         WisentField(

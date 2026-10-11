@@ -134,6 +134,9 @@ extension PostureView {
         ) {
             WisentPanel {
                 VStack(alignment: .leading, spacing: WisentDesign.Space.x3) {
+                    if let failure = buildIdentity.readFailure {
+                        WisentField(label: "Build record", value: failure, tone: .warning)
+                    }
                     HStack(alignment: .top, spacing: WisentDesign.Space.x4) {
                         WisentField(label: "Product version", value: buildIdentity.productVersion)
                         WisentField(
