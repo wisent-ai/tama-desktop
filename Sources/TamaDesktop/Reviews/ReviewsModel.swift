@@ -1,6 +1,6 @@
 import Foundation
 
-struct PushReviewRecord: Decodable, Identifiable, Sendable {
+struct RetainedReviewRecord: Decodable, Identifiable, Sendable {
     enum Outcome: String, Decodable, Sendable {
         case pass
         case sourceFinding = "source_finding"
@@ -44,9 +44,9 @@ struct PushReviewRecord: Decodable, Identifiable, Sendable {
     }
 }
 
-struct PushReviewListing: Decodable, Sendable {
+struct RetainedReviewListing: Decodable, Sendable {
     let directory: String
-    let records: [PushReviewRecord]
+    let records: [RetainedReviewRecord]
 }
 
 @MainActor
@@ -57,9 +57,9 @@ final class ReviewsModel: ObservableObject {
     }
 
     @Published private(set) var state: State = .idle
-    @Published private(set) var listing: PushReviewListing?
+    @Published private(set) var listing: RetainedReviewListing?
     @Published var selectedID: String?
-    @Published private(set) var selected: PushReviewRecord?
+    @Published private(set) var selected: RetainedReviewRecord?
     @Published private(set) var detailState: State = .idle
 
     func refresh() async {
@@ -71,8 +71,8 @@ final class ReviewsModel: ObservableObject {
         detailState = .idle
         do {
             listing = try await TamaClient().request(
-                "reviews/list", body: [:], as: PushReviewListing.self,
-                describing: "Retained push reviews"
+                "reviews/list", body: [:], as: RetainedReviewListing.self,
+                describing: "Retained commit reviews"
             )
             state = .ready
         } catch {
@@ -90,8 +90,8 @@ final class ReviewsModel: ObservableObject {
         detailState = .loading
         do {
             let record = try await TamaClient().request(
-                "reviews/show", body: ["id": id], as: PushReviewRecord.self,
-                describing: "Retained push review \(id)"
+                "reviews/show", body: ["id": id], as: RetainedReviewRecord.self,
+                describing: "Retained commit review \(id)"
             )
             try Task.checkCancellation()
             guard selectedID == id else { return }

@@ -2,19 +2,18 @@ import AppKit
 import SwiftUI
 import WisentDesignSystem
 
-/// The attestations Tama reads: a session's, that its task is finished, which
-/// the stop gates read when no model is declared, and every commit's own,
-/// against the push reviewer's standard, which review-push and the commit
-/// gate read. Record one from a file, show or remove the one the form names,
-/// read the claims its standard asks for, and see every kept record with its
-/// verdict today.
+/// A session's recorded attestation that its task is finished, which the
+/// stop gates that would ask a model read when none is declared. Record one
+/// from a file, show or remove the one the form names, read the claims the
+/// task standard asks for, and see every kept record with its verdict today.
+/// What commits and answers carry is `CarriedAttestationSection`.
 struct AttestationSection: View {
     @StateObject private var model = AttestationModel()
 
     var body: some View {
         WisentSectionBox(
-            title: "Attestations",
-            detail: "Every commit carries its own attestation; with no model declared, a session ends on its own too."
+            title: "Recorded attestations",
+            detail: "With no model declared, a session ends on its own recorded attestation."
         ) {
             if let working = model.working {
                 WisentSkeletonText(label: working)
@@ -58,16 +57,6 @@ struct AttestationSection: View {
             }
             TextField("Session id (read by the stop gates)", text: $model.session)
                 .textFieldStyle(.roundedBorder)
-            HStack(spacing: WisentDesign.Space.x3) {
-                TextField("Commit (read by review-push)", text: $model.commit)
-                    .textFieldStyle(.roundedBorder)
-                Button("Choose repository…") { chooseRepository() }
-                if let repository = model.repository {
-                    Text(repository.path)
-                        .font(WisentTypeScale.identifierSmall())
-                        .foregroundStyle(WisentDesign.secondary)
-                }
-            }
             HStack(spacing: WisentDesign.Space.x3) {
                 Button("Record") { model.record() }
                     .disabled(model.attestationFile == nil)
@@ -164,7 +153,7 @@ struct AttestationSection: View {
                             .font(WisentTypeScale.caption())
                             .foregroundStyle(record.stands ? WisentDesign.secondary : WisentDesign.muted)
                         Spacer()
-                        Button("Remove") { model.remove(record, in: model.repository) }
+                        Button("Remove") { model.remove(record) }
                             .disabled(model.working != nil)
                     }
                 }
@@ -180,16 +169,6 @@ struct AttestationSection: View {
         panel.canChooseDirectories = false
         if panel.runModal() == .OK {
             model.attestationFile = panel.url
-        }
-    }
-
-    private func chooseRepository() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK {
-            model.repository = panel.url
         }
     }
 }

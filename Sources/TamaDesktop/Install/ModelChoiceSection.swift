@@ -2,10 +2,12 @@ import SwiftUI
 import WisentDesignSystem
 
 /// Below the model service row: declare that this machine has no model or
-/// return Tama to Brama. With no model, the stop gates and review-push read
-/// the attestations of `AttestationSection`. A service and its key are
-/// declared in the terminal (`tama model-provider set --origin`), so the key
-/// never crosses a request.
+/// return Tama to Brama. With no model, the stop gates that would ask one
+/// read the session's recorded attestation (`AttestationSection`);
+/// review-push and the turn-end gates read the attestation commits and
+/// answers carry (`CarriedAttestationSection`) on every machine. A service
+/// and its key are declared in the terminal (`tama model-provider set
+/// --origin`), so the key never crosses a request.
 struct ModelChoiceSection: View {
     @ObservedObject var inspection: InspectionModel
     @StateObject private var choice = ModelChoiceModel()
@@ -13,7 +15,7 @@ struct ModelChoiceSection: View {
     var body: some View {
         WisentSectionBox(
             title: "No model",
-            detail: "Without Brama or any model, Tama still enforces every deterministic rule; sessions and pushes stand on their own attestations."
+            detail: "Without Brama or any model, Tama still enforces every deterministic rule; pushes and ending answers carry their attestations, and sessions stand on their recorded ones."
         ) {
             if let working = choice.working {
                 WisentSkeletonText(label: working)

@@ -49,6 +49,7 @@ struct InstallPlanView: View {
                 mcpSection
                 modelServiceSection
                 ModelChoiceSection(inspection: inspection)
+                CarriedAttestationSection()
                 AttestationSection()
             } else if inspection.isReadingPlan {
                 WisentSkeletonGroup(

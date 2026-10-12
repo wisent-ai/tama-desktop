@@ -35,14 +35,14 @@ struct ReviewsView: View {
         switch model.state {
         case .idle:
             WisentEmptyPanel(
-                title: "Inspect push reviews",
+                title: "Inspect commit reviews",
                 detail:
-                    "Refresh to read retained outcomes and their exact causes without repeating a push or calling the reviewer.",
+                    "Refresh to read retained commit-review outcomes and their exact causes without repeating a commit or calling the reviewer.",
                 symbol: "text.magnifyingglass"
             )
         case .loading:
             WisentProgressPanel(
-                title: "Reading reviews", detail: "Reading Tama's retained push-review results.")
+                title: "Reading reviews", detail: "Reading Tama's retained commit-review results.")
         case .failed(let cause):
             WisentAlertPanel(tone: .danger, title: "Review inspection failed", detail: cause)
         case .ready:
@@ -100,10 +100,10 @@ struct ReviewsView: View {
                         switch result.outcome {
                         case .pass:
                             Text(
-                                "This records the review outcome, not proof that Git published the ref."
+                                "This records the review outcome, not proof that Git created the commit."
                             )
                         case .sourceFinding:
-                            Text("Repair the grounded source finding before pushing.")
+                            Text("Repair the grounded finding before committing again.")
                         case .reviewFailure:
                             Text(
                                 "Repair the named review operation or dependency. A failed review does not establish a source defect."

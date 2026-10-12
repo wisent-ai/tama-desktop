@@ -1,8 +1,8 @@
 import Foundation
 
-/// One attestation as the backend reports it: what it attests (`session` or
-/// `commit` and its id), whether it stands against its subject's standard,
-/// every reason it does not, and where it is kept.
+/// One recorded attestation as the backend reports it: the session it
+/// attests (`kind` is `session`), whether it stands against the task
+/// standard, every reason it does not, and where it is kept.
 struct AttestationReport: Decodable, Sendable {
     let kind: String
     let id: String
@@ -35,8 +35,8 @@ struct ShownAttestation: Decodable, Sendable {
     let attestation: Document
 }
 
-/// The claims a subject's attestation confirms and the lists it leaves empty,
-/// as `attestation/standard` answers.
+/// The claims a session's attestation confirms and the lists it leaves
+/// empty, as `attestation/standard` answers.
 struct AttestationStandard: Decodable, Sendable {
     struct Claim: Decodable, Sendable {
         let key: String
@@ -65,10 +65,11 @@ private struct RemovedAttestation: Decodable {
     let removed: String
 }
 
-/// The attestations section's reads and writes, each the terminal's own
-/// command as a request (`tama attestation record|show|list|remove`), so a
-/// refusal shows the sentence the terminal prints. The subject is a session
-/// id, or a commit with the repository it is in.
+/// The recorded attestations' reads and writes, each the terminal's own
+/// command as a request (`tama attestation record|show|list|remove
+/// --session ID`), so a refusal shows the sentence the terminal prints. A
+/// commit's or a turn's attestation is not recorded: it is carried in its
+/// own text (`CarriedAttestationModel`).
 @MainActor
 final class AttestationModel: ObservableObject {
     @Published private(set) var working: String?
@@ -79,36 +80,23 @@ final class AttestationModel: ObservableObject {
     @Published private(set) var removed: String?
     @Published private(set) var records: [AttestationReport] = []
     @Published var session = ""
-    @Published var commit = ""
-    @Published var repository: URL?
     @Published var attestationFile: URL?
 
     private static let operation = "The attestations"
-    /// The backend's subject kinds, which are also the request fields that
-    /// name them.
+    /// The backend's subject kind, which is also the request field that
+    /// names it.
     private static let sessionKind = "session"
-    private static let commitKind = "commit"
 
-    /// The subject the form names, or the sentence that says what is missing.
+    /// The session the form names, or the sentence that says it is missing.
     private func subject() -> Result<[String: String], AttestationFormError> {
         let named = session.trimmingCharacters(in: .whitespacesAndNewlines)
-        let revision = commit.trimmingCharacters(in: .whitespacesAndNewlines)
-        switch (named.isEmpty, revision.isEmpty) {
-        case (false, false):
-            return .failure(.init("Name a session or a commit, not both."))
-        case (true, true):
-            return .failure(.init("Name the session or the commit the attestation attests."))
-        case (false, true):
-            return .success([Self.sessionKind: named])
-        case (true, false):
-            guard let repository else {
-                return .failure(.init("Choose the repository commit \(revision) is in."))
-            }
-            return .success([Self.commitKind: revision, "repository": repository.path])
+        guard !named.isEmpty else {
+            return .failure(.init("Name the session the attestation attests."))
         }
+        return .success([Self.sessionKind: named])
     }
 
-    /// `tama attestation record --file FILE (--session ID | --commit REV)`.
+    /// `tama attestation record --file FILE --session ID`.
     func record() {
         guard working == nil else { return }
         guard let attestationFile else {
@@ -132,7 +120,7 @@ final class AttestationModel: ObservableObject {
         }
     }
 
-    /// `tama attestation show (--session ID | --commit REV)`.
+    /// `tama attestation show --session ID`.
     func show() {
         withSubject("Reading the kept attestation") { fields in
             let body: [String: Any] = fields
@@ -142,8 +130,8 @@ final class AttestationModel: ObservableObject {
         }
     }
 
-    /// `tama attestation standard (--session ID | --commit REV)`: every claim
-    /// the named subject's attestation must confirm, in words.
+    /// `tama attestation standard --session ID`: every claim the session's
+    /// attestation must confirm, in words.
     func showStandard() {
         withSubject("Reading the attestation standard") { fields in
             let body: [String: Any] = fields
@@ -153,20 +141,17 @@ final class AttestationModel: ObservableObject {
         }
     }
 
-    /// `tama attestation remove` for the subject the form names.
+    /// `tama attestation remove --session ID` for the session the form names.
     func removeNamed() {
         withSubject("Removing the kept attestation") { fields in
             try await self.remove(fields)
         }
     }
 
-    /// `tama attestation remove` for one listed record; a commit is looked
-    /// up in the repository the form names.
-    func remove(_ record: AttestationReport, in repository: URL?) {
+    /// `tama attestation remove --session ID` for one listed record.
+    func remove(_ record: AttestationReport) {
         guard working == nil else { return }
-        var fields = [record.kind: record.id]
-        if record.kind == Self.commitKind, let repository { fields["repository"] = repository.path }
-        run("Removing the kept attestation") { try await self.remove(fields) }
+        run("Removing the kept attestation") { try await self.remove([record.kind: record.id]) }
     }
 
     /// `tama attestation list`.
