@@ -9,8 +9,9 @@ import WisentDesignSystem
 /// plan is read-only: this screen states target paths, and performs none of
 /// the changes. The model service row is `tama model-provider show` and
 /// `check`: which service is asked and whether it accepts this machine. The
-/// section under it is the one place that writes: declaring no model,
-/// returning to Brama, and recording a task's attestation (`ModelChoiceSection`).
+/// sections under it are the ones that write: declaring no model or
+/// returning to Brama (`ModelChoiceSection`), and recording, showing and
+/// removing the attestations Tama reads with no model (`AttestationSection`).
 struct InstallPlanView: View {
     @ObservedObject var inspection: InspectionModel
 
@@ -48,6 +49,7 @@ struct InstallPlanView: View {
                 mcpSection
                 modelServiceSection
                 ModelChoiceSection(inspection: inspection)
+                AttestationSection()
             } else if inspection.isReadingPlan {
                 WisentSkeletonGroup(
                     label: "Reading the install plan",
