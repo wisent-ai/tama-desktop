@@ -35,6 +35,32 @@ struct ShownAttestation: Decodable, Sendable {
     let attestation: Document
 }
 
+/// The claims a subject's attestation confirms and the lists it leaves empty,
+/// as `attestation/standard` answers.
+struct AttestationStandard: Decodable, Sendable {
+    struct Claim: Decodable, Sendable {
+        let key: String
+        let claim: String
+    }
+    struct EmptyList: Decodable, Sendable {
+        let key: String
+        let why: String
+    }
+    struct Declared: Decodable, Sendable {
+        let required: [Claim]
+        let mustBeEmpty: [EmptyList]
+
+        enum CodingKeys: String, CodingKey {
+            case required
+            case mustBeEmpty = "must_be_empty"
+        }
+    }
+
+    let kind: String
+    let id: String
+    let standard: Declared
+}
+
 private struct RemovedAttestation: Decodable {
     let removed: String
 }
@@ -49,6 +75,7 @@ final class AttestationModel: ObservableObject {
     @Published private(set) var failure: String?
     @Published private(set) var verdict: AttestationReport?
     @Published private(set) var shown: ShownAttestation?
+    @Published private(set) var standard: AttestationStandard?
     @Published private(set) var removed: String?
     @Published private(set) var records: [AttestationReport] = []
     @Published var session = ""
@@ -111,6 +138,17 @@ final class AttestationModel: ObservableObject {
             let body: [String: Any] = fields
             self.shown = try await TamaClient().request(
                 "attestation/show", body: body, as: ShownAttestation.self,
+                describing: Self.operation)
+        }
+    }
+
+    /// `tama attestation standard (--session ID | --commit REV)`: every claim
+    /// the named subject's attestation must confirm, in words.
+    func showStandard() {
+        withSubject("Reading the attestation standard") { fields in
+            let body: [String: Any] = fields
+            self.standard = try await TamaClient().request(
+                "attestation/standard", body: body, as: AttestationStandard.self,
                 describing: Self.operation)
         }
     }

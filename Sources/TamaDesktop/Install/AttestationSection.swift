@@ -2,18 +2,19 @@ import AppKit
 import SwiftUI
 import WisentDesignSystem
 
-/// The attestations Tama reads in place of a model when none is declared: a
-/// session's, that its task is finished, which the stop gates read, and a
-/// commit's, against the push reviewer's standard, which review-push reads.
-/// Record one from a file, show or remove the one the form names, and see
-/// every kept record with its verdict today.
+/// The attestations Tama reads: a session's, that its task is finished, which
+/// the stop gates read when no model is declared, and every commit's own,
+/// against the push reviewer's standard, which review-push and the commit
+/// gate read. Record one from a file, show or remove the one the form names,
+/// read the claims its standard asks for, and see every kept record with its
+/// verdict today.
 struct AttestationSection: View {
     @StateObject private var model = AttestationModel()
 
     var body: some View {
         WisentSectionBox(
             title: "Attestations",
-            detail: "With no model declared, a session ends and a commit is pushed on its own attestation."
+            detail: "Every commit carries its own attestation; with no model declared, a session ends on its own too."
         ) {
             if let working = model.working {
                 WisentSkeletonText(label: working)
@@ -32,6 +33,9 @@ struct AttestationSection: View {
             }
             if let shown = model.shown {
                 shownPanel(shown)
+            }
+            if let standard = model.standard {
+                standardPanel(standard)
             }
             recordsPanel
         }
@@ -69,6 +73,7 @@ struct AttestationSection: View {
                     .disabled(model.attestationFile == nil)
                 Button("Show") { model.show() }
                 Button("Remove") { model.removeNamed() }
+                Button("Standard") { model.showStandard() }
                 Button("Refresh list") { model.list() }
             }
             .disabled(model.working != nil)
@@ -111,6 +116,30 @@ struct AttestationSection: View {
                     Text("Kept at \(recorded)")
                         .font(WisentTypeScale.identifierSmall())
                         .foregroundStyle(WisentDesign.muted)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func standardPanel(_ standard: AttestationStandard) -> some View {
+        WisentPanel {
+            VStack(alignment: .leading, spacing: WisentDesign.Space.x2) {
+                Text("What \(standard.kind) \(standard.id)'s attestation confirms")
+                    .font(WisentTypeScale.eyebrow())
+                ForEach(standard.standard.required, id: \.key) { claim in
+                    VStack(alignment: .leading) {
+                        Text(claim.key).font(WisentTypeScale.identifierSmall())
+                        Text(claim.claim).font(WisentTypeScale.caption())
+                            .foregroundStyle(WisentDesign.secondary)
+                    }
+                }
+                ForEach(standard.standard.mustBeEmpty, id: \.key) { list in
+                    VStack(alignment: .leading) {
+                        Text("\(list.key) stays empty").font(WisentTypeScale.identifierSmall())
+                        Text(list.why).font(WisentTypeScale.caption())
+                            .foregroundStyle(WisentDesign.muted)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
