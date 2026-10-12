@@ -145,13 +145,18 @@ struct PolicyInspectionClient: Sendable {
                 "the check carries no verdict sentence"
             )
         }
+        // A machine that declared no model has nothing to check: the choice
+        // stands as declared, and the stop gates read the session's own
+        // attestation instead of a model.
+        let declaredNone = choice["provider"] as? String == "none"
         return InstallPlanLevel(
             key: "model-service",
             level: "Model service",
-            activeByArchiveAlone: check["accepted"] as? Bool == true
-                && check["endpoint_allowed"] as? Bool == true,
+            activeByArchiveAlone: declaredNone
+                || (check["accepted"] as? Bool == true
+                    && check["endpoint_allowed"] as? Bool == true),
             fields: flatten(name: "service", value: choice)
-                + flatten(name: "check", value: check),
+                + (declaredNone ? [] : flatten(name: "check", value: check)),
             notes: [verdict]
         )
     }
@@ -225,7 +230,7 @@ struct PolicyInspectionClient: Sendable {
         return InstallPlanLevel(
             key: key,
             level: body["level"] as? String ?? key,
-            activeByArchiveAlone: body["activeByArchiveAlone"] as? Bool ?? false,
+            activeByArchiveAlone: body["activeByArchiveAlone"] as? Bool == true,
             fields: fields,
             notes: notes
         )

@@ -8,7 +8,9 @@ import WisentDesignSystem
 /// approving a privileged install could not see which files it would touch. The
 /// plan is read-only: this screen states target paths, and performs none of
 /// the changes. The model service row is `tama model-provider show` and
-/// `check`: which service is asked and whether it accepts this machine.
+/// `check`: which service is asked and whether it accepts this machine. The
+/// section under it is the one place that writes: declaring no model,
+/// returning to Brama, and recording a task's attestation (`ModelChoiceSection`).
 struct InstallPlanView: View {
     @ObservedObject var inspection: InspectionModel
 
@@ -45,18 +47,17 @@ struct InstallPlanView: View {
                 ForEach(plan.levels) { level($0) }
                 mcpSection
                 modelServiceSection
+                ModelChoiceSection(inspection: inspection)
             } else if inspection.isReadingPlan {
                 WisentSkeletonGroup(
                     label: "Reading the install plan",
                     spacing: WisentDesign.Space.x4
                 ) {
-                    // The signal strip, then a section box per scope: a title
-                    // and the block of label/value rows underneath it.
-                    WisentSkeleton(.block, height: 56)
-                    ForEach(0..<2, id: \.self) { _ in
-                        WisentSkeleton(.heading, width: 180)
-                        WisentSkeleton(.block, height: 132)
-                    }
+                    // The signal strip, then a section box: a title and the
+                    // block of label/value rows underneath it.
+                    WisentSkeleton(.block)
+                    WisentSkeleton(.heading)
+                    WisentSkeleton(.block)
                 }
             } else if inspection.planError == nil {
                 WisentEmptyPanel(
@@ -97,26 +98,34 @@ struct InstallPlanView: View {
             detail: setupGuidance(for: level).first,
             trailing: level.activeByArchiveAlone ? "ready" : "setup required"
         ) {
-            WisentPanel(padding: 0) {
-                VStack(spacing: 0) {
-                    ForEach(level.fields) { field in
-                        HStack(alignment: .firstTextBaseline, spacing: WisentDesign.Space.x4) {
-                            Text(field.label.uppercased())
-                                .font(WisentTypeScale.eyebrow())
-                                .tracking(0.6)
-                                .foregroundStyle(WisentDesign.muted)
-                                .frame(width: 168, alignment: .leading)
-                            Text(field.value)
-                                .font(WisentTypeScale.identifierSmall())
-                                .foregroundStyle(WisentDesign.ink)
-                                .fixedSize(horizontal: false, vertical: true)
-                            Spacer(minLength: 0)
+            WisentPanel(padding: .zero) {
+                VStack(alignment: .leading, spacing: .zero) {
+                    // A grid lines every label up in one column as wide as
+                    // its longest label, with no width written down for it.
+                    Grid(
+                        alignment: .leadingFirstTextBaseline,
+                        horizontalSpacing: WisentDesign.Space.x4,
+                        verticalSpacing: .zero
+                    ) {
+                        ForEach(level.fields) { field in
+                            GridRow {
+                                Text(field.label.uppercased())
+                                    .font(WisentTypeScale.eyebrow())
+                                    .foregroundStyle(WisentDesign.muted)
+                                Text(field.value)
+                                    .font(WisentTypeScale.identifierSmall())
+                                    .foregroundStyle(WisentDesign.ink)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(
+                                        maxWidth: .infinity,
+                                        minHeight: WisentAppLayout.denseRowHeight,
+                                        alignment: .leading
+                                    )
+                            }
+                            Divider()
                         }
-                        .padding(.horizontal, WisentDesign.Space.x4)
-                        .frame(minHeight: WisentAppLayout.denseRowHeight)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        Divider()
                     }
+                    .padding(.horizontal, WisentDesign.Space.x4)
                     ForEach(setupGuidance(for: level).dropFirst(), id: \.self) { guidance in
                         Text(guidance)
                             .font(WisentTypeScale.caption())
