@@ -155,7 +155,7 @@ enum TamaRequestProcess {
                     return
                 }
                 run.started(process.processIdentifier)
-                send(body, to: input.fileHandleForWriting)
+                send(body, to: input.fileHandleForWriting, run: run)
             }
         } onCancel: {
             run.stop()
@@ -167,10 +167,19 @@ enum TamaRequestProcess {
     /// the end before it writes anything, and both of its output pipes are
     /// already being drained, so the write cannot wait on it. A process that
     /// exits before reading makes the write fail instead of raising a SIGPIPE
-    /// that would end the app; the exit itself is what the run then reports.
-    private static func send(_ body: Data, to handle: FileHandle) {
+    /// that would end the app; the exit itself is what the run then reports,
+    /// and a failed write or close is added to the run's stderr with its cause.
+    private static func send(_ body: Data, to handle: FileHandle, run: RequestRun) {
         _ = fcntl(handle.fileDescriptor, F_SETNOSIGPIPE, 1)
-        try? handle.write(contentsOf: body)
-        try? handle.close()
+        do {
+            try handle.write(contentsOf: body)
+        } catch {
+            run.appendError(Data("request body not written: \(error.localizedDescription)\n".utf8))
+        }
+        do {
+            try handle.close()
+        } catch {
+            run.appendError(Data("request input not closed: \(error.localizedDescription)\n".utf8))
+        }
     }
 }
