@@ -46,7 +46,7 @@ struct ModelChoiceSection: View {
 
     private var attestationForm: some View {
         VStack(alignment: .leading, spacing: WisentDesign.Space.x2) {
-            Text("Task attestation")
+            Text("Task or commit attestation")
                 .font(WisentTypeScale.eyebrow())
                 .foregroundStyle(WisentDesign.muted)
             HStack(spacing: WisentDesign.Space.x3) {
@@ -63,7 +63,20 @@ struct ModelChoiceSection: View {
             }
             TextField("Session id (to record it for the stop gates)", text: $choice.session)
                 .textFieldStyle(.roundedBorder)
-            Button(choice.session.isEmpty ? "Read attestation" : "Read and record attestation") {
+            HStack(spacing: WisentDesign.Space.x3) {
+                TextField("Commit (to record it for review-push)", text: $choice.commit)
+                    .textFieldStyle(.roundedBorder)
+                Button("Choose repository…") { chooseRepository() }
+                if let repository = choice.repository {
+                    Text(repository.path)
+                        .font(WisentTypeScale.identifierSmall())
+                        .foregroundStyle(WisentDesign.secondary)
+                }
+            }
+            Button(
+                choice.session.isEmpty && choice.commit.isEmpty
+                    ? "Read attestation" : "Read and record attestation"
+            ) {
                 choice.attest()
             }
             .disabled(choice.working != nil || choice.attestationFile == nil)
@@ -84,7 +97,7 @@ struct ModelChoiceSection: View {
             WisentAlertPanel(
                 tone: .success,
                 title: "The attestation stands",
-                detail: "Read only; name a session to record it for the stop gates."
+                detail: "Read only; name a session or a commit to record it."
             )
         }
     }
@@ -96,6 +109,16 @@ struct ModelChoiceSection: View {
         panel.canChooseDirectories = false
         if panel.runModal() == .OK {
             choice.attestationFile = panel.url
+        }
+    }
+
+    private func chooseRepository() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        if panel.runModal() == .OK {
+            choice.repository = panel.url
         }
     }
 }

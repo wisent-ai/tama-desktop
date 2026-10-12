@@ -20,6 +20,8 @@ final class ModelChoiceModel: ObservableObject {
     @Published private(set) var failure: String?
     @Published private(set) var verdict: AttestationVerdict?
     @Published var session = ""
+    @Published var commit = ""
+    @Published var repository: URL?
     @Published var attestationFile: URL?
 
     private static let choiceOperation = "The model choice"
@@ -35,9 +37,9 @@ final class ModelChoiceModel: ObservableObject {
         change("Returning Tama to Brama", "model-provider/unset", body: [:], then: reload)
     }
 
-    /// `tama assignment attest FILE [--session ID]`: the chosen file's
-    /// attestation read, and recorded for the session when one is named and
-    /// the attestation stands.
+    /// `tama assignment attest FILE [--session ID | --commit SHA]`: the
+    /// chosen file's attestation read, and recorded for the session, or for
+    /// the commit in the chosen repository, when it stands.
     func attest() {
         guard working == nil else { return }
         guard let attestationFile else {
@@ -53,8 +55,18 @@ final class ModelChoiceModel: ObservableObject {
         }
         var body: [String: Any] = ["attestation": document]
         let named = session.trimmingCharacters(in: .whitespacesAndNewlines)
+        let revision = commit.trimmingCharacters(in: .whitespacesAndNewlines)
         if !named.isEmpty { body["session"] = named }
-        working = named.isEmpty ? "Reading the attestation" : "Reading and recording the attestation"
+        if !revision.isEmpty {
+            guard let repository else {
+                failure = "Choose the repository commit \(revision) is in."
+                return
+            }
+            body["commit"] = revision
+            body["repository"] = repository.path
+        }
+        working = named.isEmpty && revision.isEmpty
+            ? "Reading the attestation" : "Reading and recording the attestation"
         failure = nil
         Task {
             do {
