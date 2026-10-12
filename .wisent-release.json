@@ -17,7 +17,8 @@
             "bash",
             "release/fmt.sh",
             "--check"
-          ]
+          ],
+          "kind": "format"
         },
         {
           "name": "compile",
@@ -25,7 +26,8 @@
             "bash",
             "Release/stado-release.sh",
             "compile"
-          ]
+          ],
+          "kind": "lint"
         }
       ],
       "build": {
