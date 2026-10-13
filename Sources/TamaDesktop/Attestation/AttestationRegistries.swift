@@ -46,7 +46,9 @@ final class AttestationRegistriesModel: ObservableObject {
     @Published private(set) var failure: String?
     @Published private(set) var records: [RegistryRecord] = []
     @Published private(set) var verified: [VerifiedRecord]?
-    /// The kinds the unnarrowed listing holds, for narrowing it.
+    /// Every kind Tama names (`attestation/kinds`), for narrowing the
+    /// listing and picking what to record, whether or not a record of it
+    /// exists yet.
     @Published private(set) var kinds: [String] = []
     @Published var kind = ""
     /// What `attest` records: the subject and the statement made of it.
@@ -60,10 +62,11 @@ final class AttestationRegistriesModel: ObservableObject {
     func list() {
         run("Reading every attestation registry") {
             self.verified = nil
+            self.kinds = try await TamaClient().request(
+                "attestation/kinds", body: [:], as: [String].self, describing: Self.operation)
             self.records = try await TamaClient().request(
                 "attestation/registries", body: self.body, as: [RegistryRecord].self,
                 describing: Self.operation)
-            if self.kind.isEmpty { self.kinds = Array(Set(self.records.map(\.kind))).sorted() }
         }
     }
 
