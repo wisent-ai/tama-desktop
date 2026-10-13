@@ -113,7 +113,7 @@ extension SessionView {
                         }
                         .width(min: 90, ideal: 130)
                         TableColumn("POLICY") { event in
-                            Text(event.blockedHookId ?? "—")
+                            Text(policyText(event.blockedHookId))
                                 .font(WisentTypeScale.identifierSmall())
                                 .foregroundStyle(WisentDesign.secondary)
                                 .lineLimit(1)
@@ -271,5 +271,11 @@ extension SessionView {
             badges.append((capability.lifetime, .brand))
         }
         return badges
+    }
+
+    /// The hook an event was blocked by, or that no hook blocked it.
+    func policyText(_ blockedHookId: String?) -> String {
+        guard let blockedHookId else { return "No hook blocked" }
+        return blockedHookId
     }
 }

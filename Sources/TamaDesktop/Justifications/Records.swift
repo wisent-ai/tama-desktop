@@ -122,9 +122,7 @@ extension JustificationsView {
                 }
                 .width(min: 54, ideal: 70)
                 TableColumn("EXPIRES") { entry in
-                    Text(
-                        entry.expiresAt.map { $0.formatted(date: .numeric, time: .omitted) } ?? "—"
-                    )
+                    Text(expiryText(entry.expiresAt))
                     .font(WisentTypeScale.identifierSmall())
                     .foregroundStyle(
                         entry.isExpired ? WisentDesign.warning : WisentDesign.secondary
@@ -147,5 +145,11 @@ extension JustificationsView {
             // index had before the window turned selection on.
             .textSelection(.disabled)
         }
+    }
+
+    /// A justification recorded without an expiry holds until it is revoked.
+    func expiryText(_ expiresAt: Date?) -> String {
+        guard let expiresAt else { return "No expiry" }
+        return expiresAt.formatted(date: .numeric, time: .omitted)
     }
 }
