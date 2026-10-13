@@ -24,6 +24,12 @@ struct VerifiedRecord: Decodable, Sendable {
     let failure: String?
 }
 
+/// What `attestation/revoke` answers: the kind and subject withdrawn.
+struct RevokedAttestation: Decodable, Sendable {
+    let kind: String
+    let subject: String
+}
+
 /// `tama attestation list [--kind]` and `verify [--kind]` as the
 /// `attestation/registries` and `attestation/verify` requests: the same
 /// records, the same refusals, no model.
@@ -55,6 +61,22 @@ final class AttestationRegistriesModel: ObservableObject {
         run("Verifying every attestation") {
             self.verified = try await TamaClient().request(
                 "attestation/verify", body: self.body, as: [VerifiedRecord].self,
+                describing: Self.operation)
+        }
+    }
+
+    /// `tama attestation revoke --kind KIND --subject SUBJECT`, then the
+    /// listing again; a refusal (a test approval, a spent build consent)
+    /// carries the command's sentence.
+    func revoke(_ record: RegistryRecord) {
+        run("Revoking \(record.kind) \(record.subject)") {
+            let fields: [String: Any] = ["kind": record.kind, "subject": record.subject]
+            let _: RevokedAttestation = try await TamaClient().request(
+                "attestation/revoke", body: fields, as: RevokedAttestation.self,
+                describing: Self.operation)
+            self.verified = nil
+            self.records = try await TamaClient().request(
+                "attestation/registries", body: self.body, as: [RegistryRecord].self,
                 describing: Self.operation)
         }
     }
@@ -112,8 +134,12 @@ struct AttestationRegistriesSection: View {
                 }
             } else {
                 ForEach(Array(model.records.enumerated()), id: \.offset) { _, record in
-                    Text(record.line).font(WisentTypeScale.caption())
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    HStack {
+                        Text(record.line).font(WisentTypeScale.caption())
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Button("Revoke") { model.revoke(record) }
+                            .disabled(model.working != nil)
+                    }
                 }
             }
         }
