@@ -51,6 +51,7 @@ struct InstallPlanView: View {
                 ModelChoiceSection(inspection: inspection)
                 CarriedAttestationSection()
                 AttestationSection()
+                AttestationRegistriesSection()
             } else if inspection.isReadingPlan {
                 WisentSkeletonGroup(
                     label: "Reading the install plan",
