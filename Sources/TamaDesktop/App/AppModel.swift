@@ -273,7 +273,10 @@ final class AppModel: ObservableObject {
             }.value
             self.refreshLocalPolicyState()
             await self.refreshAgentSessions()
-            return "Installed hook release \(self.installedHookReleaseID ?? "unknown")."
+            guard let release = self.installedHookReleaseID else {
+                return "Installed the hook runtime, but its release id could not be read back."
+            }
+            return "Installed hook release \(release)."
         } recover: {
             self.refreshLocalPolicyState()
         }
