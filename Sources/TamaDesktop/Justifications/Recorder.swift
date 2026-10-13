@@ -20,6 +20,7 @@ struct JustificationRecorder: View {
     @Environment(\.dismiss) private var dismiss
     @State private var target = ""
     @State private var justification = ""
+    @State private var trajectoryEvidence = ""
     @State private var refusal: String?
     @State private var isRecording = false
 
@@ -35,6 +36,13 @@ struct JustificationRecorder: View {
                     "Justification",
                     text: $justification,
                     prompt: "What the file is for and why it exists.",
+                    lines: .prose
+                )
+                field(
+                    "Trajectory evidence (trajectory, keeper and routine files only)",
+                    text: $trajectoryEvidence,
+                    prompt:
+                        "A passing or reference source, a non-passing source and a concrete artifact, as pre-edit-trajectory-evidence lists them. Leave empty for any other file.",
                     lines: .prose
                 )
                 length
@@ -125,9 +133,11 @@ struct JustificationRecorder: View {
     private func record() {
         refusal = nil
         isRecording = true
+        let evidence = trajectoryEvidence.trimmingCharacters(in: .whitespacesAndNewlines)
         let request = JustificationRecordingClient.Request(
             target: target.trimmingCharacters(in: .whitespacesAndNewlines),
-            justification: justification
+            justification: justification,
+            trajectoryEvidence: evidence.isEmpty ? nil : evidence
         )
         Task {
             do {
@@ -152,6 +162,9 @@ struct JustificationRecordingClient {
     struct Request {
         let target: String
         let justification: String
+        /// Written beside the justification as the field
+        /// `pre-edit-trajectory-evidence` reads; `nil` for any other file.
+        let trajectoryEvidence: String?
     }
 
     private struct Recorded: Decodable {
@@ -160,11 +173,14 @@ struct JustificationRecordingClient {
 
     func record(_ request: Request) async throws {
         let client = TamaClient()
-        let body: [String: Any] = [
+        var body: [String: Any] = [
             "kind": "file",
             "file": request.target,
             "justification": request.justification,
         ]
+        if let evidence = request.trajectoryEvidence {
+            body["trajectoryEvidence"] = evidence
+        }
         _ = try await client.request(
             "justifications/record", body: body,
             as: Recorded.self, describing: "Recording a justification")
