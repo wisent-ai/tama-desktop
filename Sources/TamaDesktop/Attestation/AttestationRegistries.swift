@@ -30,6 +30,13 @@ struct RevokedAttestation: Decodable, Sendable {
     let subject: String
 }
 
+/// What `attestation/attest` answers: the subject recorded and the registry
+/// that keeps it.
+struct RecordedAttestation: Decodable, Sendable {
+    let recorded: String
+    let registry: String
+}
+
 /// `tama attestation list [--kind]` and `verify [--kind]` as the
 /// `attestation/registries` and `attestation/verify` requests: the same
 /// records, the same refusals, no model.
@@ -42,6 +49,9 @@ final class AttestationRegistriesModel: ObservableObject {
     /// The kinds the unnarrowed listing holds, for narrowing it.
     @Published private(set) var kinds: [String] = []
     @Published var kind = ""
+    /// What `attest` records: the subject and the statement made of it.
+    @Published var subject = ""
+    @Published var statement = ""
 
     private static let operation = "The attestation registries"
 
@@ -73,6 +83,24 @@ final class AttestationRegistriesModel: ObservableObject {
             let fields: [String: Any] = ["kind": record.kind, "subject": record.subject]
             let _: RevokedAttestation = try await TamaClient().request(
                 "attestation/revoke", body: fields, as: RevokedAttestation.self,
+                describing: Self.operation)
+            self.verified = nil
+            self.records = try await TamaClient().request(
+                "attestation/registries", body: self.body, as: [RegistryRecord].self,
+                describing: Self.operation)
+        }
+    }
+
+    /// `tama attestation record --kind KIND --subject SUBJECT --statement
+    /// TEXT` with the kind picked above, then the listing again; a kind only
+    /// the operator gives is refused with the act that records it.
+    func attest() {
+        run("Recording \(kind) \(subject)") {
+            let fields: [String: Any] = [
+                "kind": self.kind, "subject": self.subject, "statement": self.statement,
+            ]
+            let _: RecordedAttestation = try await TamaClient().request(
+                "attestation/attest", body: fields, as: RecordedAttestation.self,
                 describing: Self.operation)
             self.verified = nil
             self.records = try await TamaClient().request(
@@ -118,6 +146,13 @@ struct AttestationRegistriesSection: View {
                 }
                 Button("List") { model.list() }
                 Button("Verify") { model.verify() }
+            }
+            .disabled(model.working != nil)
+            HStack(spacing: WisentDesign.Space.x3) {
+                TextField("Subject", text: $model.subject)
+                TextField("Statement", text: $model.statement)
+                Button("Record") { model.attest() }
+                    .disabled(model.subject.isEmpty || model.statement.isEmpty)
             }
             .disabled(model.working != nil)
             if let working = model.working { WisentSkeletonText(label: working) }
