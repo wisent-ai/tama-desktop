@@ -37,23 +37,39 @@ struct BuildIdentity: Decodable, Sendable {
             }
         }
         // No readable record: a development build when none is bundled, or
-        // a build whose bundled record failed, which says so.
-        do {
-            var identity = BuildIdentity(
-                architecture: "unknown",
-                builtAt: "unknown",
-                channel: readFailure == nil ? "development" : "unreadable build record",
-                hookRelease: nil,
-                platform: "macOS",
-                productVersion: Bundle.main.infoDictionary?["TamaProductVersion"] as? String
-                    ?? Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
-                    ?? "unknown",
-                sourceDirty: true,
-                sourceRevision: "unavailable"
-            )
-            identity.readFailure = readFailure
-            return identity
+        // a build whose bundled record failed, which says so. What only the
+        // record states reads as not recorded; the architecture is the one
+        // this binary was compiled for, and the version the bundle's own.
+        let info = Bundle.main.infoDictionary
+        var productVersion = "not recorded"
+        if let version = info?["TamaProductVersion"] as? String {
+            productVersion = version
+        } else if let version = info?["CFBundleShortVersionString"] as? String {
+            productVersion = version
         }
+        var identity = BuildIdentity(
+            architecture: compiledArchitecture,
+            builtAt: "not recorded",
+            channel: readFailure == nil ? "development" : "unreadable build record",
+            hookRelease: nil,
+            platform: "macOS",
+            productVersion: productVersion,
+            sourceDirty: true,
+            sourceRevision: "not recorded"
+        )
+        identity.readFailure = readFailure
+        return identity
+    }
+
+    /// The architecture this binary was compiled for.
+    private static var compiledArchitecture: String {
+        #if arch(arm64)
+            return "arm64"
+        #elseif arch(x86_64)
+            return "x86_64"
+        #else
+            return "not recorded"
+        #endif
     }
 
     var displayedRevision: String {
