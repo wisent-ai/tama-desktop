@@ -16,8 +16,11 @@ struct ReviewsView: View {
             ],
             scrolls: false, constrainsWidth: false
         ) {
-            content
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            VSplitView {
+                ScrollView { StageView() }
+                content
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
         }
         .task(id: model.selectedID) { await model.readSelected() }
     }
