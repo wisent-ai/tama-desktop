@@ -101,6 +101,7 @@ struct SessionView: View {
                 sessionHookSummary
                 if let session = model.selectedAgentSession {
                     faults(session)
+                    turnEnd(session)
                     adapterStatus(session)
                     counters(session)
                     capability(session)
