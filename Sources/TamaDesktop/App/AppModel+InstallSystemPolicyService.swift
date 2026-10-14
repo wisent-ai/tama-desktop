@@ -4,6 +4,12 @@ import Foundation
 import WisentAuth
 import WisentDesignSystem
 
+/// What `sessions/capability/revoke` answers: `revoked`, `none-held` or
+/// `no-override`, as `tama sessions capability revoke --json` prints it.
+private struct CapabilityRevocation: Decodable {
+    let outcome: String
+}
+
 extension AppModel {
     func installSystemPolicyService() {
         mutate("Registering the privileged macOS policy backend…") {
@@ -102,6 +108,22 @@ extension AppModel {
             }
             return
                 "Session \(session.sessionId) loaded adapter \(digest) without replacing its process."
+        } recover: {
+            await self.refreshAgentSessions()
+        }
+    }
+    /// Withdraws the capability granted to `session` at once, through the
+    /// operation `tama sessions capability revoke` runs; the refusal carries
+    /// the product's own sentence.
+    func revokeCapability(in session: AgentSessionRecord) {
+        mutate("Withdrawing the access granted to session \(session.sessionId)…") {
+            let answer = try await TamaClient().request(
+                "sessions/capability/revoke",
+                body: ["sessionId": session.sessionId, "agent": session.agentId],
+                as: CapabilityRevocation.self,
+                describing: "Withdrawing session access")
+            await self.refreshAgentSessions()
+            return "Session \(session.sessionId): access \(answer.outcome)."
         } recover: {
             await self.refreshAgentSessions()
         }

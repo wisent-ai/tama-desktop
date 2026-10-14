@@ -58,6 +58,13 @@ struct SessionView: View {
                     isEnabled: !model.isPolicyMutationInProgress
                 ) { model.reloadAdapter(in: session) })
         }
+        if let session = model.selectedAgentSession, session.capability != nil {
+            actions.append(
+                WisentAction(
+                    "Withdraw access", symbol: "xmark.shield", kind: .secondary,
+                    isEnabled: !model.isPolicyMutationInProgress
+                ) { model.revokeCapability(in: session) })
+        }
         return actions
     }
 
