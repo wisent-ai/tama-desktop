@@ -93,11 +93,17 @@ struct ViolationsClient: Sendable {
     private static let scanOperation = "The violation scan"
     private static let cleanOperation = "The cleanup"
 
-    func scan(repoPath: String, mode: ViolationScanMode) async throws -> ViolationReport {
+    /// `hook`, when given, narrows the replay to that one registered hook, as
+    /// `tama violations find --hook <id>` does; the request refuses an id the
+    /// program does not run.
+    func scan(repoPath: String, mode: ViolationScanMode, hook: String?) async throws -> ViolationReport {
         let path = try validatedRepositoryPath(repoPath)
         var body: [String: Any] = ["repo": path]
         if let value = mode.requestValue {
             body["mode"] = value
+        }
+        if let hook {
+            body["hook"] = hook
         }
         let result = try await client().job(
             "violations/scan",

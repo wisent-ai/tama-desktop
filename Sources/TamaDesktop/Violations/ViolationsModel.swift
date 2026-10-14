@@ -26,6 +26,9 @@ final class ViolationsModel: ObservableObject {
     /// How many repair rounds the operator allows, as typed. `tama violations clean`
     /// has no default for `--max-rounds`, so neither does this screen.
     @Published var repairRounds: String = ""
+    /// The one registered hook the every-rule replay runs, as typed; empty
+    /// replays the write guard and the size guard.
+    @Published var hookFilter: String = ""
 
     private let allowsOperations: Bool
     private var scanTask: Task<ViolationReport, Error>?
@@ -95,8 +98,10 @@ final class ViolationsModel: ObservableObject {
         }
         scanState = .scanning
         let mode = scanMode
+        let typed = hookFilter.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hook: String? = mode == .everyRule && !typed.isEmpty ? typed : nil
         let task = Task.detached(priority: .userInitiated) {
-            try await ViolationsClient().scan(repoPath: path, mode: mode)
+            try await ViolationsClient().scan(repoPath: path, mode: mode, hook: hook)
         }
         scanTask = task
         do {

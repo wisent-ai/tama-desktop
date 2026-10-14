@@ -27,15 +27,22 @@ struct ViolationsView: View {
             scrolls: false,
             constrainsWidth: false
         ) {
-            HStack(spacing: 0) {
-                WisentFacetRail(
-                    groups: facetGroups,
-                    footerTitle: "Selection",
-                    footerDetail:
-                        "\(visible.count.formatted(.number)) of \((model.report?.totals.violations ?? .zero).formatted(.number))"
-                )
-                centre(visible: visible)
-                inspector
+            VStack(alignment: .leading, spacing: .zero) {
+                if model.scanMode == .everyRule {
+                    TextField("Replay one hook only (a tama hook id, e.g. check-numeric-literals)", text: $model.hookFilter)
+                        .textFieldStyle(.roundedBorder)
+                        .padding(WisentDesign.Space.x4)
+                }
+                HStack(spacing: .zero) {
+                    WisentFacetRail(
+                        groups: facetGroups,
+                        footerTitle: "Selection",
+                        footerDetail:
+                            "\(visible.count.formatted(.number)) of \((model.report?.totals.violations ?? .zero).formatted(.number))"
+                    )
+                    centre(visible: visible)
+                    inspector
+                }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
