@@ -1,14 +1,15 @@
 /// Which pass of `tama violations find` a scan runs: the hook replay, or one
 /// of the in-process passes the CLI offers as `--size-only`, `--duplicates`,
-/// `--internal-names` and `--time-limits`. The screen offers every pass the
-/// command has, and `requestValue` is the `mode` the `violations/scan`
-/// request takes.
+/// `--internal-names`, `--time-limits` and `--fallbacks`. The screen offers
+/// every pass the command has, and `requestValue` is the `mode` the
+/// `violations/scan` request takes.
 enum ViolationScanMode: String, CaseIterable, Identifiable, Sendable {
     case everyRule
     case sizes
     case duplicates
     case internalNames
     case timeLimits
+    case fallbacks
 
     var id: String { rawValue }
 
@@ -19,6 +20,7 @@ enum ViolationScanMode: String, CaseIterable, Identifiable, Sendable {
         case .duplicates: "Capabilities written again"
         case .internalNames: "Internal names"
         case .timeLimits: "Waits and time limits"
+        case .fallbacks: "Fallbacks and dropped errors"
         }
     }
 
@@ -30,6 +32,7 @@ enum ViolationScanMode: String, CaseIterable, Identifiable, Sendable {
         case .duplicates: "duplicates"
         case .internalNames: "internal-names"
         case .timeLimits: "time-limits"
+        case .fallbacks: "fallbacks"
         }
     }
 }
