@@ -268,9 +268,9 @@ Installation, state ownership, permissions, observability, recovery, and removal
 
 ## Project status and support
 
-Status: **development, pre-release (`0.x`)**. No stable or supported binary release is currently published. Until the first preview passes release qualification, the repository is for maintainers and source builds only.
+Status: **development, pre-release (`0.x`)**. No stable or supported binary release is currently published. Until a release is promoted from Stado's `candidate` channel to `stable`, the repository is for maintainers and source builds only.
 
-- Canonical release version: the immutable signed Git tag `v<SemVer>` selected by [`Scripts/release/package-release.sh`](Scripts/release/package-release.sh)
+- Canonical release version: `CFBundleShortVersionString` in [`App/Info.plist`](App/Info.plist), the version source [`.wisent-release.json`](.wisent-release.json) declares; Stado builds, signs, notarizes and promotes each release through [`Release/stado-release.sh`](Release/stado-release.sh)
 - Compatibility, releases, upgrade, and rollback: [release documentation](https://tama.wisent.com/docs/releases/)
 - Testing and qualification status: [testing documentation](https://tama.wisent.com/docs/testing/)
 - Security reports: [private GitHub Security Advisory](https://github.com/wisent-ai/tama-desktop/security/advisories/new)
