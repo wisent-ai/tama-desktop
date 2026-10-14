@@ -91,14 +91,14 @@ struct PolicyInspectionClient: Sendable {
 
     func installPlan() async throws -> InstallPlan {
         let document = try await client().document(
-            "install-plan",
+            "install/plan",
             describing: Self.planOperation
         )
         return try Self.decodePlan(document)
     }
 
     func mcpConfiguration() async throws -> String {
-        try await client().prettyText("mcp-config", describing: Self.mcpOperation)
+        try await client().prettyText("mcp/config", describing: Self.mcpOperation)
     }
 
     /// Which model service Tama asks and whether it accepts this machine's
