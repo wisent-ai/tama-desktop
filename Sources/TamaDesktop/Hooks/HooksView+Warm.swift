@@ -56,7 +56,7 @@ extension HooksView {
                             text: row.isUsable ? "First run \(row.elapsedMs) ms" : row.state,
                             tone: row.isUsable ? .warning : .danger
                         )
-                        Text(row.path)
+                        Text(row.detail)
                             .font(WisentTypeScale.caption())
                             .foregroundStyle(WisentDesign.muted)
                             .lineLimit(1)

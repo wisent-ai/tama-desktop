@@ -10,8 +10,16 @@ struct HookWarmRow: Codable, Sendable, Equatable, Identifiable {
     let elapsedMs: Int
     let exitCode: Int?
     let state: String
+    /// Why an unrunnable binary could not run, as the operating system said.
+    let cause: String?
 
     var isUsable: Bool { state == "warm" }
+
+    /// What a person reads beside the row: the path, and why it could not run.
+    var detail: String {
+        guard let cause else { return path }
+        return "\(cause): \(path)"
+    }
 }
 
 struct HookWarmReport: Codable, Sendable, Equatable {
