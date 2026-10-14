@@ -17,11 +17,25 @@ struct RegistryRecord: Decodable, Sendable {
     }
 }
 
-/// One verification as `tama attestation verify --json` prints it.
+/// One verification as `tama attestation verify --json` prints it. A place
+/// the ledger and a registry view disagree carries no record, only why.
 struct VerifiedRecord: Decodable, Sendable {
-    let record: RegistryRecord
+    let record: RegistryRecord?
     let verified: Bool
     let failure: String?
+
+    /// The record verified, or, for a disagreement, what disagrees.
+    var title: String {
+        if let record { return record.line }
+        return "The ledger and a registry disagree"
+    }
+}
+
+/// What `attestation/migrate` answers: the ledger and the records it
+/// brought in from the registries.
+struct MigratedLedger: Decodable, Sendable {
+    let ledger: String
+    let attestations: [RegistryRecord]
 }
 
 /// What `attestation/revoke` answers: the kind and subject withdrawn.
@@ -46,6 +60,8 @@ final class AttestationRegistriesModel: ObservableObject {
     @Published private(set) var failure: String?
     @Published private(set) var records: [RegistryRecord] = []
     @Published private(set) var verified: [VerifiedRecord]?
+    /// What the last migration brought into the ledger.
+    @Published private(set) var migrated: String?
     /// Every kind Tama names (`attestation/kinds`), for narrowing the
     /// listing and picking what to record, whether or not a record of it
     /// exists yet.
@@ -112,6 +128,22 @@ final class AttestationRegistriesModel: ObservableObject {
         }
     }
 
+    /// `tama attestation migrate`: bring every registry into the one
+    /// attestation ledger, then the listing again.
+    func migrate() {
+        run("Bringing every registry into the attestation ledger") {
+            let migrated: MigratedLedger = try await TamaClient().request(
+                "attestation/migrate", body: [:], as: MigratedLedger.self,
+                describing: Self.operation)
+            self.migrated =
+                "Brought \(migrated.attestations.count) attestation(s) into \(migrated.ledger)"
+            self.verified = nil
+            self.records = try await TamaClient().request(
+                "attestation/registries", body: self.body, as: [RegistryRecord].self,
+                describing: Self.operation)
+        }
+    }
+
     private func run(_ label: String, _ work: @escaping @MainActor () async throws -> Void) {
         guard working == nil else { return }
         working = label
@@ -140,7 +172,8 @@ struct AttestationRegistriesSection: View {
     var body: some View {
         WisentSectionBox(
             title: "Every attestation",
-            detail: "Read from every registry as one record; Verify re-reads what each names."
+            detail:
+                "One ledger keeps every attestation; the registries the gates read are its views. Migrate brings what a registry holds into the ledger; Verify re-reads what each names and names any disagreement."
         ) {
             HStack(spacing: WisentDesign.Space.x3) {
                 Picker("Kind", selection: $model.kind) {
@@ -149,6 +182,7 @@ struct AttestationRegistriesSection: View {
                 }
                 Button("List") { model.list() }
                 Button("Verify") { model.verify() }
+                Button("Migrate") { model.migrate() }
             }
             .disabled(model.working != nil)
             HStack(spacing: WisentDesign.Space.x3) {
@@ -159,15 +193,19 @@ struct AttestationRegistriesSection: View {
             }
             .disabled(model.working != nil)
             if let working = model.working { WisentSkeletonText(label: working) }
+            if let migrated = model.migrated {
+                Text(migrated).font(WisentTypeScale.caption())
+            }
             if let failure = model.failure {
                 WisentAlertPanel(tone: .danger, title: "Tama refused", detail: failure)
             }
             if let verified = model.verified {
                 ForEach(Array(verified.enumerated()), id: \.offset) { _, each in
                     if let failure = each.failure {
-                        WisentAlertPanel(tone: .warning, title: each.record.line, detail: failure)
+                        WisentAlertPanel(tone: .warning, title: each.title, detail: failure)
                     } else {
-                        WisentAlertPanel(tone: .success, title: each.record.line, detail: "verifies")
+                        WisentAlertPanel(
+                            tone: .success, title: each.title, detail: "verifies")
                     }
                 }
             } else {
