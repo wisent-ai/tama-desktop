@@ -3,10 +3,22 @@ import SwiftUI
 import WisentDesignSystem
 
 /// The two carried standards as `attestation/required` answers: the claims
-/// every commit message carries for review-push, and each stop hook's claims
-/// the answer a turn ends with carries.
+/// every commit message carries for review-push with the Git trailers its
+/// harsh review is written in, and each stop hook's claims the answer a
+/// turn ends with carries.
 struct CarriedStandard: Decodable, Sendable {
-    struct Commit: Decodable, Sendable { let claims: [String] }
+    struct Trailer: Decodable, Sendable {
+        let trailer: String
+        let why: String
+    }
+    struct Trailers: Decodable, Sendable {
+        let required: [Trailer]
+        let mustBeEmpty: [Trailer]
+    }
+    struct Commit: Decodable, Sendable {
+        let claims: [String]
+        let trailers: Trailers
+    }
     struct Turn: Decodable, Sendable { let hooks: [String: [String]] }
 
     let commit: Commit
@@ -19,14 +31,16 @@ struct CarriedStandard: Decodable, Sendable {
 }
 
 /// What one commit or one answer still lacks, as `attestation/check` and
-/// `attestation/attest-commit` answer: the same claims the gate would name
-/// in its refusal, where a standing attestation is carried (the message, the
+/// `attestation/attest-commit` answer: the same claims and trailers the gate
+/// would name in its refusal, each finding the harsh review names, where a
+/// standing attestation is carried (the message, the
 /// `refs/notes/attestation` note, the answer) and where `attest-commit` kept it.
 struct CarriedCheck: Decodable, Sendable {
     let kind: String
     let id: String
     let stands: Bool
     let missing: [String]
+    let findings: [String]
     let carriedIn: String?
     let keptIn: String?
 
@@ -218,6 +232,16 @@ struct CarriedAttestationSection: View {
                     Text(claim).font(WisentTypeScale.caption()).foregroundStyle(
                         WisentDesign.secondary)
                 }
+                Text("Its harsh review is written in Git trailers, in the message's last paragraph")
+                    .font(WisentTypeScale.eyebrow())
+                ForEach(standard.commit.trailers.required, id: \.trailer) { entry in
+                    Text("At least one \(entry.trailer): \(entry.why)")
+                        .font(WisentTypeScale.caption()).foregroundStyle(WisentDesign.secondary)
+                }
+                ForEach(standard.commit.trailers.mustBeEmpty, id: \.trailer) { entry in
+                    Text("No \(entry.trailer): \(entry.why)")
+                        .font(WisentTypeScale.caption()).foregroundStyle(WisentDesign.secondary)
+                }
                 ForEach(standard.hooks, id: \.key) { hook in
                     Text("An answer ending a turn carries, for \(hook.key)")
                         .font(WisentTypeScale.eyebrow())
@@ -242,7 +266,8 @@ struct CarriedAttestationSection: View {
                 tone: .warning,
                 title:
                     "\(check.kind) \(check.id) does not carry its attestation; the gate refuses it",
-                detail: check.missing.map { "missing: \"\($0)\"" }.joined(separator: "\n")
+                detail: (check.missing.map { "missing: \"\($0)\"" }
+                    + check.findings.map { "finding: \"\($0)\"" }).joined(separator: "\n")
             )
         }
     }
