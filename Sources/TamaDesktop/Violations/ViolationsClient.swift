@@ -7,15 +7,15 @@ struct ViolationReport: Decodable, Sendable {
     let totals: ViolationTotals
 
     var scannedFiles: Int {
-        repos.reduce(0) { $0 + $1.scannedFiles }
+        repos.map(\.scannedFiles).reduce(.zero, +)
     }
 
     var skippedFiles: Int {
-        repos.reduce(0) { $0 + $1.skippedFiles.count }
+        repos.map(\.skippedFiles.count).reduce(.zero, +)
     }
 
     var scanErrors: Int {
-        repos.reduce(0) { $0 + $1.errors.count }
+        repos.map(\.errors.count).reduce(.zero, +)
     }
 
     /// Every finding, flattened once, because the repair screen ranks by rule
@@ -111,8 +111,9 @@ struct ViolationsClient: Sendable {
             describing: Self.scanOperation
         )
         switch result.status {
-        // Status 1 is "violations found", which is a report and not a failure.
-        case 0, 1:
+        // The scan exits with failure when it found violations, which is a
+        // report and not a failure of the scan.
+        case Int(EXIT_SUCCESS), Int(EXIT_FAILURE):
             do {
                 return try JSONDecoder().decode(ViolationReport.self, from: result.document)
             } catch {
@@ -135,14 +136,13 @@ struct ViolationsClient: Sendable {
 
     func clean(repoPath: String, maxRounds: Int) async throws -> String {
         let path = try validatedRepositoryPath(repoPath)
-        try ensureCleanupAgentAvailable()
         let result = try await client().job(
             "violations/clean",
             body: ["repo": path, "maxRounds": maxRounds],
             describing: Self.cleanOperation
         )
         switch result.status {
-        case 0:
+        case Int(EXIT_SUCCESS):
             let summary = result.stdoutText.trimmingCharacters(in: .whitespacesAndNewlines)
             return summary.isEmpty
                 ? "The cleanup finished without printing a summary."
@@ -186,23 +186,11 @@ struct ViolationsClient: Sendable {
         }
         return root.path
     }
-
-    private func ensureCleanupAgentAvailable() throws {
-        let manager = FileManager.default
-        guard
-            executableCandidates(named: "codex").contains(where: {
-                manager.isExecutableFile(atPath: $0.path)
-            })
-        else {
-            throw ViolationsError.cleanupAgentUnavailable
-        }
-    }
 }
 
 enum ViolationsError: LocalizedError {
     case invalidRepository(String)
     case repositoryNotOwned(String)
-    case cleanupAgentUnavailable
 
     /// The sentence the repair screen shows when the operator stops a cleanup:
     /// the working tree is not where it started, and saying so is the whole
@@ -216,8 +204,6 @@ enum ViolationsError: LocalizedError {
             "Choose an existing absolute Git repository directory: \(path)"
         case .repositoryNotOwned(let path):
             "Tama refuses to mutate a repository not owned by the current user: \(path)"
-        case .cleanupAgentUnavailable:
-            "Codex is unavailable. Install and authenticate Codex before confirming cleanup."
         }
     }
 }
