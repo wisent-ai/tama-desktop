@@ -50,6 +50,7 @@ struct InstallPlanView: View {
                 modelServiceSection
                 ModelChoiceSection(inspection: inspection)
                 CarriedAttestationSection()
+                PendingCommitsSection()
                 AttestationSection()
                 AttestationRegistriesSection()
             } else if inspection.isReadingPlan {
@@ -180,7 +181,7 @@ struct InstallPlanView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             } else if inspection.isReadingMCP {
-                WisentSkeletonText(lines: 6, label: "Reading configuration")
+                WisentSkeletonText(label: "Reading configuration")
             }
         }
     }
