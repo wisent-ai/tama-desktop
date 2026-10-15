@@ -18,13 +18,26 @@ struct CarriedStandard: Decodable, Sendable {
     }
 }
 
-/// What one commit message or one answer still lacks, as `attestation/check`
-/// answers: the same claims the gate would name in its refusal.
+/// What one commit or one answer still lacks, as `attestation/check` and
+/// `attestation/attest-commit` answer: the same claims the gate would name
+/// in its refusal, where a standing attestation is carried (the message, the
+/// `refs/notes/attestation` note, the answer) and where `attest-commit` kept it.
 struct CarriedCheck: Decodable, Sendable {
     let kind: String
     let id: String
     let stands: Bool
     let missing: [String]
+    let carriedIn: String?
+    let keptIn: String?
+
+    /// Where the standing attestation is, as Tama answered it.
+    var standing: String {
+        switch (keptIn, carriedIn) {
+        case let (kept?, _): return "Kept in \(kept); the commit is unchanged."
+        case let (nil, carried?): return "Carried in its \(carried); the gate lets it through."
+        case (nil, nil): return "Tama's answer names no place the attestation is carried."
+        }
+    }
 }
 
 /// `tama attestation standard --commit|--turn` and `tama attestation check`
@@ -40,6 +53,7 @@ final class CarriedAttestationModel: ObservableObject {
     @Published var repository: URL?
     @Published var hook = ""
     @Published var answer = ""
+    @Published var commitAttestation = ""
 
     private static let operation = "The carried attestations"
 
@@ -53,16 +67,53 @@ final class CarriedAttestationModel: ObservableObject {
     /// `tama attestation check --commit REV --repository PATH`.
     func checkCommit() {
         let revision = commit.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !revision.isEmpty else { return failure = "Name the commit to check." }
-        guard let repository else { return failure = "Choose the repository commit \(revision) is in." }
+        guard !revision.isEmpty else {
+            failure = "Name the commit to check."
+            return
+        }
+        guard let repository else {
+            failure = "Choose the repository commit \(revision) is in."
+            return
+        }
         send(["commit": revision, "repository": repository.path])
+    }
+
+    /// `tama attestation attest --commit REV --file PATH --repository PATH`,
+    /// with the attestation typed here: kept beside an existing commit, which
+    /// is not changed, only when it carries every claim.
+    func attestCommit() {
+        let revision = commit.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !revision.isEmpty else {
+            failure = "Name the commit to attest."
+            return
+        }
+        guard let repository else {
+            failure = "Choose the repository commit \(revision) is in."
+            return
+        }
+        guard !commitAttestation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            failure = "Write the attestation commit \(revision) is to keep."
+            return
+        }
+        let fields: [String: Any] = [
+            "commit": revision, "repository": repository.path, "attestation": commitAttestation,
+        ]
+        run("Keeping the attestation") {
+            self.check = try await TamaClient().request(
+                "attestation/attest-commit", body: fields, as: CarriedCheck.self,
+                describing: Self.operation)
+        }
     }
 
     /// `tama attestation check --turn HOOK --file PATH`, with the answer typed here.
     func checkAnswer() {
-        guard !hook.isEmpty else { return failure = "Choose the stop hook that reads the answer." }
+        guard !hook.isEmpty else {
+            failure = "Choose the stop hook that reads the answer."
+            return
+        }
         guard !answer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            return failure = "Write the answer the turn would end with."
+            failure = "Write the answer the turn would end with."
+            return
         }
         send(["turn": hook, "answer": answer])
     }
@@ -79,7 +130,8 @@ final class CarriedAttestationModel: ObservableObject {
         run("Checking the attestation") {
             let fields: [String: Any] = body
             self.check = try await TamaClient().request(
-                "attestation/check", body: fields, as: CarriedCheck.self, describing: Self.operation)
+                "attestation/check", body: fields, as: CarriedCheck.self, describing: Self.operation
+            )
         }
     }
 
@@ -111,7 +163,8 @@ struct CarriedAttestationSection: View {
     var body: some View {
         WisentSectionBox(
             title: "Carried attestations",
-            detail: "Every pushed commit carries the commit claims in its message; every ending answer carries its stop hooks' claims."
+            detail:
+                "Every pushed commit carries the commit claims in its message, or an existing commit in its attestation note; every ending answer carries its stop hooks' claims."
         ) {
             if let working = model.working { WisentSkeletonText(label: working) }
             if let failure = model.failure {
@@ -146,6 +199,9 @@ struct CarriedAttestationSection: View {
             TextEditor(text: $model.answer)
                 .font(WisentTypeScale.caption())
             Button("Check answer") { model.checkAnswer() }
+            TextEditor(text: $model.commitAttestation)
+                .font(WisentTypeScale.caption())
+            Button("Keep attestation beside commit") { model.attestCommit() }
         }
         .disabled(model.working != nil)
     }
@@ -159,13 +215,15 @@ struct CarriedAttestationSection: View {
                     Button("Copy block") { model.copyCommitBlock(standard) }
                 }
                 ForEach(standard.commit.claims, id: \.self) { claim in
-                    Text(claim).font(WisentTypeScale.caption()).foregroundStyle(WisentDesign.secondary)
+                    Text(claim).font(WisentTypeScale.caption()).foregroundStyle(
+                        WisentDesign.secondary)
                 }
                 ForEach(standard.hooks, id: \.key) { hook in
                     Text("An answer ending a turn carries, for \(hook.key)")
                         .font(WisentTypeScale.eyebrow())
                     ForEach(hook.value, id: \.self) { claim in
-                        Text(claim).font(WisentTypeScale.caption()).foregroundStyle(WisentDesign.secondary)
+                        Text(claim).font(WisentTypeScale.caption()).foregroundStyle(
+                            WisentDesign.secondary)
                     }
                 }
             }
@@ -178,11 +236,12 @@ struct CarriedAttestationSection: View {
         if check.stands {
             WisentAlertPanel(
                 tone: .success, title: "\(check.kind) \(check.id) carries every claim",
-                detail: "The gate lets it through.")
+                detail: check.standing)
         } else {
             WisentAlertPanel(
                 tone: .warning,
-                title: "\(check.kind) \(check.id) does not carry its attestation; the gate refuses it",
+                title:
+                    "\(check.kind) \(check.id) does not carry its attestation; the gate refuses it",
                 detail: check.missing.map { "missing: \"\($0)\"" }.joined(separator: "\n")
             )
         }
