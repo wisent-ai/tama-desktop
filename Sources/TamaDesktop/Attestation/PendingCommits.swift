@@ -18,6 +18,9 @@ struct PendingReport: Decodable, Sendable {
         let missing: [String]
         let findings: [String]
         let patches: [Patched]
+        /// Why the commits it patches could not be measured, such as a
+        /// malformed `Repairs:` line; the commit does not stand while it is set.
+        let patchesFailure: String?
 
         /// Whether the commit stands and where, as Tama answered it.
         var standing: String {
@@ -32,6 +35,7 @@ struct PendingReport: Decodable, Sendable {
         var lines: [String] {
             missing.map { "missing: \"\($0)\"" } + findings.map { "finding: \"\($0)\"" }
                 + patches.map { "patches: \($0.commit) \($0.subject)" }
+                + [patchesFailure].compactMap { $0 }.map { "patches unread: \($0)" }
         }
     }
     let repository: String
