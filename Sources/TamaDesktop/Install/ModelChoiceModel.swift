@@ -14,7 +14,9 @@ final class ModelChoiceModel: ObservableObject {
 
     /// `tama model-provider set --none`, then the service read again.
     func declareNone(then reload: @escaping () async -> Void) {
-        change("Declaring that this machine has no model", "model-provider/set", body: ["none": true], then: reload)
+        change(
+            "Declaring that this machine has no model", "model-provider/set", body: ["none": true],
+            then: reload)
     }
 
     /// `tama model-provider unset`, then the service read again.

@@ -128,6 +128,19 @@ cancelling a job Stado already accepted. Recording never starts a build.
 The [build reference](https://tama.wisent.com/docs/cli/build/) describes the
 matching CLI commands, HTTP fields, fleet receipts and unchanged checks.
 
+### See what each session's commits cost it
+
+**Policy → Commit standing** lists every agent session with the points its
+commits earned: one for a commit whose Rust files are all in rustfmt's form,
+one lost for a commit with a file out of it. The commit is made either way; a
+session below zero has every tool call refused until a charge is taken back.
+Each charge names its repository and files, and **Take back** removes it with
+the reason it was recorded in error. **Score** charges the commits of a
+revision range made before they were scored, each to the session whose commit
+call was running when Git recorded it. The
+[standing reference](https://tama.wisent.com/docs/cli/standing/) describes the
+matching CLI verbs and request fields.
+
 ## How the product works
 
 ```mermaid

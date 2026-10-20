@@ -187,10 +187,12 @@ struct TamaClient: Sendable {
             if let sentence = envelope?["error"] as? String, !sentence.isEmpty {
                 message = sentence
             } else {
-                message = "The Tama backend answered with status \(status) without an error sentence: \(body)"
+                message =
+                    "The Tama backend answered with status \(status) without an error sentence: \(body)"
             }
         } catch {
-            message = body.isEmpty
+            message =
+                body.isEmpty
                 ? "The Tama backend answered with status \(status) and an empty body."
                 : "The Tama backend answered with status \(status) and a body that is not JSON (\(error)): \(body)"
         }

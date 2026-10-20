@@ -15,7 +15,8 @@ struct ModelChoiceSection: View {
     var body: some View {
         WisentSectionBox(
             title: "No model",
-            detail: "Without Brama or any model, Tama still enforces every deterministic rule; pushes and ending answers carry their attestations, and sessions stand on their recorded ones."
+            detail:
+                "Without Brama or any model, Tama still enforces every deterministic rule; pushes and ending answers carry their attestations, and sessions stand on their recorded ones."
         ) {
             if let working = choice.working {
                 WisentSkeletonText(label: working)

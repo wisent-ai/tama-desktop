@@ -47,8 +47,8 @@ struct CarriedCheck: Decodable, Sendable {
     /// Where the standing attestation is, as Tama answered it.
     var standing: String {
         switch (keptIn, carriedIn) {
-        case let (kept?, _): return "Kept in \(kept); the commit is unchanged."
-        case let (nil, carried?): return "Carried in its \(carried); the gate lets it through."
+        case (let kept?, _): return "Kept in \(kept); the commit is unchanged."
+        case (nil, let carried?): return "Carried in its \(carried); the gate lets it through."
         case (nil, nil): return "Tama's answer names no place the attestation is carried."
         }
     }

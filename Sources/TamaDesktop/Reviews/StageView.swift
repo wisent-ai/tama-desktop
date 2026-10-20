@@ -7,7 +7,9 @@ struct StageView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: WisentDesign.Space.x3) {
             Text("Session-owned staging").font(WisentTypeScale.body())
-            Text("Stage recorded edits without taking another session's hunks. Overlapping or missing evidence refuses the operation; no compiler is run.")
+            Text(
+                "Stage recorded edits without taking another session's hunks. Overlapping or missing evidence refuses the operation; no compiler is run."
+            )
             TextField("Session identity", text: $model.session)
                 .disabled(model.running)
             TextField("Repository checkout path", text: $model.repository)

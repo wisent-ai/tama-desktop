@@ -29,9 +29,12 @@ struct ViolationsView: View {
         ) {
             VStack(alignment: .leading, spacing: .zero) {
                 if model.scanMode == .everyRule {
-                    TextField("Replay one hook only (a tama hook id, e.g. check-numeric-literals)", text: $model.hookFilter)
-                        .textFieldStyle(.roundedBorder)
-                        .padding(WisentDesign.Space.x4)
+                    TextField(
+                        "Replay one hook only (a tama hook id, e.g. check-numeric-literals)",
+                        text: $model.hookFilter
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .padding(WisentDesign.Space.x4)
                 }
                 HStack(spacing: .zero) {
                     WisentFacetRail(

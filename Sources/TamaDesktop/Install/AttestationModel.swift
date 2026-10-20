@@ -109,7 +109,8 @@ final class AttestationModel: ObservableObject {
                 document = try JSONSerialization.jsonObject(with: Data(contentsOf: attestationFile))
             } catch {
                 throw AttestationFormError(
-                    "\(attestationFile.path) could not be read as JSON: \(error.localizedDescription)")
+                    "\(attestationFile.path) could not be read as JSON: \(error.localizedDescription)"
+                )
             }
             var body: [String: Any] = fields
             body["attestation"] = document

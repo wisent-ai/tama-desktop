@@ -100,6 +100,8 @@ struct RootView: View {
             HooksView(model: model)
         case .session:
             SessionView(model: model)
+        case .standing:
+            StandingView()
         case .violations:
             ViolationsView(model: violations, hasScope: !violations.repoPath.isEmpty)
         case .worktrees:

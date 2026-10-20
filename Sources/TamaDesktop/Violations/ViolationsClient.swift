@@ -96,7 +96,9 @@ struct ViolationsClient: Sendable {
     /// `hook`, when given, narrows the replay to that one registered hook, as
     /// `tama violations find --hook <id>` does; the request refuses an id the
     /// program does not run.
-    func scan(repoPath: String, mode: ViolationScanMode, hook: String?) async throws -> ViolationReport {
+    func scan(repoPath: String, mode: ViolationScanMode, hook: String?) async throws
+        -> ViolationReport
+    {
         let path = try validatedRepositoryPath(repoPath)
         var body: [String: Any] = ["repo": path]
         if let value = mode.requestValue {

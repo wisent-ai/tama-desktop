@@ -123,11 +123,11 @@ extension JustificationsView {
                 .width(min: 54, ideal: 70)
                 TableColumn("EXPIRES") { entry in
                     Text(expiryText(entry.expiresAt))
-                    .font(WisentTypeScale.identifierSmall())
-                    .foregroundStyle(
-                        entry.isExpired ? WisentDesign.warning : WisentDesign.secondary
-                    )
-                    .monospacedDigit()
+                        .font(WisentTypeScale.identifierSmall())
+                        .foregroundStyle(
+                            entry.isExpired ? WisentDesign.warning : WisentDesign.secondary
+                        )
+                        .monospacedDigit()
                 }
                 .width(min: 66, ideal: 86)
                 TableColumn("VERDICT") { entry in

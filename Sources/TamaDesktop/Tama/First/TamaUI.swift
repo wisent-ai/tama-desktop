@@ -12,6 +12,7 @@ enum SidebarDestination: String, Identifiable, CaseIterable {
     case posture
     case hooks
     case session
+    case standing
     case violations
     case worktrees
     case copies
@@ -35,7 +36,7 @@ enum SidebarDestination: String, Identifiable, CaseIterable {
 
     var group: Group {
         switch self {
-        case .posture, .hooks, .session, .builds, .learning: .policy
+        case .posture, .hooks, .session, .standing, .builds, .learning: .policy
         case .violations, .worktrees, .copies, .reviews, .justifications: .repair
         case .coverage, .installPlan, .settings: .system
         }
@@ -46,6 +47,7 @@ enum SidebarDestination: String, Identifiable, CaseIterable {
         case .posture: "Posture"
         case .hooks: "Hooks"
         case .session: "Session"
+        case .standing: "Commit standing"
         case .violations: "Violations"
         case .worktrees: "Worktrees"
         case .copies: "Copies"
@@ -64,6 +66,7 @@ enum SidebarDestination: String, Identifiable, CaseIterable {
         case .posture: "shield.lefthalf.filled"
         case .hooks: "list.bullet.rectangle"
         case .session: "person.badge.key"
+        case .standing: "chart.bar.xaxis"
         case .violations: "ladybug"
         case .worktrees: "square.stack.3d.up.slash"
         case .copies: "square.on.square.dashed"
@@ -83,7 +86,7 @@ enum SidebarDestination: String, Identifiable, CaseIterable {
     /// authorization boundary rather than appearing as dead rows.
     var requiresControl: Bool {
         switch self {
-        case .session, .violations, .worktrees, .copies, .reviews, .justifications,
+        case .session, .standing, .violations, .worktrees, .copies, .reviews, .justifications,
             .builds, .learning:
             true
         case .posture, .hooks, .coverage, .installPlan, .settings: false
@@ -131,10 +134,9 @@ func counted(_ value: Int, _ noun: String) -> String {
     "\(value.formatted(.number)) \(noun)\(value == 1 ? "" : "s")"
 }
 
-/// A 64-character control key or a 40-character release identifier is evidence,
-/// not prose: the head is what identifies it in a log.
-private let shortIdentifierLength = 12
-
+/// A control key, release identifier or commit is evidence, not prose, and is
+/// shown whole: no length was ever declared that names it uniquely, and a
+/// head cut at a guessed length can name two.
 func shortIdentifier(_ value: String) -> String {
-    String(value.prefix(shortIdentifierLength))
+    value
 }

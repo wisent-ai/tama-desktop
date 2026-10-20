@@ -24,7 +24,8 @@ enum TurnEndClock: Decodable, Equatable, Sendable {
         case .milliseconds(let milliseconds):
             let seconds = Measurement(value: Double(milliseconds), unit: UnitDuration.milliseconds)
                 .converted(to: .seconds).value
-            return Date(timeIntervalSince1970: seconds).formatted(date: .abbreviated, time: .standard)
+            return Date(timeIntervalSince1970: seconds).formatted(
+                date: .abbreviated, time: .standard)
         case .clockError(let error):
             return "at a time the core's clock could not give (\(error))"
         }
@@ -78,12 +79,14 @@ struct TurnEndPanel: View {
     var body: some View {
         Group {
             if let failure {
-                WisentAlertPanel(tone: .danger, title: "Last turn ending unreadable", detail: failure)
+                WisentAlertPanel(
+                    tone: .danger, title: "Last turn ending unreadable", detail: failure)
             } else if let record {
                 if record.answered, record.decision?.blockedHookId == nil {
                     WisentField(label: "Last turn ending", value: Self.detail(record))
                 } else {
-                    WisentAlertPanel(tone: .warning, title: "Last turn ending", detail: Self.detail(record))
+                    WisentAlertPanel(
+                        tone: .warning, title: "Last turn ending", detail: Self.detail(record))
                 }
             }
         }
@@ -102,7 +105,9 @@ struct TurnEndPanel: View {
         if let reading = record.reading {
             lines.append(reading)
         } else {
-            lines.append("This record was written before the core gave each record its reading; `tama hooks running` reads it.")
+            lines.append(
+                "This record was written before the core gave each record its reading; `tama hooks running` reads it."
+            )
         }
         if let started = record.startedAtMs {
             lines.append("Received \(started.shown)")

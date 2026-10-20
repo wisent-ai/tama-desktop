@@ -73,7 +73,8 @@ struct AttestationSection: View {
     private func verdictPanel(_ verdict: AttestationReport) -> some View {
         if verdict.stands, let recorded = verdict.recorded {
             WisentAlertPanel(
-                tone: .success, title: "\(verdict.subject) stands", detail: "Recorded at \(recorded).")
+                tone: .success, title: "\(verdict.subject) stands",
+                detail: "Recorded at \(recorded).")
         } else {
             WisentAlertPanel(
                 tone: .warning,
@@ -90,14 +91,18 @@ struct AttestationSection: View {
                 Text("\(shown.kind) \(shown.id): \(shown.stands ? "stands" : "does not stand")")
                     .font(WisentTypeScale.eyebrow())
                 ForEach(shown.refusals, id: \.self) { refusal in
-                    Text(refusal).font(WisentTypeScale.caption()).foregroundStyle(WisentDesign.secondary)
+                    Text(refusal).font(WisentTypeScale.caption()).foregroundStyle(
+                        WisentDesign.secondary)
                 }
                 ForEach(claims, id: \.key) { claim in
                     VStack(alignment: .leading) {
-                        Text("\(claim.key): \(claim.value.confirmed == true ? "confirmed" : "not confirmed")")
-                            .font(WisentTypeScale.identifierSmall())
+                        Text(
+                            "\(claim.key): \(claim.value.confirmed == true ? "confirmed" : "not confirmed")"
+                        )
+                        .font(WisentTypeScale.identifierSmall())
                         if let how = claim.value.how {
-                            Text(how).font(WisentTypeScale.caption()).foregroundStyle(WisentDesign.muted)
+                            Text(how).font(WisentTypeScale.caption()).foregroundStyle(
+                                WisentDesign.muted)
                         }
                     }
                 }
@@ -151,7 +156,8 @@ struct AttestationSection: View {
                         Text(record.subject).font(WisentTypeScale.identifierSmall())
                         Text(record.stands ? "stands" : "does not stand")
                             .font(WisentTypeScale.caption())
-                            .foregroundStyle(record.stands ? WisentDesign.secondary : WisentDesign.muted)
+                            .foregroundStyle(
+                                record.stands ? WisentDesign.secondary : WisentDesign.muted)
                         Spacer()
                         Button("Remove") { model.remove(record) }
                             .disabled(model.working != nil)

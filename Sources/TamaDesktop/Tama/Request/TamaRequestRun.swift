@@ -128,7 +128,8 @@ final class RequestRun: @unchecked Sendable {
                     withJSONObject: json, options: [.fragmentsAllowed])
             } catch {
                 let cause = error.localizedDescription
-                unreadableEvents.append("an answer whose json cannot be encoded (\(cause)): \(text)")
+                unreadableEvents.append(
+                    "an answer whose json cannot be encoded (\(cause)): \(text)")
                 return
             }
         }

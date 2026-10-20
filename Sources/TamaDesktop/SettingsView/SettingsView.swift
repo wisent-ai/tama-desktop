@@ -202,7 +202,7 @@ struct SettingsView: View {
                                 Text(bundle.sourcePath)
                                     .font(.system(size: 11, design: .monospaced))
                                 Text(
-                                    "\(bundle.hookCount) hooks · \(bundle.fileCount) files · SHA-256 \(bundle.sourceDigest.prefix(12))… · inactive"
+                                    "\(bundle.hookCount) hooks · \(bundle.fileCount) files · SHA-256 \(bundle.sourceDigest) · inactive"
                                 )
                                 .font(WisentTypeScale.caption())
                                 .foregroundStyle(WisentDesign.secondary)
