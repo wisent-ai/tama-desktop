@@ -143,8 +143,11 @@ struct TurnEndPanel: View {
 }
 
 extension SessionView {
+    /// What holds this session's next step: how its last turn ended, and the
+    /// task scope its changes and calls are judged against.
     @ViewBuilder
     func turnEnd(_ session: AgentSessionRecord) -> some View {
         TurnEndPanel(session: session)
+        TaskScopePanel(session: session.sessionId)
     }
 }
