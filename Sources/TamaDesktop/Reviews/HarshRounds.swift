@@ -42,7 +42,9 @@ enum HarshEntry: Decodable, Sendable, Hashable, Identifiable {
     case round(tree: String, reviewer: HarshReviewer, findings: [HarshFinding], atMs: UInt64)
     case disposed(quote: String, defect: String, atMs: UInt64)
 
-    private enum Keys: String, CodingKey { case entry, tree, reviewer, findings, quote, defect, atMs }
+    private enum Keys: String, CodingKey {
+        case entry, tree, reviewer, findings, quote, defect, atMs
+    }
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: Keys.self)
@@ -133,7 +135,8 @@ struct HarshRoundsView: View {
                     "A commit is made only after a reviewer that is not its author recorded a round that found nothing."
                 )
             case .loading:
-                WisentProgressPanel(title: "Reading rounds", detail: "Reading the checkout's register.")
+                WisentProgressPanel(
+                    title: "Reading rounds", detail: "Reading the checkout's register.")
             case .failed(let cause):
                 WisentAlertPanel(tone: .danger, title: "Rounds could not be read", detail: cause)
             case .ready:

@@ -1,0 +1,6 @@
+[
+  {
+    "extension": "swift",
+    "argv": ["xcrun", "swift-format", "format", "--configuration", ".swift-format"]
+  }
+]
