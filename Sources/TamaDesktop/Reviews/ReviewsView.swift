@@ -17,7 +17,12 @@ struct ReviewsView: View {
             scrolls: false, constrainsWidth: false
         ) {
             VSplitView {
-                ScrollView { StageView() }
+                ScrollView {
+                    VStack(alignment: .leading) {
+                        StageView()
+                        HarshRoundsView()
+                    }
+                }
                 content
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             }
