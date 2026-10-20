@@ -73,7 +73,12 @@ final class AttestationRegistriesModel: ObservableObject {
 
     private static let operation = "The attestation registries"
 
-    private var body: [String: Any] { kind.isEmpty ? [:] : ["kind": kind] }
+    /// The request body naming the picked kind, empty for every kind. It is
+    /// built by a function outside the main actor, so the request it is
+    /// handed to owns a fresh value rather than one the model's actor holds.
+    private nonisolated static func body(kind: String) -> [String: Any] {
+        kind.isEmpty ? [:] : ["kind": kind]
+    }
 
     func list() {
         run("Reading every attestation registry") {
@@ -81,7 +86,8 @@ final class AttestationRegistriesModel: ObservableObject {
             self.kinds = try await TamaClient().request(
                 "attestation/kinds", body: [:], as: [String].self, describing: Self.operation)
             self.records = try await TamaClient().request(
-                "attestation/registries", body: self.body, as: [RegistryRecord].self,
+                "attestation/registries", body: Self.body(kind: self.kind),
+                as: [RegistryRecord].self,
                 describing: Self.operation)
         }
     }
@@ -89,7 +95,7 @@ final class AttestationRegistriesModel: ObservableObject {
     func verify() {
         run("Verifying every attestation") {
             self.verified = try await TamaClient().request(
-                "attestation/verify", body: self.body, as: [VerifiedRecord].self,
+                "attestation/verify", body: Self.body(kind: self.kind), as: [VerifiedRecord].self,
                 describing: Self.operation)
         }
     }
@@ -105,7 +111,8 @@ final class AttestationRegistriesModel: ObservableObject {
                 describing: Self.operation)
             self.verified = nil
             self.records = try await TamaClient().request(
-                "attestation/registries", body: self.body, as: [RegistryRecord].self,
+                "attestation/registries", body: Self.body(kind: self.kind),
+                as: [RegistryRecord].self,
                 describing: Self.operation)
         }
     }
@@ -123,7 +130,8 @@ final class AttestationRegistriesModel: ObservableObject {
                 describing: Self.operation)
             self.verified = nil
             self.records = try await TamaClient().request(
-                "attestation/registries", body: self.body, as: [RegistryRecord].self,
+                "attestation/registries", body: Self.body(kind: self.kind),
+                as: [RegistryRecord].self,
                 describing: Self.operation)
         }
     }
@@ -139,7 +147,8 @@ final class AttestationRegistriesModel: ObservableObject {
                 "Brought \(migrated.attestations.count) attestation(s) into \(migrated.ledger)"
             self.verified = nil
             self.records = try await TamaClient().request(
-                "attestation/registries", body: self.body, as: [RegistryRecord].self,
+                "attestation/registries", body: Self.body(kind: self.kind),
+                as: [RegistryRecord].self,
                 describing: Self.operation)
         }
     }

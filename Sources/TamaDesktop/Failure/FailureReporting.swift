@@ -57,8 +57,6 @@ enum TamaFailureReporting {
                 "not_found"
             case .repositoryNotOwned:
                 "auth"
-            case .cleanupAgentUnavailable:
-                "config"
             }
         }
         return "unknown"
