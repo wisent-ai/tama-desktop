@@ -1,0 +1,58 @@
+The Commit standing screen lists, scores and takes back session charges
+
+tama standing gives each agent session a point for a commit in rustfmt's
+form and takes one for a commit with a Rust file out of it, and below zero
+every tool call of the session is refused; the app could not show any of it.
+Policy, Commit standing lists every scored session, blocked ones first, with
+its points and each charge's repository and files; Take back removes a
+charge with the reason it was recorded in error; Score charges the commits
+of a revision range made before they were scored. Each action runs tama
+request standing/list, standing/score or standing/withdraw, the routes that
+call the functions the CLI verbs call, and a refusal is shown in the
+command's own words. The screen needs control access, as the Session screen
+does. The README describes it.
+
+Release and control identifiers are shown whole: the length they were cut
+at was a number nobody declared, and a head cut at a guessed length can
+name two identifiers.
+
+The declared Swift format gate refuses the committed tree: thirteen sources
+written before the gate checked them are out of swift-format's form. Their
+committed versions are written in that form here, computed on the committed
+tree exported into the build directory, so no session's uncommitted edit is
+carried.
+
+Repairs: "Tama Desktop: a backend refusal without the error envelope shows its body" TamaClient.swift was left out of swift-format's form
+Repairs: "Session screen shows the selected session's last turn ending: the reading the core wrote, when the stop was received and answered, the refusing hook and each hook's exit and run time, and an unreadable record by its path" SessionView+TurnEnd.swift was left out of swift-format's form
+Repairs: "The Install screen's Attestations section records, shows, lists and removes the attestations Tama reads with no model, through tama request attestation/record, show, list and remove; the No model section only declares no model or returns to Brama" AttestationModel.swift and AttestationSection.swift were left out of swift-format's form
+Repairs: "Expose recorded session staging in Reviews" StageView.swift was left out of swift-format's form
+Repairs: "Tama requests name stdout lines that are not readable events" TamaRequestRun.swift was left out of swift-format's form
+Repairs: "Tama Desktop shows the attestation commits and ending answers carry and checks one before it is pushed or ended" ModelChoiceSection.swift was left out of swift-format's form
+Repairs: "The Install screen declares no model, returns Tama to Brama and reads or records a task's attestation through tama request, showing a declared no-model choice as ready; Justifications sources get unique file names so the package builds again" ModelChoiceModel.swift was left out of swift-format's form
+Repairs: "Install screen reads a checkout's unpushed commits as review-push will" PendingCommits.swift was left out of swift-format's form
+Repairs: "Carried attestations: keep an existing commit's attestation beside it, and say where one stands" CarriedAttestation.swift was left out of swift-format's form
+Repairs: "Violations: replay one hook only, named in a field above the rules" ViolationsClient.swift and ViolationsView.swift were left out of swift-format's form
+Repairs: "Remove the Merges screen" the sidebar's group and control lists it rewrote did not name every screen the app offers; they now name Commit standing
+
+Run: Release/fmt.sh --check on the committed tree exported with git archive
+named the thirteen sources; after Release/fmt.sh wrote them there, each
+changed file's formatted blob is the one this commit carries.
+
+I read this commit's message and every line of its patch, as a principal engineer who assumes an AI agent wrote every line.
+The claims about the lines this commit adds hold for them as the push leaves them: a defect that a later commit of the push repairs, naming this commit by its subject on a Repairs: line, is a repaired defect, never one left in place.
+No line this commit adds carries a defect: every path I traced does what its caller and the documentation say.
+This commit adds no needless abstraction and no second copy of something that already exists.
+No error is swallowed and no missing or failed value is answered with one nobody stated.
+No number is guessed: each comes from a declaration, a caller's argument refused by name when missing, or a measurement.
+No code hides a failure by pausing, waiting or trying again.
+No comment narrates the change or an incident, and no host, account, date or internal id is written into the repository.
+Every test added runs the real product and checks its behaviour, not a mock, a copy or the source text.
+This commit does not only reformat, and every commit the remote does not have yet whose lines it removes or replaces is named by its subject on a Repairs: line of its message or attestation note, with the defect it repairs there.
+The documentation this commit touches, or should touch, says exactly what the code does.
+No line and no message of this commit carries private information of ours: no host, account, person, address, secret, token, session or defect id, and no detail of an incident; what it says would be the same in a repository anyone can read.
+This commit solves no problem of ours alone: it adds or repairs a general primitive a user outside Wisent could run for their own case, not a fix shaped to one of our machines, accounts, runs or incidents.
+As a very strict, grumpy senior engineer who hates AI, I tried with everything I have to refuse this commit: what I attacked, what I checked, and why each attack failed.
+
+Harsh-Review-Attacked: a decode that does not match the route; checked that the types decode the camelCase fields the register serialises (recordedAt, withdrawnAt) and that session and cause are optional, as score writes null for them.
+Harsh-Review-Attacked: a rule of the app's own; checked that the screen holds none and sends the fields to tama request, which runs the register's functions and refuses an empty reason itself.
+Harsh-Review-Attacked: a stale list after an action; checked that score and take back read the list again after the product answers.
