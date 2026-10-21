@@ -27,7 +27,11 @@ extension HooksView {
                     prose("Side effects", sideEffects)
                 }
                 events(hook)
-                WisentField(label: "Source", value: hook.sourcePath ?? "No archived source path")
+                if let source = hook.sourcePath {
+                    WisentField(label: "Source", value: source)
+                } else {
+                    WisentField(label: "Source", value: "The catalog records no archived source")
+                }
                 WisentField(label: "Command", value: hook.command)
                 machineControl(hook)
                 sessionControl(hook)
@@ -151,14 +155,12 @@ extension HooksView {
     @ViewBuilder
     private func machineControl(_ hook: HookRecord) -> some View {
         Divider()
-        let selected = machineSelection.selection?.includes(hook.id) ?? true
-        let isLastSelection =
-            machineSelection.selection?.mode == "only"
-            && machineSelection.selection?.enabled.count == 1
-            && selected
         let status = machineStatus(hook)
         WisentField(label: "On this machine", value: status.0, tone: status.1)
-        if model.allowsControl, machineSelection.selection != nil {
+        if model.allowsControl, let selection = machineSelection.selection {
+            let selected = selection.includes(hook.id)
+            // The last hook of an `only` selection cannot be removed.
+            let isLastSelection = selection.mode == "only" && selection.enabled == [hook.id]
             WisentActionButton(
                 action: WisentAction(
                     selected ? "Remove from machine selection" : "Add to machine selection",
@@ -166,11 +168,7 @@ extension HooksView {
                     kind: selected ? .secondary : .primary,
                     isEnabled: !machineSelection.isWorking && !isLastSelection
                 ) {
-                    machineSelection.setEnforced(
-                        !selected,
-                        hookID: hook.id,
-                        catalogIDs: model.hooks.map(\.id)
-                    )
+                    machineSelection.setEnforced(!selected, hookID: hook.id)
                 }
             )
             if isLastSelection {
