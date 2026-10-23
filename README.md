@@ -190,6 +190,7 @@ Full prerequisites, first-success steps, failure recovery, reset, and uninstall 
 - **Session-control JSON protocol:** machine interface between Tama and supported local agent supervisors. Its schema and ownership rules are defined in the [core contracts](https://tama.wisent.com/docs/core-contracts/).
 - **Release manifests:** machine-readable build and artifact identity described in the [release documentation](https://tama.wisent.com/docs/releases/).
 - **Command examples:** directly runnable shell commands with inline risk and side-effect comments in [`examples/`](examples/).
+- **Contributions screen:** `tama contributions pending|report` as `tama request contributions/<verb>`, documented with [`tama contributions`](https://tama.wisent.com/docs/cli/assignment/contributions/).
 
 ### Policy-bundle import
 

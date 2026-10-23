@@ -18,6 +18,7 @@ struct RootView: View {
     @StateObject private var inspection = InspectionModel()
     @StateObject private var worktrees = WorktreesModel()
     @StateObject private var copies = CopiesModel()
+    @StateObject private var contributions = ContributionsModel()
     @StateObject private var reviews = ReviewsModel()
     @State var selection: SidebarDestination = .posture
 
@@ -116,6 +117,8 @@ struct RootView: View {
             LearningView()
         case .justifications:
             JustificationsView(
+        case .contributions:
+            ContributionsView(model: contributions)
                 collections: model.snapshot?.justifications ?? [],
                 isRefreshing: model.isRefreshing
             )

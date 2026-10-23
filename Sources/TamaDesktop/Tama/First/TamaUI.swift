@@ -20,6 +20,7 @@ enum SidebarDestination: String, Identifiable, CaseIterable {
     case justifications
     case builds
     case learning
+    case contributions
     case coverage
     case installPlan
     case settings
@@ -36,7 +37,7 @@ enum SidebarDestination: String, Identifiable, CaseIterable {
 
     var group: Group {
         switch self {
-        case .posture, .hooks, .session, .standing, .builds, .learning: .policy
+        case .posture, .hooks, .session, .standing, .builds, .learning, .contributions: .policy
         case .violations, .worktrees, .copies, .reviews, .justifications: .repair
         case .coverage, .installPlan, .settings: .system
         }
@@ -55,6 +56,7 @@ enum SidebarDestination: String, Identifiable, CaseIterable {
         case .justifications: "Justifications"
         case .builds: "Build registry"
         case .learning: "Learned"
+        case .contributions: "Contributions"
         case .coverage: "Coverage"
         case .installPlan: "Install plan"
         case .settings: "Settings"
@@ -74,6 +76,7 @@ enum SidebarDestination: String, Identifiable, CaseIterable {
         case .justifications: "text.badge.checkmark"
         case .builds: "hammer"
         case .learning: "lightbulb"
+        case .contributions: "gift"
         case .coverage: "point.3.connected.trianglepath.dotted"
         case .installPlan: "shippingbox"
         case .settings: "gearshape.2"
@@ -87,7 +90,7 @@ enum SidebarDestination: String, Identifiable, CaseIterable {
     var requiresControl: Bool {
         switch self {
         case .session, .standing, .violations, .worktrees, .copies, .reviews, .justifications,
-            .builds, .learning:
+            .builds, .learning, .contributions:
             true
         case .posture, .hooks, .coverage, .installPlan, .settings: false
         }
