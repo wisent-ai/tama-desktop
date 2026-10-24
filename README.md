@@ -259,20 +259,26 @@ source commands installs or restarts an application.
 ## Provisioning profiles for a release
 
 The app (`ai.wisent.tama.desktop`) and its network filter system extension
-(`ai.wisent.tama.network-filter`) are signed with Developer ID provisioning
-profiles, which the Stado release reads from the owner-vault item
-`tama-desktop-signing`. Stado makes or reuses them through App Store Connect
-and stores them there:
+(`ai.wisent.tama.network-filter`) need Developer ID provisioning profiles.
+Use the item part of the `TAMA_APP_PROFILE_B64` and
+`TAMA_NETWORK_FILTER_PROFILE_B64` bindings in `.wisent-release.json` as
+`PROFILE_ITEM`; both fields must reach the item the release actually reads.
+Set `VAULT_HOST` to its owner-vault host and `API_KEY_ITEM` to the authorized
+team API key item. Stado makes or reuses the profiles through App Store Connect:
 
 ```sh
-stado credentials item signing-profile --provider apple --host <owner-vault-host> tama-desktop-signing \
-  --credentials <App Store Connect key item> \
+stado credentials signing-profile ensure --provider apple --host "$VAULT_HOST" "$PROFILE_ITEM" \
+  --credentials "$API_KEY_ITEM" \
   --profile app_provisioning_profile_base64=ai.wisent.tama.desktop \
   --profile network_filter_provisioning_profile_base64=ai.wisent.tama.network-filter
 ```
 
-Both bundle ids must be registered in the team's Apple Developer account with
-their Network Extension capability; an unregistered one is refused by name.
+Both bundle ids must be registered with their Network Extension capability.
+The API key item must expose `key_id`, `issuer_id` and `private_key_p8_base64`
+to Stado. A missing field is a failed acquisition, not an Apple sign-in or a
+profile readiness result. An unregistered bundle is refused by name. Inspect
+the stored field metadata with `stado credentials item show --host "$VAULT_HOST"
+"$PROFILE_ITEM" --json`; profile storage alone does not prove release signing.
 
 ## Operational model
 
