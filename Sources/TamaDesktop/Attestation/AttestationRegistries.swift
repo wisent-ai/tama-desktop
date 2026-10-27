@@ -55,9 +55,9 @@ struct RecordedAttestation: Decodable, Sendable {
 /// `attestation/registries` and `attestation/verify` requests: the same
 /// records, the same refusals, no model.
 @MainActor
-final class AttestationRegistriesModel: ObservableObject {
-    @Published private(set) var working: String?
-    @Published private(set) var failure: String?
+final class AttestationRegistriesModel: ObservableObject, SectionRequests {
+    @Published var working: String?
+    @Published var failure: String?
     @Published private(set) var records: [RegistryRecord] = []
     @Published private(set) var verified: [VerifiedRecord]?
     /// What the last migration brought into the ledger.
@@ -82,18 +82,23 @@ final class AttestationRegistriesModel: ObservableObject {
 
     func list() {
         run("Reading every attestation registry") {
-            self.verified = nil
             self.kinds = try await TamaClient().request(
                 "attestation/kinds", body: [:], as: [String].self, describing: Self.operation)
-            self.records = try await TamaClient().request(
-                "attestation/registries", body: Self.body(kind: self.kind),
-                as: [RegistryRecord].self,
-                describing: Self.operation)
+            try await self.relist()
         }
+    }
+
+    /// The registries read again after a change, narrowed as the picker says.
+    private func relist() async throws {
+        verified = nil
+        records = try await TamaClient().request(
+            "attestation/registries", body: Self.body(kind: kind), as: [RegistryRecord].self,
+            describing: Self.operation)
     }
 
     func verify() {
         run("Verifying every attestation") {
+            self.verified = nil
             self.verified = try await TamaClient().request(
                 "attestation/verify", body: Self.body(kind: self.kind), as: [VerifiedRecord].self,
                 describing: Self.operation)
@@ -109,11 +114,7 @@ final class AttestationRegistriesModel: ObservableObject {
             let _: RevokedAttestation = try await TamaClient().request(
                 "attestation/revoke", body: fields, as: RevokedAttestation.self,
                 describing: Self.operation)
-            self.verified = nil
-            self.records = try await TamaClient().request(
-                "attestation/registries", body: Self.body(kind: self.kind),
-                as: [RegistryRecord].self,
-                describing: Self.operation)
+            try await self.relist()
         }
     }
 
@@ -121,6 +122,10 @@ final class AttestationRegistriesModel: ObservableObject {
     /// TEXT` with the kind picked above, then the listing again; a kind only
     /// the operator gives is refused with the act that records it.
     func attest() {
+        guard !kind.isEmpty else {
+            failure = "Pick the kind of attestation to record; every kind is only for listing."
+            return
+        }
         run("Recording \(kind) \(subject)") {
             let fields: [String: Any] = [
                 "kind": self.kind, "subject": self.subject, "statement": self.statement,
@@ -128,11 +133,7 @@ final class AttestationRegistriesModel: ObservableObject {
             let _: RecordedAttestation = try await TamaClient().request(
                 "attestation/attest", body: fields, as: RecordedAttestation.self,
                 describing: Self.operation)
-            self.verified = nil
-            self.records = try await TamaClient().request(
-                "attestation/registries", body: Self.body(kind: self.kind),
-                as: [RegistryRecord].self,
-                describing: Self.operation)
+            try await self.relist()
         }
     }
 
@@ -145,27 +146,7 @@ final class AttestationRegistriesModel: ObservableObject {
                 describing: Self.operation)
             self.migrated =
                 "Brought \(migrated.attestations.count) attestation(s) into \(migrated.ledger)"
-            self.verified = nil
-            self.records = try await TamaClient().request(
-                "attestation/registries", body: Self.body(kind: self.kind),
-                as: [RegistryRecord].self,
-                describing: Self.operation)
-        }
-    }
-
-    private func run(_ label: String, _ work: @escaping @MainActor () async throws -> Void) {
-        guard working == nil else { return }
-        working = label
-        failure = nil
-        Task {
-            do {
-                try await work()
-            } catch let error as LocalizedError {
-                failure = error.errorDescription
-            } catch {
-                failure = error.localizedDescription
-            }
-            working = nil
+            try await self.relist()
         }
     }
 }
@@ -198,7 +179,8 @@ struct AttestationRegistriesSection: View {
                 TextField("Subject", text: $model.subject)
                 TextField("Statement", text: $model.statement)
                 Button("Record") { model.attest() }
-                    .disabled(model.subject.isEmpty || model.statement.isEmpty)
+                    .disabled(
+                        model.kind.isEmpty || model.subject.isEmpty || model.statement.isEmpty)
             }
             .disabled(model.working != nil)
             if let working = model.working { WisentSkeletonText(label: working) }

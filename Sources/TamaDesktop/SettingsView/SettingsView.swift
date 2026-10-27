@@ -66,14 +66,14 @@ struct SettingsView: View {
     var localEnforcement: some View {
         WisentSectionBox(
             title: "Local protection",
-            trailing: model.areHooksDisabled ? "off" : "on"
+            trailing: model.protectionWord
         ) {
             WisentPanel {
                 VStack(alignment: .leading, spacing: WisentDesign.Space.x4) {
                     HStack(alignment: .top, spacing: WisentDesign.Space.x4) {
                         WisentField(
                             label: "Installed policy",
-                            value: model.installedHookReleaseID ?? "Not installed by Tama",
+                            value: installedReleaseLabel,
                             tone: model.installedHookReleaseID == nil ? .neutral : .success
                         )
                         WisentField(
@@ -146,7 +146,7 @@ struct SettingsView: View {
             title: "Policy bundles",
             detail:
                 "Adopt an existing self-contained Tama policy bundle or sealed release without installing or enabling it.",
-            trailing: "\(model.policyBundles?.bundles.count ?? 0) inactive"
+            trailing: policyBundlesCount
         ) {
             WisentPanel {
                 VStack(alignment: .leading, spacing: WisentDesign.Space.x3) {
@@ -164,7 +164,7 @@ struct SettingsView: View {
                                 .font(WisentTypeScale.bodyStrong())
                             ForEach(result.conflicts) { conflict in
                                 Text("\(conflict.path) — \(conflict.reason)")
-                                    .font(.system(size: 11, design: .monospaced))
+                                    .font(WisentTypeScale.identifierSmall())
                                     .foregroundStyle(WisentDesign.secondary)
                             }
                             Button("Replace these reviewed bundle files") {
@@ -200,7 +200,7 @@ struct SettingsView: View {
                         ForEach(bundles) { bundle in
                             VStack(alignment: .leading, spacing: WisentDesign.Space.x1) {
                                 Text(bundle.sourcePath)
-                                    .font(.system(size: 11, design: .monospaced))
+                                    .font(WisentTypeScale.identifierSmall())
                                 Text(
                                     "\(bundle.hookCount) hooks · \(bundle.fileCount) files · SHA-256 \(bundle.sourceDigest) · inactive"
                                 )
@@ -256,15 +256,11 @@ struct SettingsView: View {
                     HStack(alignment: .top, spacing: WisentDesign.Space.x4) {
                         WisentField(
                             label: "Policy release",
-                            value: buildIdentity.hookRelease?.releaseId ?? "Not recorded"
+                            value: bundledReleaseLabel
                         )
                         WisentField(
                             label: "Policy revision",
-                            value: buildIdentity.hookRelease.map { release in
-                                release.sourceDirty
-                                    ? "\(release.sourceRevision) (dirty source)"
-                                    : release.sourceRevision
-                            } ?? "Not recorded",
+                            value: bundledRevisionLabel,
                             tone: buildIdentity.hookRelease?.sourceDirty == true
                                 ? .warning : .neutral
                         )

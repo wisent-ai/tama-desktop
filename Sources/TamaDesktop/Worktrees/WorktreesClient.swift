@@ -19,7 +19,10 @@ struct WorktreeRecord: Decodable, Identifiable, Sendable {
 
     /// A worktree checked out at a bare commit has no branch, and `detached
     /// HEAD` is what git calls that state.
-    var branchLabel: String { branch ?? "detached HEAD" }
+    var branchLabel: String {
+        guard let branch else { return "detached HEAD" }
+        return branch
+    }
 
     var shortHead: String { shortIdentifier(head) }
 
@@ -61,13 +64,11 @@ struct WorktreeListing: Decodable, Sendable {
     let repositories: [WorktreeRepository]
     let worktreeCount: Int
     /// Directories the walk could not list, each with the operating system's
-    /// own reason. A document that omits the key comes from a backend older
-    /// than the field, which is an empty list and not a decode failure.
-    let unreadableDirectories: [WalkGap]?
+    /// own reason. `tama worktrees` always writes this list; a document
+    /// without it is not the route's answer and fails to decode naming the key.
+    let unreadableDirectories: [WalkGap]
 
-    /// The absent key is resolved once, here, because every reader treats a
-    /// missing report and an empty one the same way.
-    var walkGaps: [WalkGap] { unreadableDirectories ?? [] }
+    var walkGaps: [WalkGap] { unreadableDirectories }
 
     /// Flattened once, because the table ranks worktrees across repositories
     /// while the rail counts them per repository.
@@ -113,17 +114,15 @@ struct WorktreeRemoval: Decodable, Sendable {
     let refused: [WorktreeRefusal]
     /// Directories the walk could not list, each with the operating system's
     /// own reason: a pass carrying one of these removed nothing.
-    let unreadableDirectories: [WalkGap]?
-    /// The worktrees `--except` kept out of this pass. A document that omits
-    /// the key excepted nothing, which is an empty list and not a decode
-    /// failure: the field is younger than the route.
-    let excepted: [String]?
+    let unreadableDirectories: [WalkGap]
+    /// The worktrees `--except` kept out of this pass, always written by the
+    /// route, empty when nothing was excepted.
+    let excepted: [String]
 
-    /// Kept is stated separately from refused everywhere on the screen, so the
-    /// absent key is resolved once, here.
-    var exceptedPaths: [String] { excepted ?? [] }
+    /// Kept is stated separately from refused everywhere on the screen.
+    var exceptedPaths: [String] { excepted }
 
-    var walkGaps: [WalkGap] { unreadableDirectories ?? [] }
+    var walkGaps: [WalkGap] { unreadableDirectories }
 }
 
 /// The two worktree operations, each one `tama request` process.

@@ -246,7 +246,7 @@ checkout. Changed, missing or additional source inputs stop the release.
 
 ```console
 bash Release/tama-source.sh unpack --destination .build/source-check
-../tama/rust/target/release/tama hooks source-identity --source-root .build/source-check/tama
+../tama/rust/target/release/tama hooks identity --source-root .build/source-check/tama
 ```
 
 `unpack` refuses to overwrite an existing source directory. The identity reader
@@ -267,7 +267,7 @@ Set `VAULT_HOST` to its owner-vault host and `API_KEY_ITEM` to the authorized
 team API key item. Stado makes or reuses the profiles through App Store Connect:
 
 ```sh
-stado credentials signing-profile ensure --provider apple --host "$VAULT_HOST" "$PROFILE_ITEM" \
+stado credentials signing profile ensure --provider apple --host "$VAULT_HOST" "$PROFILE_ITEM" \
   --credentials "$API_KEY_ITEM" \
   --profile app_provisioning_profile_base64=ai.wisent.tama.desktop \
   --profile network_filter_provisioning_profile_base64=ai.wisent.tama.network-filter
@@ -279,6 +279,8 @@ to Stado. A missing field is a failed acquisition, not an Apple sign-in or a
 profile readiness result. An unregistered bundle is refused by name. Inspect
 the stored field metadata with `stado credentials item show --host "$VAULT_HOST"
 "$PROFILE_ITEM" --json`; profile storage alone does not prove release signing.
+
+Real acquisition qualification is `swift test --package-path tests/provisioning --scratch-path .build/provisioning-package --filter TamaDesktopProvisioningTests`, run from this checkout with isolated team, bundle and vault fixtures. The standalone package uses only XCTest and system frameworks, not the application dependency graph. Required declarations, persisted-state checks, cleanup and evidence are documented in [Provisioning qualification](https://tama.wisent.com/docs/releases/#provisioning-qualification). It does not substitute for real provider creation, signing, notarization or graphical qualification.
 
 ## Operational model
 

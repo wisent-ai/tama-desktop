@@ -92,6 +92,11 @@ struct ViolationTotals: Decodable, Equatable, Sendable {
 struct ViolationsClient: Sendable {
     private static let scanOperation = "The violation scan"
     private static let cleanOperation = "The cleanup"
+    private let command: TamaCommand?
+
+    init(command: TamaCommand? = nil) {
+        self.command = command
+    }
 
     /// `hook`, when given, narrows the replay to that one registered hook, as
     /// `tama violations find --hook <id>` does; the request refuses an id the
@@ -116,23 +121,9 @@ struct ViolationsClient: Sendable {
         // The scan exits with failure when it found violations, which is a
         // report and not a failure of the scan.
         case Int(EXIT_SUCCESS), Int(EXIT_FAILURE):
-            do {
-                return try JSONDecoder().decode(ViolationReport.self, from: result.document)
-            } catch {
-                // The decoding reason is the only evidence there is when the
-                // scanner's output and this build disagree about the report.
-                throw TamaBackendError.unreadableOutput(
-                    Self.scanOperation,
-                    error.localizedDescription
-                )
-            }
+            return try result.decoded(as: ViolationReport.self, describing: Self.scanOperation)
         default:
-            let message = result.failureSentence
-            throw TamaBackendError.refused(
-                message.isEmpty
-                    ? "\(Self.scanOperation) reported status \(result.status)."
-                    : message
-            )
+            throw failedJob(result, failurePoint: "tama.violations.scan")
         }
     }
 
@@ -150,17 +141,26 @@ struct ViolationsClient: Sendable {
                 ? "The cleanup finished without printing a summary."
                 : summary
         default:
-            let message = result.failureSentence
-            throw TamaBackendError.refused(
-                message.isEmpty
-                    ? "\(Self.cleanOperation) reported status \(result.status)."
-                    : message
-            )
+            throw failedJob(result, failurePoint: "tama.violations.clean")
         }
     }
 
+    /// A rejected job status is reported here before its origin-reported error
+    /// reaches a screen; accepted scan findings never enter this branch.
+    private func failedJob(
+        _ result: TamaClient.JobResult, failurePoint: String
+    ) -> TamaBackendError {
+        let error = TamaBackendError.refused(result.failureSentence)
+        TamaFailureReporting.report(
+            failurePoint: failurePoint,
+            code: TamaFailureReporting.code(for: error),
+            detail: error.localizedDescription
+        )
+        return error
+    }
+
     private func client() -> TamaClient {
-        TamaClient()
+        TamaClient(command: command)
     }
 
     private func validatedRepositoryPath(_ value: String) throws -> String {

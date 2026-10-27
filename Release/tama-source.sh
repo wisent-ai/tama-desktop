@@ -12,7 +12,7 @@
 # the archive's SHA-256 and its recorded commit against the pin and prints the
 # archive path. `unpack` verifies, refuses members outside tama/ and a
 # committed identity marker, extracts, and writes .tama-source-archive.json,
-# the marker `tama hooks source-identity` reads.
+# the marker `tama hooks identity` reads.
 set -euo pipefail
 
 PROJECT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -20,20 +20,24 @@ PIN="$PROJECT/Release/tama-revision"
 VENDOR="$PROJECT/Release/vendor/tama"
 SOURCE="$(dirname -- "$PROJECT")/tama"
 MARKER=".tama-source-archive.json"
-# The marker schema `tama hooks source-identity` accepts (MARKER_SCHEMA in
+# The marker schema `tama hooks identity` accepts (MARKER_SCHEMA in
 # tama-cli's hooks/package/identity/archive.rs).
 MARKER_SCHEMA="1"
 COMMIT_PATTERN='^[0-9a-f]{40}$'
 DIGEST_PATTERN='^[0-9a-f]{64}$'
 DIGEST_ALGORITHM="256"
+# A refusal exits with the status a failed command leaves.
+REFUSED_STATUS=$(false; echo $?)
 
 refuse() {
   printf 'Tama source pin refused: %s\n' "$*" >&2
-  exit 1
+  exit "$REFUSED_STATUS"
 }
 
 digest() {
-  shasum -a "$DIGEST_ALGORITHM" "$1" | cut -d ' ' -f 1
+  local summed
+  summed=$(shasum -a "$DIGEST_ALGORITHM" "$1")
+  printf '%s\n' "${summed%% *}"
 }
 
 archive_path() {
@@ -62,7 +66,11 @@ verify_archive() {
   [ -f "$archive" ] || refuse "$archive is absent"
   actual="$(digest "$archive")"
   [ "$actual" = "$sha" ] || refuse "$archive: expected sha256 $sha, observed $actual"
-  observed="$(gzip -dc "$archive" | git get-tar-commit-id || true)"
+  # The commit id sits in the archive's first header, so the reader stops
+  # early; gzip is read through a process substitution, whose broken pipe is
+  # not this check's failure.
+  observed="$(git get-tar-commit-id < <(gzip -dc "$archive"))" \
+    || refuse "$archive: git get-tar-commit-id found no recorded Git commit"
   [ "$observed" = "$revision" ] || refuse "$archive: expected Git commit $revision, observed '${observed}'"
 }
 
@@ -80,21 +88,38 @@ json_string() {
   printf '"%s"' "${text//\"/\\\"}"
 }
 
+# The value given after `flag` in the arguments that follow it; anything
+# else is refused with `usage`.
+option_value() {
+  local flag="$1" usage="$2" value=""
+  shift
+  shift
+  while (( $# )); do
+    [ "$1" = "$flag" ] || refuse "$usage"
+    shift
+    (( $# )) || refuse "$usage"
+    value="$1"
+    shift
+  done
+  [ -n "$value" ] || refuse "$usage"
+  printf '%s\n' "$value"
+}
+
 unpack() {
-  [ "${1:-}" = "--destination" ] && [ -n "${2:-}" ] || refuse "usage: tama-source.sh unpack --destination DIR"
-  local revision sha archive destination root outside
+  local revision sha archive requested destination root outside
+  requested="$(option_value --destination "usage: tama-source.sh unpack --destination DIR" "$@")"
   revision="$(pinned_revision)"
   sha="$(pinned_digest "$revision")"
   archive="$(archive_path "$revision")"
   verify_archive "$archive" "$revision" "$sha"
-  mkdir -p "$2"
-  destination="$(CDPATH= cd -- "$2" && pwd)"
+  mkdir -p "$requested"
+  destination="$(CDPATH= cd -- "$requested" && pwd)"
   root="$destination/tama"
   [ ! -e "$root" ] || refuse "refusing to overwrite an existing source directory: $root"
-  outside="$(tar -tzf "$archive" | grep -Ev '^tama(/|$)' || true)"
+  outside="$(tar -tzf "$archive" | awk '!/^tama(\/|$)/')"
   [ -z "$outside" ] || refuse "archive member is outside the Tama source: ${outside%%$'\n'*}"
   ! tar -tzf "$archive" | grep -Eq '(^|/)\.\.(/|$)' || refuse "archive member climbs out of the Tama source"
-  # -p keeps the archive's modes, as `tama hooks source-identity` does when it
+  # -p keeps the archive's modes, as `tama hooks identity` does when it
   # extracts the same archive to compare: an input's mode is part of it.
   tar -xpzf "$archive" -C "$destination"
   printf '{"archive": %s, "revision": %s, "schema": %s, "sha256": %s}\n' \
@@ -103,8 +128,8 @@ unpack() {
 }
 
 pin() {
-  [ "${1:-}" = "--revision" ] && [ -n "${2:-}" ] || refuse "usage: tama-source.sh pin --revision FULL_TAMA_COMMIT"
-  local requested="$2" resolved previous="" staging archive sha destination superseded
+  local requested resolved previous="" staging archive sha destination superseded
+  requested="$(option_value --revision "usage: tama-source.sh pin --revision FULL_TAMA_COMMIT" "$@")"
   resolved="$(git -C "$SOURCE" rev-parse --verify --end-of-options "$requested^{commit}")" \
     || refuse "$SOURCE does not hold commit $requested"
   [ "$requested" = "$resolved" ] || refuse "supply the full committed source revision, not '$requested'; resolved $resolved"
@@ -131,12 +156,15 @@ pin() {
   if [ -n "$previous" ] && [ "$previous" != "$resolved" ]; then
     superseded="$(dirname -- "$(archive_path "$previous")")"
     rm -f "$superseded/source.tar.gz" "$superseded/source.sha256"
-    rmdir "$superseded" 2>/dev/null || true
+    if [ -z "$(ls -A "$superseded")" ]; then
+      rmdir "$superseded"
+    fi
   fi
   printf '{"revision": "%s", "sha256": "%s"}\n' "$resolved" "$sha"
 }
 
-case "${1:-}" in
+(( $# )) || refuse "usage: tama-source.sh <pin --revision COMMIT|verify|unpack --destination DIR>"
+case "$1" in
   pin) shift; pin "$@" ;;
   verify) verify ;;
   unpack) shift; unpack "$@" ;;

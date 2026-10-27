@@ -20,7 +20,10 @@ struct ReviewsView: View {
                 ScrollView {
                     VStack(alignment: .leading) {
                         StageView()
+                        IndexRepairView()
                         HarshRoundsView()
+                        AdmittedCommitView()
+                        AdmissionCutoverView()
                     }
                 }
                 content

@@ -13,7 +13,7 @@ extension JustificationsView {
         let holding = collection.entries.lazy
             .filter { verdict($0, requirement: requirement).holds }
             .count
-        return WisentCounterRow(counters: [
+        var counters = [
             WisentCounterRow.Counter(
                 "Records",
                 value: collection.entries.count.formatted(.number),
@@ -31,12 +31,16 @@ extension JustificationsView {
                 detail: "Missing evidence or expired",
                 tone: holding == collection.entries.count ? .neutral : .warning
             ),
-            WisentCounterRow.Counter(
-                "Minimum words",
-                value: requirement.minimumWords.formatted(.number),
-                detail: "Required length"
-            ),
-        ])
+        ]
+        // A minimum is shown only where the requirement states one.
+        if let required = requirement.minimumWords {
+            counters.append(
+                WisentCounterRow.Counter(
+                    "Minimum words", value: required.formatted(.number), detail: "Required length"
+                )
+            )
+        }
+        return WisentCounterRow(counters: counters)
     }
 
     @ViewBuilder
@@ -47,12 +51,7 @@ extension JustificationsView {
     ) -> some View {
         if collections.isEmpty {
             if isRefreshing {
-                WisentSkeletonTable(
-                    rows: 6,
-                    columns: 4,
-                    header: true,
-                    label: "Reading justifications"
-                )
+                WisentSkeletonTable(header: true, label: "Reading justifications")
             } else {
                 WisentEmptyPanel(
                     title: "No justification policy",
@@ -60,7 +59,7 @@ extension JustificationsView {
                     symbol: "text.badge.checkmark"
                 )
             }
-            Spacer(minLength: 0)
+            Spacer()
         } else if entries.isEmpty {
             WisentEmptyPanel(
                 title: "No justifications recorded",
@@ -69,7 +68,7 @@ extension JustificationsView {
                     : "Justifications could not be read.",
                 symbol: "tray"
             )
-            Spacer(minLength: 0)
+            Spacer()
         } else if visible.isEmpty {
             WisentEmptyPanel(
                 title: "No record matches this selection",
@@ -81,7 +80,7 @@ extension JustificationsView {
                     query = ""
                 }
             )
-            Spacer(minLength: 0)
+            Spacer()
         } else if let requirement = collection?.requirement {
             table(visible: visible, entries: entries, requirement: requirement)
         }
@@ -95,32 +94,29 @@ extension JustificationsView {
         requirement: JustificationRequirement
     ) -> some View {
         let holding = entries.lazy.filter { verdict($0, requirement: requirement).holds }.count
-        let chipsOnHolding = holding * 2 <= entries.count
+        // The chip marks the minority verdict: chips go on holding records
+        // when they are no more than the records that do not hold.
+        let chipsOnHolding = holding <= entries.count - holding
         return WisentTableFrame {
             Table(visible, selection: $selection) {
                 TableColumn("TARGET") { entry in
                     Text(entry.registryKey)
                         .font(WisentTypeScale.identifier())
                         .foregroundStyle(WisentDesign.ink)
-                        .lineLimit(1)
                         .truncationMode(.head)
                         .help(entry.registryKey)
                         .frame(height: WisentAppLayout.tableRowHeight, alignment: .leading)
                 }
-                .width(min: 130, ideal: 220)
                 TableColumn("WORDS") { entry in
-                    Text(
-                        "\(entry.wordCount.formatted(.number))/\(requirement.minimumWords.formatted(.number))"
-                    )
+                    Text(words(entry, requirement: requirement))
                     .font(WisentTypeScale.identifierSmall())
                     .foregroundStyle(
-                        entry.wordCount >= requirement.minimumWords
-                            ? WisentDesign.secondary
-                            : WisentDesign.warning
+                        requirement.minimumWords.map { entry.wordCount < $0 } == true
+                            ? WisentDesign.warning
+                            : WisentDesign.secondary
                     )
                     .monospacedDigit()
                 }
-                .width(min: 54, ideal: 70)
                 TableColumn("EXPIRES") { entry in
                     Text(expiryText(entry.expiresAt))
                         .font(WisentTypeScale.identifierSmall())
@@ -129,14 +125,12 @@ extension JustificationsView {
                         )
                         .monospacedDigit()
                 }
-                .width(min: 66, ideal: 86)
                 TableColumn("VERDICT") { entry in
                     let verdict = verdict(entry, requirement: requirement)
                     if verdict.holds == chipsOnHolding {
                         WisentStatusChip(text: verdict.label, tone: verdict.tone)
                     }
                 }
-                .width(min: 60, ideal: 120)
             }
             .tableStyle(.inset)
             // A click on this table already means "select this record" and a
@@ -144,6 +138,15 @@ extension JustificationsView {
             // compete with both. Opting out restores exactly the behaviour the
             // index had before the window turned selection on.
             .textSelection(.disabled)
+        }
+    }
+
+    /// A record's word count, beside the requirement's minimum where it states one.
+    func words(_ entry: JustificationEntry, requirement: JustificationRequirement) -> String {
+        let counted = entry.wordCount.formatted(.number)
+        switch requirement.minimumWords {
+        case let .some(required): return "\(counted)/\(required.formatted(.number))"
+        case .none: return counted
         }
     }
 

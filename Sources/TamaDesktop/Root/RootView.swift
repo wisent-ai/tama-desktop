@@ -61,7 +61,7 @@ struct RootView: View {
                     selection = .posture
                 } label: {
                     WisentBadge(
-                        model.areHooksDisabled ? "Emergency bypass" : "Policy active",
+                        protectionBadge,
                         symbol: model.areHooksDisabled
                             ? "exclamationmark.octagon.fill"
                             : "checkmark.shield.fill",
@@ -90,6 +90,14 @@ struct RootView: View {
         .accessibilityElement(children: .contain)
     }
 
+    private var protectionBadge: String {
+        switch model.hooksDisabledState {
+        case true?: "Emergency bypass"
+        case false?: "Policy active"
+        case nil: "Protection unreadable"
+        }
+    }
+
     // MARK: - Detail
 
     @ViewBuilder
@@ -109,6 +117,8 @@ struct RootView: View {
             WorktreesView(model: worktrees)
         case .copies:
             CopiesView(model: copies)
+        case .contributions:
+            ContributionsView(model: contributions)
         case .reviews:
             ReviewsView(model: reviews)
         case .builds:
@@ -116,12 +126,18 @@ struct RootView: View {
         case .learning:
             LearningView()
         case .justifications:
-            JustificationsView(
-        case .contributions:
-            ContributionsView(model: contributions)
-                collections: model.snapshot?.justifications ?? [],
-                isRefreshing: model.isRefreshing
-            )
+            if let snapshot = model.snapshot {
+                JustificationsView(
+                    collections: snapshot.justifications,
+                    isRefreshing: model.isRefreshing
+                )
+            } else {
+                WisentEmptyPanel(
+                    title: "Policy not read",
+                    detail: "Justifications are read with the policy snapshot; refresh the policy to read them.",
+                    symbol: "text.badge.checkmark"
+                )
+            }
         case .coverage:
             CoverageView(inspection: inspection)
         case .installPlan:

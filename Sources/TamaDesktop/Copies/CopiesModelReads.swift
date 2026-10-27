@@ -1,33 +1,78 @@
 import Foundation
 
+/// What a copies walk found, as both the scan and the removal preview carry it.
+protocol CopyWalk {
+    var copies: [CopyRecord] { get }
+    var copyCount: Int { get }
+    var bytes: Int { get }
+    var twins: [CopyTwin] { get }
+    var linkedWorktrees: [String] { get }
+    var unreadable: [String] { get }
+    var walkGaps: [WalkGap] { get }
+}
+
+extension CopyListing: CopyWalk {}
+extension CopyRemoval: CopyWalk {}
+
 /// Everything the copies screen reads without changing anything: which
 /// document answers a question, which rows a pass would delete, and which
 /// verbs are available. Split from `CopiesModel` when the two halves together
 /// crossed the three-hundred-line limit; nothing here mutates.
 @MainActor
 extension CopiesModel {
-    /// The preview when there is one, because it is the same walk the removal
-    /// makes, and the scan otherwise.
-    var copies: [CopyRecord] { preview?.copies ?? listing?.copies ?? [] }
+    /// The walk that answers: the preview when there is one, because it is the
+    /// same walk the removal makes, and the scan otherwise. Before any scan
+    /// there is none, and the screen has found nothing yet.
+    var walk: (any CopyWalk)? {
+        if let preview { return preview }
+        return listing
+    }
 
-    var copyCount: Int { preview?.copyCount ?? listing?.copyCount ?? .zero }
+    var copies: [CopyRecord] {
+        guard let walk else { return [] }
+        return walk.copies
+    }
 
-    var bytes: Int { preview?.bytes ?? listing?.bytes ?? .zero }
+    var copyCount: Int {
+        guard let walk else { return .zero }
+        return walk.copyCount
+    }
+
+    var bytes: Int {
+        guard let walk else { return .zero }
+        return walk.bytes
+    }
 
     var sizeLabel: String { copiedSize(bytes) }
 
-    var twins: [CopyTwin] { preview?.twins ?? listing?.twins ?? [] }
+    var twins: [CopyTwin] {
+        guard let walk else { return [] }
+        return walk.twins
+    }
 
-    var linkedWorktrees: [String] { preview?.linkedWorktrees ?? listing?.linkedWorktrees ?? [] }
+    var linkedWorktrees: [String] {
+        guard let walk else { return [] }
+        return walk.linkedWorktrees
+    }
 
-    var unreadable: [String] { preview?.unreadable ?? listing?.unreadable ?? [] }
+    var unreadable: [String] {
+        guard let walk else { return [] }
+        return walk.unreadable
+    }
 
     /// Directories the walk could not read. The screen shows these beside the
     /// count, because a table of no copies from a pass that could not look is
     /// not the same answer as one checkout per repository.
-    var walkGaps: [WalkGap] { preview?.walkGaps ?? listing?.walkGaps ?? [] }
+    var walkGaps: [WalkGap] {
+        guard let walk else { return [] }
+        return walk.walkGaps
+    }
 
-    var refusals: [CopyRefusal] { preview?.refused ?? [] }
+    /// What the backend refused; only a removal preview refuses anything.
+    var refusals: [CopyRefusal] {
+        guard let preview else { return [] }
+        return preview.refused
+    }
 
     var isBusy: Bool {
         scanState == .scanning || removalState == .previewing || removalState == .applying
@@ -47,7 +92,10 @@ extension CopiesModel {
 
     /// What the operator marked here, plus what the document reported back as
     /// excepted: a path in either is kept out of the pass.
-    var kept: Set<String> { keptPaths.union(preview?.excepted ?? []) }
+    var kept: Set<String> {
+        guard let preview else { return keptPaths }
+        return keptPaths.union(preview.excepted)
+    }
 
     var claimed: Set<String> { claimedPaths }
 

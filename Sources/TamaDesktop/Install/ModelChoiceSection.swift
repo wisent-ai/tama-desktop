@@ -6,7 +6,7 @@ import WisentDesignSystem
 /// read the session's recorded attestation (`AttestationSection`);
 /// review-push and the turn-end gates read the attestation commits and
 /// answers carry (`CarriedAttestationSection`) on every machine. A service
-/// and its key are declared in the terminal (`tama model-provider set
+/// and its key are declared in the terminal (`tama model set
 /// --origin`), so the key never crosses a request.
 struct ModelChoiceSection: View {
     @ObservedObject var inspection: InspectionModel

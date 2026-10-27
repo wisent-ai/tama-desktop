@@ -47,7 +47,7 @@ extension AppModel {
             if let failure = self.localPolicyStateError {
                 throw HookEmergencyError.commandFailed(failure)
             }
-            guard self.areHooksDisabled == disabled else {
+            guard self.hooksDisabledState == disabled else {
                 throw HookEmergencyError.stateDidNotPersist
             }
             return disabled
@@ -190,13 +190,13 @@ extension AppModel {
     }
     /// The emergency switch and the installed release as recorded on disk. A
     /// record that exists but cannot be read is named in `localPolicyStateError`,
-    /// and protection whose state cannot be read is not shown as on.
+    /// and protection whose state cannot be read is shown neither as on nor off.
     func refreshLocalPolicyState() {
         var failures: [String] = []
         do {
-            areHooksDisabled = try emergencySwitch.disabledState()
+            hooksDisabledState = try emergencySwitch.disabledState()
         } catch {
-            areHooksDisabled = true
+            hooksDisabledState = nil
             failures.append(Self.sentence(error))
         }
         do {
@@ -214,5 +214,13 @@ extension AppModel {
     }
     static func sentence(_ error: Error) -> String {
         (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+    }
+    /// The switch as a person reads it: on, off, or unreadable.
+    var protectionWord: String {
+        switch hooksDisabledState {
+        case true?: "off"
+        case false?: "on"
+        case nil: "unreadable"
+        }
     }
 }

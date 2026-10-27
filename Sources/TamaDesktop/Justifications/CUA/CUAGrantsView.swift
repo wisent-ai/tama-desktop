@@ -98,7 +98,11 @@ struct CUAGrantsView: View {
                 }
                 Text(grant.allowedActions.joined(separator: ", "))
                 Text(grant.userRequestQuote).textSelection(.enabled)
-                Text("Session: \(grant.sessionId ?? "Checked by the hook at use")")
+                if let session = grant.sessionId {
+                    Text("Session: \(session)")
+                } else {
+                    Text("Session: checked by the hook at use")
+                }
                 Text(grant.lifetime)
                 Text(grant.allowedBundleId).textSelection(.enabled)
                 Text(grant.allowedExecutable).textSelection(.enabled)

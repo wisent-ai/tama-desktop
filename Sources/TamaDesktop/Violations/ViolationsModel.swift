@@ -31,13 +31,15 @@ final class ViolationsModel: ObservableObject {
     @Published var hookFilter: String = ""
 
     private let allowsOperations: Bool
+    private let client: ViolationsClient
     private var scanTask: Task<ViolationReport, Error>?
     private var cleanTask: Task<String, Error>?
     private var cleanCancellationRequested = false
 
-    init(authorization: ControlAuthorization? = nil) {
+    init(authorization: ControlAuthorization? = nil, command: TamaCommand? = nil) {
         repoPath = ""
         allowsOperations = authorization != nil
+        client = ViolationsClient(command: command)
     }
 
     var canScan: Bool {
@@ -50,7 +52,7 @@ final class ViolationsModel: ObservableObject {
     }
 
     var hasViolations: Bool {
-        (report?.totals.violations ?? 0) > 0
+        (report?.totals.violations ?? .zero) > .zero
     }
 
     /// The typed rounds as a whole number above zero, or nothing.
@@ -100,8 +102,9 @@ final class ViolationsModel: ObservableObject {
         let mode = scanMode
         let typed = hookFilter.trimmingCharacters(in: .whitespacesAndNewlines)
         let hook: String? = mode == .everyRule && !typed.isEmpty ? typed : nil
+        let client = client
         let task = Task.detached(priority: .userInitiated) {
-            try await ViolationsClient().scan(repoPath: path, mode: mode, hook: hook)
+            try await client.scan(repoPath: path, mode: mode, hook: hook)
         }
         scanTask = task
         do {
@@ -137,8 +140,9 @@ final class ViolationsModel: ObservableObject {
         }
         cleanState = .running
         cleanCancellationRequested = false
+        let client = client
         let task = Task.detached(priority: .userInitiated) {
-            try await ViolationsClient().clean(repoPath: path, maxRounds: rounds)
+            try await client.clean(repoPath: path, maxRounds: rounds)
         }
         cleanTask = task
         let outcome: Result<String, Error>
@@ -146,6 +150,13 @@ final class ViolationsModel: ObservableObject {
             outcome = .success(try await task.value)
         } catch {
             outcome = .failure(error)
+            // Record this operation before the final rescan can fail separately.
+            TamaFailureReporting.reportSurfaced(
+                failurePoint: "tama.violations.clean",
+                error: error,
+                sentence: (error as? LocalizedError)?.errorDescription
+                    ?? error.localizedDescription
+            )
         }
         cleanTask = nil
         let cancellationRequested = cleanCancellationRequested
@@ -183,11 +194,6 @@ final class ViolationsModel: ObservableObject {
             let sentence =
                 (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             cleanState = .failed(sentence)
-            TamaFailureReporting.reportSurfaced(
-                failurePoint: "tama.violations.clean",
-                error: error,
-                sentence: sentence
-            )
         case .success(let summary):
             guard
                 let report,

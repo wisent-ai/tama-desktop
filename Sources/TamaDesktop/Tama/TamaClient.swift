@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 /// The client for Tama's own operations. Every call runs one
@@ -10,30 +11,29 @@ struct TamaClient: Sendable {
     /// Nil runs the binary sealed into this build's hook release.
     var command: TamaCommand?
 
-    /// The folded end of one streamed job: the status, the result document
-    /// re-encoded as JSON, and the job's stdout and stderr text.
+    /// A streamed job's result and the complete process exchange that produced it.
     struct JobResult: Sendable {
-        /// How much of stderr, and failing that of stdout, a failure sentence shows.
-        private static let stderrSentenceLimit = 600
-        private static let stdoutSentenceLimit = 4000
-
         let status: Int
         let document: Data
-        let stdoutText: String
-        let stderrText: String
+        let operation: String
+        let exchange: TamaExchange
 
-        /// The bounded stderr sentence, or the bounded stdout sentence when
-        /// stderr stayed empty — the same preference the process runner had.
+        var stdoutText: String { exchange.stdoutText }
+
+        /// Keep the terminal document and every observed cause labelled together.
         var failureSentence: String {
-            let stderr = Self.snippet(stderrText, limit: Self.stderrSentenceLimit)
-            if !stderr.isEmpty { return stderr }
-            return Self.snippet(stdoutText, limit: Self.stdoutSentenceLimit)
+            "\(operation)\n\(exchange.diagnostics)"
         }
 
-        private static func snippet(_ text: String, limit: Int) -> String {
-            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard trimmed.count > limit else { return trimmed }
-            return String(trimmed.prefix(limit)) + "…"
+        /// The result document decoded as `type`. A schema mismatch keeps the
+        /// whole exchange beside the decoder's cause, as a bounded answer's
+        /// does, so a consumer never loses the document, exit and output.
+        func decoded<Value: Decodable>(as type: Value.Type, describing description: String) throws -> Value {
+            do {
+                return try TamaClient.decode(document, operation: operation, as: type, describing: description)
+            } catch TamaBackendError.unreadableOutput(let context, let cause) {
+                throw TamaBackendError.unreadableOutput(context, "\(cause)\n\(exchange.diagnostics)")
+            }
         }
     }
 
@@ -47,33 +47,52 @@ struct TamaClient: Sendable {
         as type: Value.Type,
         describing description: String
     ) async throws -> Value {
-        let data = try await answer(operation, body: body, describing: description)
+        let response = try await answer(operation, body: body, describing: description)
         do {
-            return try JSONDecoder().decode(Value.self, from: data)
+            return try Self.decode(
+                response.data, operation: operation, as: type, describing: description)
+        } catch TamaBackendError.unreadableOutput(let context, let cause) {
+            throw TamaBackendError.unreadableOutput(
+                context, "\(cause)\n\(response.exchange.diagnostics)")
+        }
+    }
+
+    /// Bounded answers and streamed job results retain the same decoder
+    /// context when an app and backend disagree about the response contract.
+    static func decode<Value: Decodable>(
+        _ data: Data,
+        operation: String,
+        as type: Value.Type,
+        describing description: String
+    ) throws -> Value {
+        do {
+            return try JSONDecoder().decode(type, from: data)
         } catch {
-            throw TamaBackendError.unreadableOutput(description, error.localizedDescription)
+            throw TamaBackendError.unreadableOutput(
+                "\(description) [\(operation)]", String(reflecting: error))
         }
     }
 
     /// The raw document, for the caller that walks a shape too irregular for
     /// one Decodable type.
     func document(_ operation: String, describing description: String) async throws -> Data {
-        try await answer(operation, body: [:], describing: description)
+        try await answer(operation, body: [:], describing: description).data
     }
 
     /// The document as pretty-printed text, for the snippet an operator pastes
     /// into a client configuration.
     func prettyText(_ operation: String, describing description: String) async throws -> String {
-        let data = try await answer(operation, body: [:], describing: description)
+        let response = try await answer(operation, body: [:], describing: description)
         let pretty: Data
         do {
             pretty = try JSONSerialization.data(
-                withJSONObject: try JSONSerialization.jsonObject(with: data),
+                withJSONObject: try JSONSerialization.jsonObject(with: response.data),
                 options: [.prettyPrinted, .sortedKeys]
             )
         } catch {
             throw TamaBackendError.unreadableOutput(
-                description, "not a JSON document: \(error.localizedDescription)")
+                "\(description) [\(operation)]",
+                "JSON formatting failed: \(String(reflecting: error))\n\(response.exchange.diagnostics)")
         }
         return String(decoding: pretty, as: UTF8.self)
     }
@@ -86,43 +105,41 @@ struct TamaClient: Sendable {
     func job(
         _ operation: String,
         body: [String: Any],
-        describing description: String
+        describing description: String,
+        onEvent: (@Sendable (TamaJobEvent) -> Void)? = nil
     ) async throws -> JobResult {
-        let exchange = try await run(operation, body: body, describing: description)
+        let exchange = try await run(
+            operation, body: body, describing: description, onEvent: onEvent)
         switch exchange.end {
         case .result(let status, let document):
+            try Self.validateExit(exchange, expected: status, operation: operation, describing: description)
             return JobResult(
                 status: status,
                 document: document,
-                stdoutText: exchange.stdoutText,
-                stderrText: exchange.stderrText
+                operation: operation,
+                exchange: exchange
             )
         case .response(let status, let document):
+            // Successful HTTP status class: https://www.rfc-editor.org/rfc/rfc9110.html#section-15.3
             guard (200...299).contains(status) else {
-                throw Self.refusal(data: document, status: status)
+                throw Self.refusal(
+                    data: document, status: status, operation: operation, exchange: exchange)
             }
             throw TamaBackendError.unreadableOutput(
-                description,
-                "\(operation) answered instead of running a job"
+                "\(description) [\(operation)]",
+                "\(operation) answered instead of running a job\n\(exchange.diagnostics)"
             )
         case nil:
-            throw Self.unanswered(exchange, describing: description)
+            throw Self.unanswered(exchange, describing: "\(description) [\(operation)]")
         }
     }
 
-    /// Why a request ended with no answer: the stdout lines that could not be
-    /// read as events when there were any - the answer may be among them -
-    /// else the process's exit status and its own stderr.
+    /// A missing terminal event must not hide earlier output. Keep every
+    /// observed channel separately labelled, together with operation and exit.
     private static func unanswered(
         _ exchange: TamaExchange, describing description: String
     ) -> TamaBackendError {
-        guard exchange.unreadableEvents.isEmpty else {
-            return .unreadableOutput(
-                description,
-                "events that could not be read: "
-                    + exchange.unreadableEvents.joined(separator: "; "))
-        }
-        return .endedWithoutAnswer(exchange.exitStatus, exchange.processError)
+        return .endedWithoutAnswer(exchange.exitStatus, "\(description)\n\(exchange.diagnostics)")
     }
 
     // MARK: - Transport
@@ -131,22 +148,41 @@ struct TamaClient: Sendable {
         _ operation: String,
         body: [String: Any],
         describing description: String
-    ) async throws -> Data {
+    ) async throws -> (data: Data, exchange: TamaExchange) {
         let exchange = try await run(operation, body: body, describing: description)
         switch exchange.end {
         case .response(let status, let document):
+            // Successful HTTP status class: https://www.rfc-editor.org/rfc/rfc9110.html#section-15.3
             guard (200...299).contains(status) else {
-                throw Self.refusal(data: document, status: status)
+                throw Self.refusal(
+                    data: document, status: status, operation: operation, exchange: exchange)
             }
-            return document
+            try Self.validateExit(exchange, expected: Int(EXIT_SUCCESS), operation: operation, describing: description)
+            return (document, exchange)
         case .result:
             throw TamaBackendError.unreadableOutput(
-                description,
-                "\(operation) ran a job instead of answering"
+                "\(description) [\(operation)]",
+                "\(operation) ran a job instead of answering\n\(exchange.diagnostics)"
             )
         case nil:
-            throw Self.unanswered(exchange, describing: description)
+            throw Self.unanswered(exchange, describing: "\(description) [\(operation)]")
         }
+    }
+
+    /// A terminal document is not success when its process ended differently.
+    /// Both require a normal exit, never a numerically matching signal.
+    private static func validateExit(
+        _ exchange: TamaExchange, expected: Int, operation: String, describing description: String
+    ) throws {
+        if exchange.terminationReason == .exit, Int(exchange.exitStatus) == expected { return }
+        let error = TamaBackendError.unexpectedExit(
+            "\(description) [\(operation)] expected normal process exit status \(expected) from its terminal event, but observed \(exchange.terminationReason) with status \(exchange.exitStatus).\n\(exchange.diagnostics)")
+        TamaFailureReporting.report(
+            failurePoint: "tama.backend.exit",
+            code: TamaFailureReporting.code(for: error),
+            detail: error.localizedDescription
+        )
+        throw error
     }
 
     /// A process that cannot be found or started is reported where it
@@ -154,13 +190,39 @@ struct TamaClient: Sendable {
     private func run(
         _ operation: String,
         body: [String: Any],
-        describing description: String
+        describing description: String,
+        onEvent: (@Sendable (TamaJobEvent) -> Void)? = nil
     ) async throws -> TamaExchange {
-        let input = body.isEmpty ? Data() : try JSONSerialization.data(withJSONObject: body)
         let exchange: TamaExchange
         do {
+            let input: Data
+            // JSONSerialization raises an Objective-C exception, which no
+            // Swift `catch` reaches, for a body it cannot write (a NaN, an
+            // infinity, a value of no JSON type); it is asked first, so the
+            // body is refused here naming the operation instead of ending the app.
+            guard body.isEmpty || JSONSerialization.isValidJSONObject(body) else {
+                throw TamaBackendError.startFailed(
+                    "\(description) [\(operation)] request body cannot be encoded: it holds a value JSON cannot write (a NaN, an infinity or a value of no JSON type)"
+                )
+            }
+            do {
+                input = body.isEmpty ? Data() : try JSONSerialization.data(withJSONObject: body)
+            } catch {
+                throw TamaBackendError.startFailed(
+                    "\(description) [\(operation)] request body cannot be encoded: \(String(reflecting: error))"
+                )
+            }
             let command = try self.command ?? TamaCommand.bundled()
-            exchange = try await TamaRequestProcess.run(command, operation: operation, body: input)
+            do {
+                exchange = try await TamaRequestProcess.run(
+                    command, operation: operation, body: input, onEvent: onEvent)
+            } catch TamaBackendError.startFailed(let cause) {
+                throw TamaBackendError.startFailed(
+                    "\(description) [\(operation)] using \(command.executable.path): \(cause)"
+                )
+            }
+        } catch is CancellationError {
+            throw TamaBackendError.cancelled(description)
         } catch {
             TamaFailureReporting.report(
                 failurePoint: "tama.backend.start",
@@ -170,6 +232,27 @@ struct TamaClient: Sendable {
             throw error
         }
         if Task.isCancelled { throw TamaBackendError.cancelled(description) }
+        if !exchange.inputErrors.isEmpty {
+            let error = TamaBackendError.inputFailed(
+                exchange.exitStatus, "\(description) [\(operation)]\n\(exchange.diagnostics)")
+            TamaFailureReporting.report(
+                failurePoint: "tama.backend.input",
+                code: TamaFailureReporting.code(for: error),
+                detail: error.localizedDescription
+            )
+            throw error
+        }
+        if !exchange.outputErrors.isEmpty || !exchange.unreadableEvents.isEmpty {
+            let error = TamaBackendError.outputFailed(
+                "\(description) [\(operation)]", exchange.diagnostics)
+            TamaFailureReporting.report(
+                failurePoint: exchange.outputErrors.isEmpty
+                    ? "tama.backend.protocol" : "tama.backend.output",
+                code: TamaFailureReporting.code(for: error),
+                detail: error.localizedDescription
+            )
+            throw error
+        }
         return exchange
     }
 
@@ -178,7 +261,9 @@ struct TamaClient: Sendable {
     /// or JSON without a sentence) is shown as it came with the parser's
     /// reason: "answered with status N" alone dropped the only words that
     /// said what went wrong.
-    private static func refusal(data: Data, status: Int) -> TamaBackendError {
+    private static func refusal(
+        data: Data, status: Int, operation: String, exchange: TamaExchange
+    ) -> TamaBackendError {
         let body = String(decoding: data, as: UTF8.self)
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let message: String
@@ -196,11 +281,12 @@ struct TamaClient: Sendable {
                 ? "The Tama backend answered with status \(status) and an empty body."
                 : "The Tama backend answered with status \(status) and a body that is not JSON (\(error)): \(body)"
         }
+        let detail = "\(message)\nrequest operation: \(operation)\n\(exchange.diagnostics)"
         TamaFailureReporting.report(
             failurePoint: "tama.backend.refusal",
             code: TamaFailureReporting.code(forRefusalStatus: status),
-            detail: message
+            detail: detail
         )
-        return .refused(message)
+        return .refused(detail)
     }
 }

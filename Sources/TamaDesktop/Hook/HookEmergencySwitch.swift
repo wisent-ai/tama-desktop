@@ -3,10 +3,8 @@ import Foundation
 
 struct HookEmergencySwitch: @unchecked Sendable {
     private static let schema = "ai.wisent.tama.hook-emergency-state.v1"
-    /// The command's output is kept to its last 64 KiB. The switch waits for
-    /// the command's own exit and for its output to close; its failure is its
-    /// exit status and what it printed.
-    private static let retainedOutputBytes = 64 * 1024
+    /// The switch waits for the command's own exit and for its output to
+    /// close; its failure is its exit status and everything it printed.
     private let manager = FileManager.default
 
     /// Whether the emergency switch is set. No manifest or no state file is
@@ -123,10 +121,7 @@ struct HookEmergencySwitch: @unchecked Sendable {
 
         drainGroup.enter()
         DispatchQueue.global(qos: .userInitiated).async {
-            outputBox.drain(
-                output.fileHandleForReading,
-                retaining: Self.retainedOutputBytes
-            )
+            outputBox.drain(output.fileHandleForReading)
             drainGroup.leave()
         }
 
@@ -135,21 +130,15 @@ struct HookEmergencySwitch: @unchecked Sendable {
         if let readError = outputBox.readError {
             throw HookEmergencyError.commandOutputReadFailed(readError)
         }
-        guard !outputBox.wasTruncated else {
-            throw HookEmergencyError.commandOutputExceeded
-        }
-        let message =
-            String(
-                data: outputBox.data,
-                encoding: .utf8
-            )?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let message = String(decoding: outputBox.data, as: UTF8.self)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         guard process.terminationStatus == .zero else {
             throw HookEmergencyError.commandFailed(message)
         }
     }
 
     private var supportURL: URL {
-        manager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        URL.applicationSupportDirectory
             .appendingPathComponent("Tama", isDirectory: true)
     }
 
@@ -188,7 +177,6 @@ enum HookEmergencyError: LocalizedError {
     case controllerInstallerMissing
     case controllerReleaseMissing
     case commandFailed(String)
-    case commandOutputExceeded
     case commandOutputReadFailed(String)
     case localStateUnreadable(String, String)
 
@@ -206,10 +194,8 @@ enum HookEmergencyError: LocalizedError {
             message.isEmpty
                 ? "Tama could not update the installed hook configuration."
                 : message
-        case .commandOutputExceeded:
-            "The local policy command exceeded Tama's bounded output limit. Inspect local policy state before retrying."
         case .commandOutputReadFailed(let message):
-            "Tama could not read bounded local policy output: \(message)"
+            "Tama could not read local policy output: \(message)"
         case .localStateUnreadable(let path, let cause):
             "Tama cannot read the local policy state \(path): \(cause)"
         }

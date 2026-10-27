@@ -47,8 +47,8 @@ struct CarriedCheck: Decodable, Sendable {
     /// Where the standing attestation is, as Tama answered it.
     var standing: String {
         switch (keptIn, carriedIn) {
-        case (let kept?, _): return "Kept in \(kept); the commit is unchanged."
-        case (nil, let carried?): return "Carried in its \(carried); the gate lets it through."
+        case let (kept?, _): return "Kept in \(kept); the commit is unchanged."
+        case let (nil, carried?): return "Carried in its \(carried); the gate lets it through."
         case (nil, nil): return "Tama's answer names no place the attestation is carried."
         }
     }
@@ -58,9 +58,9 @@ struct CarriedCheck: Decodable, Sendable {
 /// as requests, so the screen shows what the terminal prints and a refusal
 /// carries the terminal's sentence. No model is asked by either.
 @MainActor
-final class CarriedAttestationModel: ObservableObject {
-    @Published private(set) var working: String?
-    @Published private(set) var failure: String?
+final class CarriedAttestationModel: ObservableObject, SectionRequests {
+    @Published var working: String?
+    @Published var failure: String?
     @Published private(set) var standard: CarriedStandard?
     @Published private(set) var check: CarriedCheck?
     @Published var commit = ""
@@ -113,6 +113,7 @@ final class CarriedAttestationModel: ObservableObject {
             "commit": revision, "repository": repository.path, "attestation": commitAttestation,
         ]
         run("Keeping the attestation") {
+            self.check = nil
             self.check = try await TamaClient().request(
                 "attestation/attest-commit", body: fields, as: CarriedCheck.self,
                 describing: Self.operation)
@@ -143,25 +144,10 @@ final class CarriedAttestationModel: ObservableObject {
     private func send(_ body: [String: String]) {
         run("Checking the attestation") {
             let fields: [String: Any] = body
+            self.check = nil
             self.check = try await TamaClient().request(
                 "attestation/check", body: fields, as: CarriedCheck.self, describing: Self.operation
             )
-        }
-    }
-
-    private func run(_ label: String, _ work: @escaping @MainActor () async throws -> Void) {
-        guard working == nil else { return }
-        working = label
-        failure = nil
-        Task {
-            do {
-                try await work()
-            } catch let error as LocalizedError {
-                failure = error.errorDescription
-            } catch {
-                failure = error.localizedDescription
-            }
-            working = nil
         }
     }
 }
@@ -273,12 +259,6 @@ struct CarriedAttestationSection: View {
     }
 
     private func chooseRepository() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK {
-            model.repository = panel.url
-        }
+        if let directory = chooseDirectory() { model.repository = directory }
     }
 }

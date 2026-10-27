@@ -25,7 +25,7 @@ struct PendingReport: Decodable, Sendable {
         /// Whether the commit stands and where, as Tama answered it.
         var standing: String {
             switch (stands, carriedIn) {
-            case (true, let place?): return "Stands in its \(place)"
+            case let (true, place?): return "Stands in its \(place)"
             case (true, nil): return "Tama answered that it stands and named no place it is carried"
             case (false, _): return "Does not stand"
             }
@@ -38,18 +38,28 @@ struct PendingReport: Decodable, Sendable {
                 + [patchesFailure].compactMap { $0 }.map { "patches unread: \($0)" }
         }
     }
+    /// Where the attestation notes stand when some commit stands only in its
+    /// note: the remote asked, both notes commits, and why the push must
+    /// carry the note; null when no commit stands on a note.
+    struct Notes: Decodable, Sendable {
+        let remote: String
+        let local: String?
+        let remoteNotes: String?
+        let unpublished: String?
+    }
     let repository: String
     let upstream: String
     let stands: Bool
+    let notes: Notes?
     let commits: [Commit]
 }
 
 /// `tama attestation pending --repository PATH` as a request, so the screen
 /// shows what the terminal prints and a refusal carries Tama's sentence.
 @MainActor
-final class PendingCommitsModel: ObservableObject {
-    @Published private(set) var working: String?
-    @Published private(set) var failure: String?
+final class PendingCommitsModel: ObservableObject, SectionRequests {
+    @Published var working: String?
+    @Published var failure: String?
     @Published private(set) var report: PendingReport?
     @Published var repository: URL?
 
@@ -60,21 +70,13 @@ final class PendingCommitsModel: ObservableObject {
             failure = "Choose the checkout whose unpushed commits to read."
             return
         }
-        guard working == nil else { return }
-        working = "Reading the unpushed commits"
-        failure = nil
         let fields: [String: Any] = ["repository": repository.path]
-        Task {
-            do {
-                report = try await TamaClient().request(
-                    "attestation/pending", body: fields, as: PendingReport.self,
-                    describing: Self.operation)
-            } catch let error as LocalizedError {
-                failure = error.errorDescription
-            } catch {
-                failure = error.localizedDescription
-            }
-            working = nil
+        run("Reading the unpushed commits") {
+            // A refused read must not leave the previous checkout's report beside it.
+            self.report = nil
+            self.report = try await TamaClient().request(
+                "attestation/pending", body: fields, as: PendingReport.self,
+                describing: Self.operation)
         }
     }
 }
@@ -117,6 +119,12 @@ struct PendingCommitsSection: View {
                 ? "Every commit over \(report.upstream) stands"
                 : "Not every commit over \(report.upstream) stands; review-push refuses the push",
             detail: report.repository)
+        if let notes = report.notes, let unpublished = notes.unpublished {
+            WisentAlertPanel(
+                tone: .warning,
+                title: "\(notes.remote) does not hold the attestation notes these commits stand on",
+                detail: unpublished)
+        }
         ForEach(report.commits, id: \.commit) { commit in
             WisentPanel {
                 VStack(alignment: .leading, spacing: WisentDesign.Space.x1) {
@@ -134,12 +142,6 @@ struct PendingCommitsSection: View {
     }
 
     private func chooseRepository() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        if panel.runModal() == .OK {
-            model.repository = panel.url
-        }
+        if let directory = chooseDirectory() { model.repository = directory }
     }
 }

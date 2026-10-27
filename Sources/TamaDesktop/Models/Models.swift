@@ -20,7 +20,9 @@ struct BuildIdentity: Decodable, Sendable {
     let hookRelease: HookBuildIdentity?
     let platform: String
     let productVersion: String
-    let sourceDirty: Bool
+    /// Whether the build record says the source was dirty; `nil` when no
+    /// record was read, since nothing then says either way.
+    let sourceDirty: Bool?
     let sourceRevision: String
     /// Why the bundled `tama-build.json` could not be read, when it exists
     /// and cannot be read or decoded. It used to read as an unbuilt
@@ -54,7 +56,7 @@ struct BuildIdentity: Decodable, Sendable {
             hookRelease: nil,
             platform: "macOS",
             productVersion: productVersion,
-            sourceDirty: true,
+            sourceDirty: nil,
             sourceRevision: "not recorded"
         )
         identity.readFailure = readFailure
@@ -73,13 +75,18 @@ struct BuildIdentity: Decodable, Sendable {
     }
 
     var displayedRevision: String {
-        sourceDirty ? "\(sourceRevision) (dirty source)" : sourceRevision
+        switch sourceDirty {
+        case true?: "\(sourceRevision) (dirty source)"
+        case false?: sourceRevision
+        case nil: "\(sourceRevision) (cleanliness not recorded)"
+        }
     }
 }
 
 struct HookCatalog: Decodable, Sendable {
     let version: Int
-    let generatedAt: String
+    /// When `tama list` built the catalog; `nil` when it did not say.
+    let generatedAt: String?
     let hooks: [HookRecord]
     let orphanSources: [String]
     let repoGitHooks: [RepoGitHook]
@@ -90,16 +97,44 @@ struct HookRecord: Decodable, Identifiable, Sendable {
     let type: String
     let command: String
     let sourcePath: String?
-    let category: String
-    let status: String
+    /// The category and status `tama list` states for the hook; `nil` when
+    /// its catalog entry states none, which the views say rather than
+    /// filing the hook under an invented one.
+    let statedCategory: String?
+    let statedStatus: String?
     let description: String?
     let why: String?
     let sideEffects: String?
     let events: [HookEvent]
-    let justificationRequirements: [JustificationRequirement]?
+    /// Every catalog entry carries this list; Tama's catalog writes it empty
+    /// for a hook that asks for no justification.
+    let justificationRequirements: [JustificationRequirement]
+
+    enum CodingKeys: String, CodingKey {
+        case id, type, command, sourcePath, description, why, sideEffects, events
+        case justificationRequirements
+        case statedCategory = "category"
+        case statedStatus = "status"
+    }
 
     var requirements: [JustificationRequirement] {
-        justificationRequirements ?? []
+        justificationRequirements
+    }
+
+    /// The category as shown: the stated one, or that Tama states none.
+    var category: String {
+        switch statedCategory {
+        case let stated?: stated
+        case nil: "Tama states no category"
+        }
+    }
+
+    /// The status as shown: the stated one, or that Tama states none.
+    var status: String {
+        switch statedStatus {
+        case let stated?: stated
+        case nil: "Tama states no status"
+        }
     }
 
     var isBlocking: Bool {
@@ -116,7 +151,10 @@ struct JustificationRequirement: Decodable, Hashable, Identifiable, Sendable {
     let title: String
     let registryPath: String
     let field: String
-    let minimumWords: Int
+    /// The least words a justification needs, stated only where the hook
+    /// measures words; a requirement that only asks for a recorded reason
+    /// states none.
+    let minimumWords: Int?
     let directUserQuoteField: String?
 
     var id: String {

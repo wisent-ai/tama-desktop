@@ -7,7 +7,11 @@ enum TamaBackendError: LocalizedError {
     /// The request process ended without printing its answer: it was killed,
     /// or crashed, and its own stderr says why.
     case endedWithoutAnswer(Int32, String)
+    case inputFailed(Int32, String)
+    case unexpectedExit(String)
     case refused(String)
+    /// Output-read or event-protocol failure already reported by the transport.
+    case outputFailed(String, String)
     case unreadableOutput(String, String)
     case cancelled(String)
 
@@ -23,8 +27,14 @@ enum TamaBackendError: LocalizedError {
             detail.isEmpty
                 ? "The Tama backend ended with status \(status) before it answered."
                 : "The Tama backend ended with status \(status) before it answered: \(detail)"
+        case .inputFailed(_, let detail):
+            "The Tama request input failed: \(detail)"
+        case .unexpectedExit(let detail):
+            "The Tama request process exit disagrees with its answer: \(detail)"
         case .refused(let message):
             message
+        case .outputFailed(let operation, let reason):
+            "\(operation) request output failed: \(reason)"
         case .unreadableOutput(let operation, let reason):
             "\(operation) produced an answer Tama could not parse: \(reason)"
         case .cancelled(let operation):
@@ -33,49 +43,16 @@ enum TamaBackendError: LocalizedError {
     }
 }
 
-/// Locates an executable by name: the PATH entries first, then the
-/// well-known install locations.
-func executableCandidates(named name: String) -> [URL] {
-    let manager = FileManager.default
-    let environment = ProcessInfo.processInfo.environment
-    var directories = (environment["PATH"] ?? "").split(separator: ":").map {
-        URL(fileURLWithPath: String($0), isDirectory: true)
-    }
-    directories.append(contentsOf: [
-        URL(fileURLWithPath: "/opt/homebrew/bin", isDirectory: true),
-        URL(fileURLWithPath: "/usr/local/bin", isDirectory: true),
-        manager.homeDirectoryForCurrentUser
-            .appendingPathComponent(".local/bin", isDirectory: true),
-    ])
-    var seen = Set<String>()
-    return directories.compactMap { directory in
-        let candidate =
-            directory
-            .appendingPathComponent(name)
-            .standardizedFileURL
-        return seen.insert(candidate.path).inserted ? candidate : nil
-    }
-}
-
 final class DataBox: @unchecked Sendable {
-    /// A pipe is read 64 KiB at a time.
-    private static let readChunkBytes = 64 * 1024
-
     private(set) var data = Data()
-    private(set) var wasTruncated = false
     private(set) var readError: String?
 
-    func drain(_ handle: FileHandle, retaining limit: Int) {
-        let chunkSize = Self.readChunkBytes
+    /// Reads `handle` until its writer closes it and keeps everything it
+    /// wrote; `readError` says why the read failed.
+    func drain(_ handle: FileHandle) {
         do {
-            while let chunk = try handle.read(upToCount: chunkSize), !chunk.isEmpty {
-                let remaining = max(limit - data.count, .zero)
-                if chunk.count > remaining {
-                    wasTruncated = true
-                }
-                if remaining > .zero {
-                    data.append(contentsOf: chunk.prefix(remaining))
-                }
+            if let all = try handle.readToEnd() {
+                data = all
             }
         } catch {
             readError = error.localizedDescription
@@ -87,26 +64,18 @@ func signalProcessTree(rootPID: pid_t, signal: Int32) {
     var descendants: [pid_t] = []
     var seen = Set<pid_t>()
 
+    // libproc's proc_listchildpids answers a count of PIDs (it divides the
+    // kernel's byte count by sizeof(int)), both when sizing with no buffer and
+    // when filling one; the buffer size it takes is in bytes.
     func collectChildren(of parent: pid_t) {
-        let requiredBytes = proc_listchildpids(parent, nil, .zero)
-        guard requiredBytes > .zero else { return }
-        var children = [pid_t](
-            repeating: pid_t(),
-            count: Int(requiredBytes) / MemoryLayout<pid_t>.stride
-        )
-        let returnedBytes = children.withUnsafeMutableBytes { buffer in
-            proc_listchildpids(
-                parent,
-                buffer.baseAddress,
-                Int32(buffer.count)
-            )
+        let available = proc_listchildpids(parent, nil, .zero)
+        guard available > .zero else { return }
+        var children = [pid_t](repeating: pid_t(), count: Int(available))
+        let listed = children.withUnsafeMutableBytes { buffer in
+            proc_listchildpids(parent, buffer.baseAddress, Int32(buffer.count))
         }
-        guard returnedBytes > .zero else { return }
-        let childCount = min(
-            children.count,
-            Int(returnedBytes) / MemoryLayout<pid_t>.stride
-        )
-        for child in children.prefix(childCount)
+        guard listed > .zero else { return }
+        for child in children.prefix(min(children.count, Int(listed)))
         where child > .zero && seen.insert(child).inserted {
             descendants.append(child)
             collectChildren(of: child)

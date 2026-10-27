@@ -60,18 +60,12 @@ struct PostureView: View {
                     label: "Reading policy",
                     spacing: WisentDesign.Space.x4
                 ) {
-                    // The signal strip, the four counters, then the two
-                    // section boxes the snapshot fills below them.
-                    WisentSkeleton(.block, height: 56)
-                    HStack(spacing: WisentDesign.Space.x3) {
-                        ForEach(0..<4, id: \.self) { _ in
-                            WisentSkeleton(.block, height: 76)
-                        }
-                    }
-                    WisentSkeleton(.heading, width: 140)
-                    WisentSkeleton(.block, height: 120)
-                    WisentSkeleton(.heading, width: 140)
-                    WisentSkeleton(.block, height: 88)
+                    // The signal strip, the counters, then a section box the
+                    // snapshot fills; each takes its size from the design system.
+                    WisentSkeleton(.block)
+                    WisentSkeleton(.block)
+                    WisentSkeleton(.heading)
+                    WisentSkeleton(.block)
                 }
             }
         }
@@ -99,6 +93,7 @@ struct PostureView: View {
             WisentAction("Reveal release", symbol: "folder", kind: .secondary) {
                 model.revealHookRelease()
             },
+            // An unreadable switch is restored: writing it again is what repairs it.
             model.areHooksDisabled
                 ? WisentAction(
                     "Re-enable all policies",
@@ -128,7 +123,7 @@ struct PostureView: View {
                 title: "Policy protection cannot be confirmed",
                 detail: failure
             )
-        } else if model.areHooksDisabled {
+        } else if model.hooksDisabledState == true {
             WisentAlertPanel(
                 tone: .danger,
                 title: "Policy protection is off",
@@ -199,8 +194,7 @@ struct PostureView: View {
             WisentAlertPanel(
                 tone: .warning,
                 title: blockingTitle(decision.event),
-                detail: decision.event.reason
-                    ?? "No reason was recorded.",
+                detail: blockingReason(decision.event),
                 actions: [
                     WisentAction("Open Session", symbol: "person.badge.key", kind: .secondary) {
                         onNavigate(.session)
@@ -211,8 +205,17 @@ struct PostureView: View {
     }
 
     private func blockingTitle(_ event: SemanticEventSummary) -> String {
-        let hook = event.blockedHookId ?? "A policy"
+        guard let hook = event.blockedHookId else {
+            return "The runtime recorded a block of \(event.event) at \(event.timestamp) without naming its hook"
+        }
         return "\(hook) blocked \(event.event) at \(event.timestamp)"
+    }
+
+    private func blockingReason(_ event: SemanticEventSummary) -> String {
+        guard let reason = event.reason else {
+            return "The runtime recorded this block without its reason."
+        }
+        return reason
     }
 
 }

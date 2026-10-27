@@ -41,10 +41,11 @@ extension JustificationsView {
                         : entry.justification
                 )
                 if requirement.directUserQuoteField != nil {
-                    prose(
-                        "DIRECT USER REQUEST",
-                        recordedQuote(entry) ?? "No user request recorded."
-                    )
+                    // A record without its quote is stated as missing, by name.
+                    switch recordedQuote(entry) {
+                    case let .some(quote): prose("DIRECT USER REQUEST", quote)
+                    case .none: prose("DIRECT USER REQUEST", "This record carries no user request.")
+                    }
                 }
             }
         } else {
@@ -64,7 +65,6 @@ extension JustificationsView {
         VStack(alignment: .leading, spacing: WisentDesign.Space.x1) {
             Text(label)
                 .font(WisentTypeScale.eyebrow())
-                .tracking(0.6)
                 .foregroundStyle(WisentDesign.muted)
             Text(text)
                 .font(WisentTypeScale.caption())
@@ -100,7 +100,7 @@ extension JustificationsView {
                 return Verdict(label: "Quote not embedded", tone: .warning, holds: false)
             }
         }
-        if entry.wordCount < requirement.minimumWords {
+        if let required = requirement.minimumWords, entry.wordCount < required {
             return Verdict(label: "Too short", tone: .warning, holds: false)
         }
         return Verdict(label: "Holds", tone: .success, holds: true)

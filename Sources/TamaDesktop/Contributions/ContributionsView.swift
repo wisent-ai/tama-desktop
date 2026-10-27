@@ -48,17 +48,19 @@ final class ContributionsModel: ObservableObject {
     @Published private(set) var isWorking = false
 
     /// The body's fields: only those the operator filled, as flags left out.
-    private func fields(_ named: [String: String]) -> [String: Any] {
+    /// Text values only, so the body is Sendable and crosses from the main
+    /// actor to the client without a data-race refusal.
+    private func fields(_ named: [String: String]) -> [String: String] {
         named.filter { !$0.value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             .mapValues { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
     }
 
-    private var range: [String: Any] {
+    private var range: [String: String] {
         fields(["repository": repository, "ref": reference, "since": since, "ledger": ledger])
     }
 
     private func perform<Answer: Decodable>(
-        _ operation: String, body: [String: Any], as type: Answer.Type, describing: String
+        _ operation: String, body: [String: String], as type: Answer.Type, describing: String
     ) async -> Answer? {
         isWorking = true
         defer { isWorking = false }

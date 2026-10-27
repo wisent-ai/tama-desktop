@@ -33,6 +33,9 @@ struct ShownAttestation: Decodable, Sendable {
     let refusals: [String]
     let recorded: String?
     let attestation: Document
+    /// Why its harsh review does not let it stand yet; nil once a reviewer
+    /// other than the session that recorded it passed it in a round.
+    let review: String?
 }
 
 /// The claims a session's attestation confirms and the lists it leaves
@@ -49,10 +52,15 @@ struct AttestationStandard: Decodable, Sendable {
     struct Declared: Decodable, Sendable {
         let required: [Claim]
         let mustBeEmpty: [EmptyList]
+        /// The lists the attestation must name something in: a finished
+        /// task's `closes`, the Oko items it says are finished. Tama omits
+        /// the key from a standard that names none, the build standard.
+        let mustName: [EmptyList]?
 
         enum CodingKeys: String, CodingKey {
             case required
             case mustBeEmpty = "must_be_empty"
+            case mustName = "must_name"
         }
     }
 

@@ -3,40 +3,41 @@ import WisentErrors
 
 /// The one reporting path for every failure Tama surfaces.
 ///
-/// Each choke point that turns a failure into user-visible state calls
-/// `report` once; the reporter itself is fire-and-forget and silent when the
-/// intake is unconfigured, so these calls never change what the operator sees.
+/// Each choke point reports once without awaiting delivery. Diagnostics can
+/// await the reports already issued; settlement means the intake answered or
+/// the attempt ended, not that every report was accepted.
 enum TamaFailureReporting {
     static let service = "tama"
+    private static let pending = DispatchGroup()
 
     static func report(failurePoint: String, code: String, detail: String) {
-        WisentFailureReporter.shared.report(
+        let failure = Failure.orFallback(
             failurePoint: failurePoint,
-            code: code,
-            service: service,
-            detail: detail
-        )
+            code: Code(rawValue: code) ?? .unknown,
+            service: service
+        ).detail(detail)
+        pending.enter()
+        WisentFailureReporter.shared.report(failure) {
+            pending.leave()
+        }
+    }
+
+    /// Wait for issued reports to settle before inspecting their stored state
+    /// or exiting. Registration is synchronous, so a detached POST that has
+    /// not started yet is included; no later sentinel can overtake it.
+    static func settle() async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            pending.notify(queue: .global(qos: .utility)) {
+                continuation.resume()
+            }
+        }
     }
 
     /// The catalogue's classification of the status a request process
-    /// answered with, in HTTP's vocabulary.
+    /// answered with, in HTTP's vocabulary: the catalogue's own reading of an
+    /// upstream status, so the app and every other consumer classify alike.
     static func code(forRefusalStatus status: Int) -> String {
-        switch status {
-        case 401, 403:
-            "auth"
-        case 404:
-            "not_found"
-        case 429:
-            "rate_limit"
-        case 501, 505:
-            "config"
-        case 504:
-            "timeout"
-        case 500...599:
-            "infra_down"
-        default:
-            "unknown"
-        }
+        Code.fromUpstream(status: status).rawValue
     }
 
     /// The best-fitting catalogue code for a failure raised inside the app.
@@ -44,22 +45,22 @@ enum TamaFailureReporting {
         if let failure = error as? TamaBackendError {
             return switch failure {
             case .backendMissing:
-                "config"
-            case .startFailed, .endedWithoutAnswer:
-                "infra_down"
-            case .refused, .unreadableOutput, .cancelled:
-                "unknown"
+                Code.config.rawValue
+            case .startFailed, .endedWithoutAnswer, .inputFailed, .unexpectedExit:
+                Code.infraDown.rawValue
+            case .refused, .outputFailed, .unreadableOutput, .cancelled:
+                Code.unknown.rawValue
             }
         }
         if let failure = error as? ViolationsError {
             return switch failure {
             case .invalidRepository:
-                "not_found"
+                Code.notFound.rawValue
             case .repositoryNotOwned:
-                "auth"
+                Code.auth.rawValue
             }
         }
-        return "unknown"
+        return Code.unknown.rawValue
     }
 
     /// Failures already reported where they originate — a backend refusal at
@@ -69,7 +70,7 @@ enum TamaFailureReporting {
     static func isReportedAtOrigin(_ error: Error) -> Bool {
         guard let failure = error as? TamaBackendError else { return false }
         return switch failure {
-        case .refused, .startFailed, .backendMissing, .cancelled:
+        case .refused, .startFailed, .backendMissing, .cancelled, .inputFailed, .outputFailed, .unexpectedExit:
             true
         case .endedWithoutAnswer, .unreadableOutput:
             false

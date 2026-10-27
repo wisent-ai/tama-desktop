@@ -77,7 +77,7 @@ struct HooksView: View {
             scrolls: false,
             constrainsWidth: false
         ) {
-            HStack(spacing: 0) {
+            HStack(spacing: .zero) {
                 WisentFacetRail(
                     groups: facetGroups(scope: scoped),
                     footerTitle: "Selection",
@@ -140,10 +140,10 @@ struct HooksView: View {
     /// Counts are measured inside the current enforcement scope, so the number
     /// beside a category is the number of rows selecting it produces.
     private func categoryGroup(scope: [HookRecord]) -> WisentFacetGroup? {
-        var counts: [String: Int] = [:]
-        for hook in scope where !hook.category.isEmpty {
-            counts[hook.category, default: .zero] += 1
-        }
+        // A hook whose catalog entry states no category is counted under the
+        // label saying so, so selecting it finds the hooks Tama left unfiled.
+        let counts = Dictionary(grouping: scope.map(\.category), by: { $0 })
+            .mapValues(\.count)
         guard !counts.isEmpty else { return nil }
         let ranked =
             counts
@@ -203,7 +203,7 @@ struct HooksView: View {
             return hook.id.lowercased().contains(needle)
                 || hook.category.lowercased().contains(needle)
                 || hook.eventNames.lowercased().contains(needle)
-                || (hook.description?.lowercased().contains(needle) ?? false)
+                || hook.description?.lowercased().contains(needle) == true
         }
     }
 

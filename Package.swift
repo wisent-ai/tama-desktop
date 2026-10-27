@@ -8,12 +8,14 @@ let package = Package(
         .executable(name: "Tama", targets: ["TamaDesktop"])
     ],
     dependencies: [
-        // By version now that its own dependencies are tagged: 0.3.6 names
-        // `wisent-errors` as `exact: "1.0.0"` and `wisent-components` as
-        // `exact: "0.9.1"`, the same two requirements this file names below.
+        // By version now that its own dependencies are tagged: 0.3.7 names
+        // `wisent-components` as `exact: "0.9.1"`, the requirement this file
+        // names below, and `wisent-errors` as `exact: "1.1.0"`, which yields
+        // to the revision this file names (1.1.0 is its ancestor). 0.3.6
+        // cannot build against that catalogue: its classifier misses `.refused`.
         .package(
             url: "https://github.com/wisent-ai/wisent-desktop-auth.git",
-            exact: "0.3.6"
+            exact: "0.3.7"
         ),
         .package(url: "https://github.com/wisent-ai/wisent-desktop-update.git", exact: "0.2.0"),
         .package(url: "https://github.com/wisent-ai/echo.git", exact: "0.3.0"),
@@ -24,12 +26,13 @@ let package = Package(
             url: "https://github.com/wisent-ai/wisent-components.git",
             exact: "0.9.1"
         ),
-        // Tag 1.0.0 is the tree this file pinned by commit before
-        // `wisent-errors` was taggable; it declares no dependencies, so an
-        // exact version requirement is legal for every consumer.
+        // By revision: the reporter's settlement callback (a report says when
+        // it has settled and why it did not land) is published on `main` and
+        // in no tag yet. A root revision requirement overrides the version
+        // requirement `wisent-desktop-auth` names; two revisions would refuse.
         .package(
             url: "https://github.com/wisent-ai/wisent-errors.git",
-            exact: "1.0.0"
+            revision: "0a2fb881a6bb74d97c6a1f901638dd53a964a43d"
         ),
     ],
     targets: [
@@ -44,6 +47,18 @@ let package = Package(
             ],
             path: "Sources/TamaDesktop",
             resources: [.process("Resources")]
-        )
+        ),
+        // The review answer and its failures, decoded and kept by the real
+        // client against the declared backend, and a refused cleanup counted
+        // in the real failure intake: tests/review-diagnostics.
+        .testTarget(
+            name: "TamaDesktopReviewDiagnosticsTests",
+            dependencies: [
+                "TamaDesktop",
+                .product(name: "WisentAuth", package: "wisent-desktop-auth"),
+                .product(name: "WisentErrors", package: "wisent-errors"),
+            ],
+            path: "tests/review-diagnostics"
+        ),
     ]
 )

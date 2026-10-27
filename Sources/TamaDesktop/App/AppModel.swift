@@ -27,7 +27,10 @@ final class AppModel: ObservableObject {
     @Published var policyBundlesError: String?
     @Published var isImportingPolicyBundle = false
 
-    @Published var areHooksDisabled = false
+    /// The emergency switch as read; `nil` while its state cannot be read.
+    @Published var hooksDisabledState: Bool? = false
+    /// Protection is not confirmed on: the switch is set or cannot be read.
+    var areHooksDisabled: Bool { hooksDisabledState != false }
     /// Why the emergency switch or installed release record could not be read.
     @Published var localPolicyStateError: String?
     @Published var installedHookReleaseID: String?
@@ -46,7 +49,10 @@ final class AppModel: ObservableObject {
     /// The watch the session task is blocked on, so stopping can release it.
     private var sessionWatch: ControlDirectoryWatch?
 
-    var hooks: [HookRecord] { snapshot?.catalog.hooks ?? [] }
+    var hooks: [HookRecord] {
+        guard let snapshot else { return [] }
+        return snapshot.catalog.hooks
+    }
 
     var isPolicyMutationInProgress: Bool { mutation.isWorking }
 
@@ -61,7 +67,7 @@ final class AppModel: ObservableObject {
                 && runtime.registryLoadError == nil
                 && !runtime.reloadRequired
                 && runtime.reloadPending != true
-                && runtime.registeredHookCount > 0
+                && runtime.registeredHookCount > .zero
                 && runtime.loadedHookCount == runtime.registeredHookCount
                 && runtime.unknownHookIds.isEmpty
                 && !session.globallyDisabled
@@ -75,7 +81,7 @@ final class AppModel: ObservableObject {
     var isSetupComplete: Bool {
         snapshot?.validation.ok == true
             && installedHookReleaseID != nil
-            && !areHooksDisabled
+            && hooksDisabledState == false
             && systemPolicyServiceStatus == "Enabled"
             && setupReadySession != nil
     }
@@ -161,7 +167,7 @@ final class AppModel: ObservableObject {
         selectedAgentSessionID = nil
         sessionError = nil
         systemPolicyServiceStatus = "Not registered"
-        areHooksDisabled = false
+        hooksDisabledState = false
         installedHookReleaseID = nil
         installedNodeExecutable = nil
         installedNodeVersion = nil

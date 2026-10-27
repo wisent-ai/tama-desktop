@@ -111,6 +111,15 @@ struct AttestationSection: View {
                         .font(WisentTypeScale.identifierSmall())
                         .foregroundStyle(WisentDesign.muted)
                 }
+                if let review = shown.review {
+                    Text("Harsh review: \(review)")
+                        .font(WisentTypeScale.caption())
+                        .foregroundStyle(WisentDesign.secondary)
+                } else {
+                    Text("Harsh review: passed by a reviewer other than its author")
+                        .font(WisentTypeScale.caption())
+                        .foregroundStyle(WisentDesign.muted)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -133,6 +142,15 @@ struct AttestationSection: View {
                         Text("\(list.key) stays empty").font(WisentTypeScale.identifierSmall())
                         Text(list.why).font(WisentTypeScale.caption())
                             .foregroundStyle(WisentDesign.muted)
+                    }
+                }
+                if let named = standard.standard.mustName {
+                    ForEach(named, id: \.key) { list in
+                        VStack(alignment: .leading) {
+                            Text("\(list.key) names at least one item").font(WisentTypeScale.identifierSmall())
+                            Text(list.why).font(WisentTypeScale.caption())
+                                .foregroundStyle(WisentDesign.muted)
+                        }
                     }
                 }
             }

@@ -37,13 +37,19 @@ enum HarshReviewer: Decodable, Sendable, Hashable {
     }
 }
 
-/// One line of the register: a round, or a finding recorded as a defect.
+/// One line of the register: a round, a finding recorded as a defect, or a
+/// finding a reviewer settled as repaired on other lines. A round states what
+/// it found in the change and what the change suggests for the rest of the
+/// codebase; one recorded before that second part was asked carries none.
 enum HarshEntry: Decodable, Sendable, Hashable, Identifiable {
-    case round(tree: String, reviewer: HarshReviewer, findings: [HarshFinding], atMs: UInt64)
+    case round(
+        tree: String, reviewer: HarshReviewer, findings: [HarshFinding], improvements: [HarshFinding]?,
+        atMs: UInt64)
     case disposed(quote: String, defect: String, atMs: UInt64)
+    case settled(quote: String, reason: String, reviewer: HarshReviewer, atMs: UInt64)
 
     private enum Keys: String, CodingKey {
-        case entry, tree, reviewer, findings, quote, defect, atMs
+        case entry, tree, reviewer, findings, improvements, quote, defect, reason, atMs
     }
 
     init(from decoder: Decoder) throws {
@@ -54,11 +60,17 @@ enum HarshEntry: Decodable, Sendable, Hashable, Identifiable {
             self = .round(
                 tree: try values.decode(String.self, forKey: .tree),
                 reviewer: try values.decode(HarshReviewer.self, forKey: .reviewer),
-                findings: try values.decode([HarshFinding].self, forKey: .findings), atMs: at)
+                findings: try values.decode([HarshFinding].self, forKey: .findings),
+                improvements: try values.decodeIfPresent([HarshFinding].self, forKey: .improvements), atMs: at)
         case "disposed":
             self = .disposed(
                 quote: try values.decode(String.self, forKey: .quote),
                 defect: try values.decode(String.self, forKey: .defect), atMs: at)
+        case "settled":
+            self = .settled(
+                quote: try values.decode(String.self, forKey: .quote),
+                reason: try values.decode(String.self, forKey: .reason),
+                reviewer: try values.decode(HarshReviewer.self, forKey: .reviewer), atMs: at)
         case let other:
             throw DecodingError.dataCorruptedError(
                 forKey: .entry, in: values, debugDescription: "unknown register entry \(other)")
@@ -67,17 +79,40 @@ enum HarshEntry: Decodable, Sendable, Hashable, Identifiable {
 
     var id: String {
         switch self {
-        case .round(let tree, _, _, let at): "round-\(at)-\(tree)"
+        case .round(let tree, _, _, _, let at): "round-\(at)-\(tree)"
         case .disposed(let quote, _, let at): "disposed-\(at)-\(quote)"
+        case .settled(let quote, _, _, let at): "settled-\(at)-\(quote)"
         }
     }
 }
 
-/// The rounds of the commit a checkout is making, as `reviews/harsh` returns them.
+/// One candidate in Oko's harsh-review queue: who staged which tree, the
+/// reviewer session the supervision pass handed it to, and that reviewer's
+/// findings once its round is recorded.
+struct HarshQueueEntry: Decodable, Sendable, Hashable, Identifiable {
+    let id: String
+    /// `waiting`, `assigned` or `reviewed`.
+    let state: String
+    let repository: String
+    let tree: String
+    let author: String
+    let reviewer: String?
+    let reviewedBy: String?
+    let findings: Int?
+}
+
+/// Oko's harsh-review queue, as `oko review harsh list` prints it.
+struct HarshQueue: Decodable, Sendable {
+    let entries: [HarshQueueEntry]
+}
+
+/// The rounds of the commit a checkout is making, and Oko's harsh-review
+/// queue, as `reviews/harsh` returns them.
 struct HarshRoundsDocument: Decodable, Sendable {
     let register: String
     let tree: String
     let entries: [HarshEntry]
+    let queue: HarshQueue
 }
 
 @MainActor
@@ -157,16 +192,44 @@ struct HarshRoundsView: View {
         }
         ForEach(document.entries) { entry in
             switch entry {
-            case .round(let tree, let reviewer, let findings, _):
+            case .round(let tree, let reviewer, let findings, let improvements, _):
                 VStack(alignment: .leading, spacing: WisentDesign.Space.x1) {
                     Text("Round by \(reviewer.named) over \(tree): \(findings.count) findings")
                     ForEach(findings, id: \.self) { finding in
                         Text("\(finding.quote) — \(finding.problem); required: \(finding.require)")
                             .textSelection(.enabled)
                     }
+                    if let improvements {
+                        Text("\(improvements.count) improvements this change suggests")
+                        ForEach(improvements, id: \.self) { improvement in
+                            Text("\(improvement.quote) — \(improvement.problem); required: \(improvement.require)")
+                                .textSelection(.enabled)
+                        }
+                    } else {
+                        Text("This round states nothing of what the change suggests, so it lets no commit through.")
+                    }
                 }
             case .disposed(let quote, let defect, _):
                 Text("Recorded as defect \(defect): \(quote)").textSelection(.enabled)
+            case .settled(let quote, let reason, let reviewer, _):
+                Text("Settled as repaired by \(reviewer.named): \(quote) — \(reason)")
+                    .textSelection(.enabled)
+            }
+        }
+        Text("Harsh-review queue").font(WisentTypeScale.body())
+        if document.queue.entries.isEmpty {
+            Text("No commit waits in Oko for a reviewer session other than its author.")
+        }
+        ForEach(document.queue.entries) { entry in
+            VStack(alignment: .leading, spacing: WisentDesign.Space.x1) {
+                Text("\(entry.state): tree \(entry.tree) in \(entry.repository), by \(entry.author)")
+                    .textSelection(.enabled)
+                if let reviewer = entry.reviewer {
+                    Text("Reviewer session \(reviewer)").textSelection(.enabled)
+                }
+                if let by = entry.reviewedBy, let findings = entry.findings {
+                    Text("Round by \(by): \(findings) findings").textSelection(.enabled)
+                }
             }
         }
     }

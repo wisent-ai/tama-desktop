@@ -83,11 +83,54 @@ struct TamaExchange: Sendable {
     /// crash reports there and nowhere else.
     let processError: String
     let exitStatus: Int32
+    let terminationReason: Process.TerminationReason
     /// Stdout lines that were not a readable event, each with why: not JSON,
     /// not an event object, or an event missing what its type needs. They
     /// used to be dropped, so a mangled answer read as "ended before it
     /// answered".
     let unreadableEvents: [String]
+    /// Failures delivering or closing the request input, separate from stderr.
+    let inputErrors: [String]
+    /// Operating-system failures reading the process's output pipes.
+    let outputErrors: [String]
+
+    var diagnostics: String {
+        let terminal = switch end {
+        case .response(let status, let document):
+            "bounded response status: \(status)\nbounded response document:\n\(String(decoding: document, as: UTF8.self))"
+        case .result(let status, let document):
+            "job result status: \(status)\njob result document:\n\(String(decoding: document, as: UTF8.self))"
+        case nil:
+            "no terminal event was observed"
+        }
+        return """
+        \(terminal)
+        request process exit status: \(exitStatus)
+        request process termination reason: \(terminationReason) (\(terminationReason.rawValue))
+        request input failures:
+        \(inputErrors.joined(separator: "\n"))
+        request output failures:
+        \(outputErrors.joined(separator: "\n"))
+        events that could not be read:
+        \(unreadableEvents.joined(separator: "\n"))
+        request process standard error:
+        \(processError)
+        streamed job standard output:
+        \(stdoutText)
+        streamed job standard error:
+        \(stderrText)
+        """
+    }
+}
+
+/// An observed job event, delivered before waiting for the terminal result:
+/// first stream "process" with chunk "launched" once the process is started,
+/// then every log event with its stream ("stdout" or "stderr") and text.
+/// The process identity is present once launch has been recorded.
+struct TamaJobEvent: Sendable {
+    let processID: Int32?
+    let stream: String
+    let chunk: String
 }
 
 /// One `tama request <operation>` process per operation.
@@ -100,9 +143,10 @@ struct TamaExchange: Sendable {
 /// ends the process and everything it started, because nobody is left to read
 /// its answer.
 enum TamaRequestProcess {
-    static func run(_ command: TamaCommand, operation: String, body: Data) async throws
-        -> TamaExchange
-    {
+    static func run(
+        _ command: TamaCommand, operation: String, body: Data,
+        onEvent: (@Sendable (TamaJobEvent) -> Void)? = nil
+    ) async throws -> TamaExchange {
         let process = Process()
         let input = Pipe()
         let output = Pipe()
@@ -113,7 +157,19 @@ enum TamaRequestProcess {
         process.standardInput = input
         process.standardOutput = output
         process.standardError = errors
-        let run = RequestRun()
+        let run = RequestRun(onEvent: onEvent) { run in
+            // A log callback may initiate cancellation while delivering stdout.
+            // Close on another queue so settling stdout cannot reenter its lock.
+            DispatchQueue.global().async {
+                closeCancelledOutput(
+                    output.fileHandleForReading, stream: .stdout,
+                    operation: operation, run: run)
+                closeCancelledOutput(
+                    errors.fileHandleForReading, stream: .stderr,
+                    operation: operation, run: run)
+            }
+        }
+        let readCount = Int(getpagesize())
         let quit = NotificationCenter.default.addObserver(
             forName: NSApplication.willTerminateNotification,
             object: nil,
@@ -121,65 +177,115 @@ enum TamaRequestProcess {
         ) { _ in
             run.stop()
         }
-        defer { NotificationCenter.default.removeObserver(quit) }
+        defer {
+            NotificationCenter.default.removeObserver(quit)
+            output.fileHandleForReading.readabilityHandler = nil
+            errors.fileHandleForReading.readabilityHandler = nil
+        }
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
-                run.attach(continuation)
-                output.fileHandleForReading.readabilityHandler = { handle in
-                    let data = handle.availableData
-                    if data.isEmpty {
-                        handle.readabilityHandler = nil
-                        run.closed(.stdout)
-                    } else {
-                        run.appendOutput(data)
-                    }
-                }
-                errors.fileHandleForReading.readabilityHandler = { handle in
-                    let data = handle.availableData
-                    if data.isEmpty {
-                        handle.readabilityHandler = nil
-                        run.closed(.stderr)
-                    } else {
-                        run.appendError(data)
-                    }
-                }
+                guard run.attach(continuation) else { return }
                 process.terminationHandler = { finished in
-                    run.exited(finished.terminationStatus)
+                    run.exited(finished.terminationStatus, reason: finished.terminationReason)
                 }
                 do {
                     try process.run()
                 } catch {
-                    output.fileHandleForReading.readabilityHandler = nil
-                    errors.fileHandleForReading.readabilityHandler = nil
-                    run.fail(TamaBackendError.startFailed(error.localizedDescription))
+                    run.fail(TamaBackendError.startFailed(String(reflecting: error)))
                     return
                 }
-                run.started(process.processIdentifier)
-                send(body, to: input.fileHandleForWriting, run: run)
+                let pid = process.processIdentifier
+                run.started(pid)
+                // The consumer learns the launched process before its output
+                // readers exist; a cancellation it starts here is settled once
+                // both readers are installed (`readersInstalled`).
+                onEvent?(TamaJobEvent(processID: pid, stream: "process", chunk: "launched"))
+                output.fileHandleForReading.readabilityHandler = { handle in
+                    do {
+                        if let data = try handle.read(upToCount: readCount), !data.isEmpty {
+                            run.appendOutput(data)
+                            return
+                        }
+                    } catch {
+                        run.outputFailed(
+                            "request \(operation) standard output not read: \(String(reflecting: error))")
+                    }
+                    handle.readabilityHandler = nil
+                    run.closed(.stdout)
+                }
+                errors.fileHandleForReading.readabilityHandler = { handle in
+                    do {
+                        if let data = try handle.read(upToCount: readCount), !data.isEmpty {
+                            run.appendError(data)
+                            return
+                        }
+                    } catch {
+                        run.outputFailed(
+                            "request \(operation) standard error not read: \(String(reflecting: error))")
+                    }
+                    handle.readabilityHandler = nil
+                    run.closed(.stderr)
+                }
+                run.readersInstalled()
+                send(body, to: input.fileHandleForWriting, operation: operation, run: run)
             }
         } onCancel: {
             run.stop()
         }
     }
 
-    /// Writes the body and closes the pipe, so the process reads one whole
-    /// document and then the end of its input. The process reads its input to
-    /// the end before it writes anything, and both of its output pipes are
-    /// already being drained, so the write cannot wait on it. A process that
-    /// exits before reading makes the write fail instead of raising a SIGPIPE
-    /// that would end the app; the exit itself is what the run then reports,
-    /// and a failed write or close is added to the run's stderr with its cause.
-    private static func send(_ body: Data, to handle: FileHandle, run: RequestRun) {
-        _ = fcntl(handle.fileDescriptor, F_SETNOSIGPIPE, 1)
+    private static func closeCancelledOutput(
+        _ handle: FileHandle, stream: RequestRun.Stream,
+        operation: String, run: RequestRun
+    ) {
+        handle.readabilityHandler = nil
+        defer { run.closed(stream) }
         do {
-            try handle.write(contentsOf: body)
+            try handle.close()
         } catch {
-            run.appendError(Data("request body not written: \(error.localizedDescription)\n".utf8))
+            run.outputFailed(
+                "request \(operation) \(stream) output not closed after cancellation: \(String(reflecting: error))")
+        }
+    }
+
+    /// Enables and verifies per-pipe protection; only a failure allocates a diagnostic.
+    static func protectInputPipe(_ handle: FileHandle) -> String? {
+        errno = .zero
+        // C TRUE: https://github.com/apple-oss-distributions/xnu/blob/main/osfmk/mach/boolean.h
+        let result = fcntl(handle.fileDescriptor, F_SETNOSIGPIPE, 1)
+        let setErrno = errno
+        errno = .zero
+        let observed = fcntl(handle.fileDescriptor, F_GETNOSIGPIPE)
+        let observedErrno = errno
+        guard result == .zero, observed > .zero else {
+            return "fcntl(F_SETNOSIGPIPE) returned \(result), errno \(setErrno); "
+                + "fcntl(F_GETNOSIGPIPE) returned \(observed), errno \(observedErrno)"
+        }
+        return nil
+    }
+
+    /// Delivers one document and EOF only through a verified protected pipe.
+    /// Input failures stop the request and remain separate from its stderr;
+    /// completion waits for input settlement and both output streams.
+    private static func send(
+        _ body: Data, to handle: FileHandle, operation: String, run: RequestRun
+    ) {
+        defer { run.closed(.input) }
+        if let cause = protectInputPipe(handle) {
+            run.inputFailed("request \(operation) input pipe protection failed: \(cause)")
+        } else {
+            do {
+                try handle.write(contentsOf: body)
+            } catch {
+                run.inputFailed(
+                    "request \(operation) body not written: \(String(reflecting: error))")
+            }
         }
         do {
             try handle.close()
         } catch {
-            run.appendError(Data("request input not closed: \(error.localizedDescription)\n".utf8))
+            run.inputFailed(
+                "request \(operation) input not closed: \(String(reflecting: error))")
         }
     }
 }

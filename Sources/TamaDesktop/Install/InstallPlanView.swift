@@ -7,7 +7,7 @@ import WisentDesignSystem
 /// The install plan and the MCP snippet had no surface, so an operator
 /// approving a privileged install could not see which files it would touch. The
 /// plan is read-only: this screen states target paths, and performs none of
-/// the changes. The model service row is `tama model-provider show` and
+/// the changes. The model service row is `tama model show` and
 /// `check`: which service is asked and whether it accepts this machine. The
 /// sections under it are the ones that write: declaring no model or
 /// returning to Brama (`ModelChoiceSection`), and recording, showing and
@@ -51,6 +51,7 @@ struct InstallPlanView: View {
                 ModelChoiceSection(inspection: inspection)
                 CarriedAttestationSection()
                 PendingCommitsSection()
+                UnjudgedCommitsSection()
                 AttestationSection()
                 AttestationRegistriesSection()
             } else if inspection.isReadingPlan {
@@ -74,6 +75,8 @@ struct InstallPlanView: View {
                     }
                 )
             }
+            JudgementSection()
+            FailedCallsSection()
         }
         .task { await inspection.loadPlan() }
     }

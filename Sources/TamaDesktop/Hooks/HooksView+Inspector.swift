@@ -48,7 +48,7 @@ extension HooksView {
 
     private func badges(_ hook: HookRecord) -> [(String, WisentTone)] {
         var badges: [(String, WisentTone)] = [
-            (hook.status.capitalized, hook.status == "active" ? .success : .warning)
+            (hook.status.capitalized, hook.statedStatus == "active" ? .success : .warning)
         ]
         if hook.isBlocking {
             badges.append(("Blocking", .warning))
@@ -60,7 +60,6 @@ extension HooksView {
         VStack(alignment: .leading, spacing: WisentDesign.Space.x1) {
             Text(label.uppercased())
                 .font(WisentTypeScale.eyebrow())
-                .tracking(0.6)
                 .foregroundStyle(WisentDesign.muted)
             Text(text)
                 .font(WisentTypeScale.caption())
@@ -74,14 +73,12 @@ extension HooksView {
         VStack(alignment: .leading, spacing: WisentDesign.Space.x2) {
             Text("EVENTS")
                 .font(WisentTypeScale.eyebrow())
-                .tracking(0.6)
                 .foregroundStyle(WisentDesign.muted)
             ForEach(hook.events) { event in
                 HStack(spacing: WisentDesign.Space.x2) {
                     Text(event.event)
                         .font(WisentTypeScale.identifierSmall())
                         .foregroundStyle(WisentDesign.ink)
-                        .lineLimit(1)
                     Spacer(minLength: WisentDesign.Space.x2)
                     if event.blocking {
                         WisentStatusChip(text: "Blocking", tone: .warning)
@@ -98,7 +95,6 @@ extension HooksView {
                 HStack(spacing: WisentDesign.Space.x3) {
                     Text("MACHINE SELECTION")
                         .font(WisentTypeScale.eyebrow())
-                        .tracking(0.6)
                         .foregroundStyle(WisentDesign.muted)
                     if let selection = machineSelection.selection {
                         WisentStatusChip(
@@ -144,7 +140,10 @@ extension HooksView {
         guard let selection = machineSelection.selection else {
             return ("Not read", .neutral)
         }
-        if model.areHooksDisabled || selection.emergencyDisabled {
+        guard let disabled = model.hooksDisabledState else {
+            return ("Switch unreadable", .warning)
+        }
+        if disabled || selection.emergencyDisabled {
             return ("Bypassed", .danger)
         }
         return selection.includes(hook.id)

@@ -1,37 +1,62 @@
 #!/bin/bash
 # Sourced by build-app.sh: validate source and prepare the signed bundle inputs.
-HOOKS_ROOT=${TAMA_HOOK_ROOT:-"$DESKTOP_ROOT/../tama"}
-NODE_BIN=${TAMA_NODE:-}
-if [ -z "$NODE_BIN" ]; then
-    NODE_BIN=$(command -v node || true)
+# The Tama checkout is the sibling of this one unless TAMA_HOOK_ROOT names
+# another.
+if [ -n "${TAMA_HOOK_ROOT+set}" ]; then
+    HOOKS_ROOT=$TAMA_HOOK_ROOT
+else
+    HOOKS_ROOT="$DESKTOP_ROOT/../tama"
 fi
-if [ -z "$NODE_BIN" ] || [ ! -x "$NODE_BIN" ]; then
-    printf '%s\n' "A supported Node.js executable is required to export the bundled catalog."
+# Node exports the bundled catalog: TAMA_NODE, else the node on PATH.
+if [ -n "${TAMA_NODE+set}" ]; then
+    NODE_BIN=$TAMA_NODE
+elif ! NODE_BIN=$(command -v node); then
+    printf '%s\n' "No node is on PATH and TAMA_NODE names none; Node.js exports the bundled catalog." >&2
     false
 fi
-if ! "$NODE_BIN" -e 'const major = Number.parseInt(process.versions.node.split(".")[0], 10); process.exit(Number.isInteger(major) && major >= 20 ? 0 : 1);'; then
-    printf '%s\n' "Node.js 20 or newer is required to export the bundled catalog."
+if [ ! -x "$NODE_BIN" ]; then
+    printf '%s\n' "$NODE_BIN is not an executable Node.js; it exports the bundled catalog." >&2
     false
 fi
-CARGO_BIN=${TAMA_CARGO:-}
-if [ -z "$CARGO_BIN" ]; then
-    CARGO_BIN=$(command -v cargo || true)
+# Cargo builds the bundled Tama backend: TAMA_CARGO, else the cargo on PATH.
+if [ -n "${TAMA_CARGO+set}" ]; then
+    CARGO_BIN=$TAMA_CARGO
+elif ! CARGO_BIN=$(command -v cargo); then
+    printf '%s\n' "No cargo is on PATH and TAMA_CARGO names none; cargo builds the bundled Tama backend." >&2
+    false
 fi
-if [ -z "$CARGO_BIN" ] || [ ! -x "$CARGO_BIN" ]; then
-    printf '%s\n' "cargo is required to build the bundled Tama backend."
+if [ ! -x "$CARGO_BIN" ]; then
+    printf '%s\n' "$CARGO_BIN is not an executable cargo; it builds the bundled Tama backend." >&2
     false
 fi
 # Tama packages, seals and installs its own hook release; the app bundles a
 # release made by the tama program built from that checkout.
 "$CARGO_BIN" build --manifest-path "$HOOKS_ROOT/rust/Cargo.toml" --locked --release -p tama-cli
 TAMA_PROGRAM="$HOOKS_ROOT/rust/target/release/tama"
-HOOK_SOURCE_IDENTITY=$("$TAMA_PROGRAM" hooks source-identity --source-root "$HOOKS_ROOT" --shell)
+HOOK_SOURCE_IDENTITY=$("$TAMA_PROGRAM" hooks identity --source-root "$HOOKS_ROOT" --shell)
 HOOK_SOURCE_REVISION=${HOOK_SOURCE_IDENTITY%% *}
 HOOK_SOURCE_DIRTY=${HOOK_SOURCE_IDENTITY#* }
-CODESIGN_IDENTITY=${WISENT_CODESIGN_IDENTITY:-}
-APP_PROVISIONING_PROFILE=${WISENT_APP_PROVISIONING_PROFILE:-}
-CODESIGN_TIMESTAMP=${TAMA_CODESIGN_TIMESTAMP:---timestamp=none}
-NETWORK_FILTER_PROVISIONING_PROFILE=${WISENT_NETWORK_FILTER_PROVISIONING_PROFILE:-}
+# An unnamed signing identity is chosen from the Keychain below.
+CODESIGN_IDENTITY=
+if [ -n "${WISENT_CODESIGN_IDENTITY+set}" ]; then
+    CODESIGN_IDENTITY=$WISENT_CODESIGN_IDENTITY
+fi
+# Profiles are embedded only when named.
+APP_PROVISIONING_PROFILE=
+if [ -n "${WISENT_APP_PROVISIONING_PROFILE+set}" ]; then
+    APP_PROVISIONING_PROFILE=$WISENT_APP_PROVISIONING_PROFILE
+fi
+NETWORK_FILTER_PROVISIONING_PROFILE=
+if [ -n "${WISENT_NETWORK_FILTER_PROVISIONING_PROFILE+set}" ]; then
+    NETWORK_FILTER_PROVISIONING_PROFILE=$WISENT_NETWORK_FILTER_PROVISIONING_PROFILE
+fi
+# A development build is signed without a secure timestamp unless
+# TAMA_CODESIGN_TIMESTAMP asks for one.
+if [ -n "${TAMA_CODESIGN_TIMESTAMP+set}" ]; then
+    CODESIGN_TIMESTAMP=$TAMA_CODESIGN_TIMESTAMP
+else
+    CODESIGN_TIMESTAMP=--timestamp=none
+fi
 if ! CODESIGN_IDENTITIES=$(security find-identity -v -p codesigning); then
     printf '%s\n' "Could not read code-signing identities from the Keychain."
     false
@@ -42,7 +67,7 @@ if [ -z "$CODESIGN_IDENTITY" ]; then
 fi
 if [ -z "$CODESIGN_IDENTITY" ] || [ "$CODESIGN_IDENTITY" = "-" ]; then
     printf '%s\n' "Stable Apple Development signing identity is required; refusing ad-hoc signing." >&2
-    exit 1
+    false
 fi
 case "$CODESIGN_IDENTITY" in
     *'
@@ -100,13 +125,16 @@ RESOURCES="$CONTENTS/Resources"
 FRAMEWORKS="$CONTENTS/Frameworks"
 
 mkdir -p "$MACOS" "$RESOURCES" "$FRAMEWORKS"
-install -m 0644 "$DESKTOP_ROOT/App/Info.plist" "$CONTENTS/Info.plist"
+install -m "$DATA_MODE" "$DESKTOP_ROOT/App/Info.plist" "$CONTENTS/Info.plist"
 plutil -replace CFBundleShortVersionString -string "$BUNDLE_SHORT_VERSION" "$CONTENTS/Info.plist"
 plutil -replace TamaProductVersion -string "$PRODUCT_VERSION" "$CONTENTS/Info.plist"
 plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$CONTENTS/Info.plist"
 # Stado resolves the deployment's update origin; source carries no host.
 # WISENT_UPDATE_FEED_URL explicitly overrides it for a staging feed.
-UPDATE_FEED_URL=${WISENT_UPDATE_FEED_URL:-}
+UPDATE_FEED_URL=
+if [ -n "${WISENT_UPDATE_FEED_URL+set}" ]; then
+    UPDATE_FEED_URL=$WISENT_UPDATE_FEED_URL
+fi
 if [ -z "$UPDATE_FEED_URL" ]; then
     UPDATE_FEED_URL=$(stado web origin url /api/release/appcast --query product=tama-desktop)
 fi
@@ -114,14 +142,14 @@ case "$UPDATE_FEED_URL" in
     https://*) ;;
     '')
         printf '%s\n' "Stado returned no update feed URL; declare an appcast origin or set WISENT_UPDATE_FEED_URL." >&2
-        exit 1 ;;
+        false ;;
     *)
         printf '%s\n' "update feed URL must use HTTPS: $UPDATE_FEED_URL" >&2
-        exit 1 ;;
+        false ;;
 esac
 plutil -replace SUFeedURL -string "$UPDATE_FEED_URL" "$CONTENTS/Info.plist"
-install -m 0755 "$BIN_DIR/Tama" "$MACOS/Tama"
-install -m 0644 \
+install -m "$EXECUTABLE_MODE" "$BIN_DIR/Tama" "$MACOS/Tama"
+install -m "$DATA_MODE" \
     "$DESKTOP_ROOT/Sources/TamaDesktop/Resources/tama-first-use.json" \
     "$RESOURCES/tama-first-use.json"
 SPARKLE_FRAMEWORK="$BIN_DIR/Sparkle.framework"
@@ -140,7 +168,7 @@ fi
 "$NODE_BIN" "$SCRIPT_DIR/app_build/export-catalog.mjs" "$HOOKS_ROOT" "$RESOURCES/tama-catalog.json"
 HOOK_RELEASE="$RESOURCES/hooks-release"
 mkdir -p "$HOOK_RELEASE"
-install -m 0644 "$HOOKS_ROOT/package.json" "$HOOK_RELEASE/package.json"
+install -m "$DATA_MODE" "$HOOKS_ROOT/package.json" "$HOOK_RELEASE/package.json"
 for directory in shared-hooks claude-hooks codex-hooks repo-githooks; do
     cp -R "$HOOKS_ROOT/$directory" "$HOOK_RELEASE/$directory"
 done

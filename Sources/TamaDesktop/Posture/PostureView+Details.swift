@@ -28,8 +28,7 @@ extension PostureView {
             signals.append(
                 WisentSignal(
                     "Bundled release",
-                    value: buildIdentity.hookRelease.map { shortIdentifier($0.releaseId) }
-                        ?? "Not recorded",
+                    value: bundledRelease(shortIdentifier),
                     tone: .neutral
                 )
             )
@@ -38,21 +37,21 @@ extension PostureView {
         signals.append(
             WisentSignal(
                 "Policy protection",
-                value: model.areHooksDisabled ? "Off" : "On",
-                tone: model.areHooksDisabled ? .danger : .success
+                value: model.protectionWord.capitalized,
+                tone: model.hooksDisabledState == false ? .success : .danger
             )
         )
         signals.append(
             WisentSignal(
                 "Machine selection",
-                value: machineSelection.selection?.modeLabel ?? "Not read",
+                value: machineSelectionLabel,
                 tone: machineSelectionTone
             )
         )
         signals.append(
             WisentSignal(
                 "Installed policy",
-                value: model.installedHookReleaseID.map(shortIdentifier) ?? "Not installed",
+                value: installedRelease(shortIdentifier, absent: "Not installed"),
                 tone: model.installedHookReleaseID == nil ? .neutral : .success
             )
         )
@@ -90,6 +89,26 @@ extension PostureView {
         if model.areHooksDisabled || selection.emergencyDisabled { return .danger }
         return selection.mode == "only" ? .warning : .success
     }
+    /// The bundled release as `shown`, or that the build record names none.
+    private func bundledRelease(_ shown: (String) -> String) -> String {
+        guard let release = buildIdentity.hookRelease else { return "Not recorded" }
+        return shown(release.releaseId)
+    }
+    /// The installed release as `shown`, or `absent` when none is recorded.
+    private func installedRelease(_ shown: (String) -> String, absent: String) -> String {
+        guard let release = model.installedHookReleaseID else { return absent }
+        return shown(release)
+    }
+    private var machineSelectionLabel: String {
+        guard let selection = machineSelection.selection else { return "Not read" }
+        return selection.modeLabel
+    }
+    private var sessionPolicyLabel: String {
+        guard let loaded = model.selectedAgentSession?.runtime?.loadedReleaseId else {
+            return "No live session"
+        }
+        return loaded
+    }
 
     func counters(_ snapshot: CatalogSnapshot) -> some View {
         let hooks = snapshot.catalog.hooks
@@ -108,7 +127,7 @@ extension PostureView {
             ),
             WisentCounterRow.Counter(
                 "Categories",
-                value: Set(hooks.map(\.category)).count.formatted(.number),
+                value: Set(hooks.compactMap(\.statedCategory)).count.formatted(.number),
                 detail: "Policy groups"
             ),
             WisentCounterRow.Counter(
@@ -150,7 +169,7 @@ extension PostureView {
                     HStack(alignment: .top, spacing: WisentDesign.Space.x4) {
                         WisentField(
                             label: "Bundled policy",
-                            value: buildIdentity.hookRelease?.releaseId ?? "Not recorded"
+                            value: bundledRelease { $0 }
                         )
                         // Read-only inspection monitors nothing local, so the
                         // absent value is "not inspected" and never the claim
@@ -158,14 +177,14 @@ extension PostureView {
                         WisentField(
                             label: "Installed release",
                             value: model.allowsControl
-                                ? (model.installedHookReleaseID ?? "Not installed by Tama")
+                                ? installedRelease({ $0 }, absent: "Not installed by Tama")
                                 : "Not inspected",
                             tone: driftTone
                         )
                         WisentField(
                             label: "Session policy",
                             value: model.allowsControl
-                                ? (runtime?.loadedReleaseId ?? "No live session")
+                                ? sessionPolicyLabel
                                 : "Not inspected",
                             tone: driftTone
                         )
@@ -196,11 +215,11 @@ extension PostureView {
             title: "Warnings",
             trailing: counted(validation.warnings.count, "warning")
         ) {
-            WisentPanel(padding: 0) {
-                VStack(spacing: 0) {
+            WisentPanel(padding: .zero) {
+                VStack(spacing: .zero) {
                     ForEach(Array(validation.warnings.enumerated()), id: \.offset) {
                         index, warning in
-                        if index > 0 { Divider() }
+                        if index != validation.warnings.startIndex { Divider() }
                         Text(warning)
                             .font(WisentTypeScale.body())
                             .foregroundStyle(WisentDesign.secondary)

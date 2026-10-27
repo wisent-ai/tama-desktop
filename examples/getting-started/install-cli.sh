@@ -1,9 +1,10 @@
 #!/bin/sh
 # Local mutation: expose the CLI embedded in one installed Tama.app on the current user's PATH.
 # A matching link is retained; any other existing entry is left untouched.
+# Usage: TAMA_APP=<path to the installed Tama.app> sh install-cli.sh
 set -eu
 
-TAMA_APP=${TAMA_APP:-"$HOME/Applications/Tama.app"}
+TAMA_APP=${TAMA_APP:?set TAMA_APP to the installed Tama.app whose CLI is linked}
 TAMA_CLI="$TAMA_APP/Contents/Resources/hooks-release/bin/tama"
 TAMA_LINK="$HOME/.local/bin/tama"
 

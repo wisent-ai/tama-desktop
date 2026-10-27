@@ -68,22 +68,39 @@ final class WorktreesModel: ObservableObject {
 
     // MARK: - Roots
 
-    /// The screen reports the preview when there is one, because it is the same
-    /// walk the removal makes, and the scan otherwise.
+    /// The walk that answers: the preview when there is one, because it is the
+    /// same walk the removal makes, and the scan otherwise; none before a scan.
+    private var walk: (repositories: [WorktreeRepository], count: Int, gaps: [WalkGap])? {
+        if let preview { return (preview.repositories, preview.worktreeCount, preview.walkGaps) }
+        if let listing { return (listing.repositories, listing.worktreeCount, listing.walkGaps) }
+        return nil
+    }
+
     var repositories: [WorktreeRepository] {
-        preview?.repositories ?? listing?.repositories ?? []
+        guard let walk else { return [] }
+        return walk.repositories
     }
 
     var worktrees: [WorktreeRecord] { repositories.flatMap(\.worktrees) }
 
-    var worktreeCount: Int { preview?.worktreeCount ?? listing?.worktreeCount ?? .zero }
+    var worktreeCount: Int {
+        guard let walk else { return .zero }
+        return walk.count
+    }
 
-    var refusals: [WorktreeRefusal] { preview?.refused ?? [] }
+    /// What the backend refused; only a removal preview refuses anything.
+    var refusals: [WorktreeRefusal] {
+        guard let preview else { return [] }
+        return preview.refused
+    }
 
     /// Directories the walk could not read. The screen shows these beside the
     /// count, because an empty table from a pass that could not look is not
     /// the same answer as a tree with no second checkouts in it.
-    var walkGaps: [WalkGap] { preview?.walkGaps ?? listing?.walkGaps ?? [] }
+    var walkGaps: [WalkGap] {
+        guard let walk else { return [] }
+        return walk.gaps
+    }
 
     var isBusy: Bool {
         scanState == .scanning || removalState == .previewing || removalState == .applying
@@ -103,7 +120,10 @@ final class WorktreesModel: ObservableObject {
 
     /// What the operator marked here, plus what the document reported back as
     /// excepted: a path in either is kept out of the pass.
-    var kept: Set<String> { keptPaths.union(preview?.exceptedPaths ?? []) }
+    var kept: Set<String> {
+        guard let preview else { return keptPaths }
+        return keptPaths.union(preview.exceptedPaths)
+    }
 
     func isKept(_ record: WorktreeRecord) -> Bool { kept.contains(record.path) }
 

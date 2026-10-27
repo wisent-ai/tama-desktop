@@ -23,7 +23,11 @@ struct BuildIntent: Decodable, Identifiable, Sendable {
     let expiresAt: UInt64
     let usedAt: UInt64?
     let userApproval: BuildApproval?
-    var id: String { "\(kind):\(target):\(revision ?? ""):\(recordedAt)" }
+    /// Unique per record: a record without a revision is told apart by that.
+    var id: String {
+        guard let revision else { return "\(kind):\(target):no-revision:\(recordedAt)" }
+        return "\(kind):\(target):\(revision):\(recordedAt)"
+    }
     enum CodingKeys: String, CodingKey {
         case kind, target, reason, revision
         case completedTask = "completed_task"

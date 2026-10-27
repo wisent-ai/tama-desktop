@@ -43,6 +43,7 @@ struct TurnEndHook: Decodable, Equatable, Sendable {
 /// The decision the core sent for the stop.
 struct TurnEndDecision: Decodable, Equatable, Sendable {
     let blockedHookId: String?
+    let reason: String?
     let results: [TurnEndHook]?
 }
 
@@ -52,6 +53,7 @@ struct TurnEndRecord: Decodable, Equatable, Sendable {
     let startedAtMs: TurnEndClock?
     let finishedAtMs: TurnEndClock?
     let reading: String?
+    let error: String?
     let decision: TurnEndDecision?
 }
 
@@ -102,12 +104,20 @@ struct TurnEndPanel: View {
 
     private static func detail(_ record: TurnEndRecord) -> String {
         var lines: [String] = []
-        if let reading = record.reading {
+        if let reading = record.reading,
+            reading.contains(where: { !$0.isWhitespace })
+        {
             lines.append(reading)
         } else {
             lines.append(
-                "This record was written before the core gave each record its reading; `tama hooks running` reads it."
+                "This turn-end record contains no reading; `tama hooks running` inspects its retained decision."
             )
+            if let error = record.error {
+                lines.append(error)
+            }
+            if let reason = record.decision?.reason {
+                lines.append(reason)
+            }
         }
         if let started = record.startedAtMs {
             lines.append("Received \(started.shown)")

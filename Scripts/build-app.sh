@@ -4,19 +4,46 @@ set -eu
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 DESKTOP_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 FINAL_APP_BUNDLE="$DESKTOP_ROOT/.build/Tama.app"
-INSTALLED_BUNDLE=${TAMA_INSTALL_APP_PATH:-"$HOME/Applications/Tama.app"}
+# Where the operator launches the app from: ~/Applications unless
+# TAMA_INSTALL_APP_PATH names another place.
+if [ -n "${TAMA_INSTALL_APP_PATH+set}" ]; then
+    INSTALLED_BUNDLE=$TAMA_INSTALL_APP_PATH
+else
+    INSTALLED_BUNDLE="$HOME/Applications/Tama.app"
+fi
 LSREGISTER=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
-PRODUCT_VERSION=${TAMA_RELEASE_VERSION:-${WISENT_RELEASE_VERSION:-$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$DESKTOP_ROOT/App/Info.plist")}}
+# Installed files: data readable by everyone and writable by its owner;
+# executables additionally executable by everyone.
+DATA_MODE=u=rw,go=r
+EXECUTABLE_MODE=u=rwx,go=rx
+# The product version is Tama's own release version, else the shared release
+# version, else the one App/Info.plist declares.
+if [ -n "${TAMA_RELEASE_VERSION+set}" ]; then
+    PRODUCT_VERSION=$TAMA_RELEASE_VERSION
+elif [ -n "${WISENT_RELEASE_VERSION+set}" ]; then
+    PRODUCT_VERSION=$WISENT_RELEASE_VERSION
+else
+    PRODUCT_VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$DESKTOP_ROOT/App/Info.plist")
+fi
 BUNDLE_SHORT_VERSION=${PRODUCT_VERSION%%[-+]*}
 if ! printf '%s\n' "$BUNDLE_SHORT_VERSION" | LC_ALL=C grep -Eq '^[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$'; then
     printf '%s\n' "The Apple bundle version derived from $PRODUCT_VERSION is invalid."
     false
 fi
-BUILD_CHANNEL=${TAMA_BUILD_CHANNEL:-development}
+# Every compiled component targets the macOS release the app declares.
+DEPLOYMENT_TARGET=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' "$DESKTOP_ROOT/App/Info.plist")
+# https://clang.llvm.org/docs/CommandGuide/clang.html#cmdoption-O0 — the level that enables most optimizations.
+CLANG_OPTIMIZATION=-O2
+# The channel is development unless TAMA_BUILD_CHANNEL names another.
+if [ -n "${TAMA_BUILD_CHANNEL+set}" ]; then
+    BUILD_CHANNEL=$TAMA_BUILD_CHANNEL
+else
+    BUILD_CHANNEL=development
+fi
 # A release worker builds an unpacked git archive, which has no repository to
 # ask: the release names its commit in WISENT_SOURCE_COMMIT, and an archive of
 # a commit is clean by construction. A local checkout is asked directly.
-if [ -n "${WISENT_SOURCE_COMMIT:-}" ] && [ ! -e "$DESKTOP_ROOT/.git" ]; then
+if [ -n "${WISENT_SOURCE_COMMIT+set}" ] && [ ! -e "$DESKTOP_ROOT/.git" ]; then
     SOURCE_REVISION=$WISENT_SOURCE_COMMIT
     SOURCE_DIRTY=false
 else
@@ -26,7 +53,12 @@ else
         SOURCE_DIRTY=true
     fi
 fi
-BUILD_NUMBER=${WISENT_BUILD_NUMBER:-$(git -C "$DESKTOP_ROOT" rev-list --count HEAD)}
+# The build number is the release's, else the count of commits.
+if [ -n "${WISENT_BUILD_NUMBER+set}" ]; then
+    BUILD_NUMBER=$WISENT_BUILD_NUMBER
+else
+    BUILD_NUMBER=$(git -C "$DESKTOP_ROOT" rev-list --count HEAD)
+fi
 TARGET_ARCH=$(uname -m)
 
 BUILD_STAGING_BUNDLE=
@@ -49,10 +81,10 @@ cleanup_staging() {
         fi
     fi
     if [ -n "$BUILD_STAGING_BUNDLE" ]; then
-        rm -rf "$BUILD_STAGING_BUNDLE" || true
+        rm -rf "$BUILD_STAGING_BUNDLE"
     fi
     if [ -n "$INSTALL_STAGING_BUNDLE" ]; then
-        rm -rf "$INSTALL_STAGING_BUNDLE" || true
+        rm -rf "$INSTALL_STAGING_BUNDLE"
     fi
     return "$status"
 }
@@ -95,28 +127,18 @@ promote_bundle() {
 
 trap cleanup_staging EXIT
 
-unregister_bundle() {
-    if output=$("$LSREGISTER" -u "$1" 2>&1); then
-        return 0
-    fi
-    case "$output" in
-        *-10814*) return 0 ;;
-    esac
-    printf '%s\n' "$output" >&2
-    return 1
-}
 . "$SCRIPT_DIR/app_build/prepare.sh"
 xcrun --sdk macosx clang \
     -fobjc-arc \
-    -O2 \
-    -mmacosx-version-min=14.0 \
+    "$CLANG_OPTIMIZATION" \
+    -mmacosx-version-min="$DEPLOYMENT_TARGET" \
     -framework Foundation \
     "$SYSTEM_POLICY_SOURCE/tama-system-policy-macos.m" \
     -o "$SYSTEM_POLICY_BACKEND"
 xcrun --sdk macosx clang \
     -fobjc-arc \
-    -O2 \
-    -mmacosx-version-min=14.0 \
+    "$CLANG_OPTIMIZATION" \
+    -mmacosx-version-min="$DEPLOYMENT_TARGET" \
     -framework Foundation \
     -lEndpointSecurity \
     -lbsm \
@@ -125,21 +147,21 @@ xcrun --sdk macosx clang \
 xcrun --sdk macosx clang \
     -fobjc-arc \
     -fapplication-extension \
-    -O2 \
-    -mmacosx-version-min=14.0 \
+    "$CLANG_OPTIMIZATION" \
+    -mmacosx-version-min="$DEPLOYMENT_TARGET" \
     -framework Foundation \
     -framework Network \
     -framework NetworkExtension \
     -lbsm \
     "$SYSTEM_POLICY_SOURCE/TamaNetworkFilter.m" \
     -o "$NETWORK_FILTER_BINARY"
-install -m 0644 \
+install -m "$DATA_MODE" \
     "$SYSTEM_POLICY_SOURCE/Bundle/TamaNetworkFilter-Info.plist" \
     "$NETWORK_FILTER_CONTENTS/Info.plist"
 plutil -replace CFBundleShortVersionString -string "$BUNDLE_SHORT_VERSION" "$NETWORK_FILTER_CONTENTS/Info.plist"
 plutil -replace TamaProductVersion -string "$PRODUCT_VERSION" "$NETWORK_FILTER_CONTENTS/Info.plist"
 plutil -replace CFBundleVersion -string "$BUILD_NUMBER" "$NETWORK_FILTER_CONTENTS/Info.plist"
-install -m 0644 \
+install -m "$DATA_MODE" \
     "$SYSTEM_POLICY_SOURCE/Bundle/ai.wisent.tama.system-policy.plist" \
     "$LAUNCH_DAEMONS/ai.wisent.tama.system-policy.plist"
 for executable in "$SYSTEM_POLICY_BACKEND" "$SYSTEM_POLICY_DAEMON"; do
@@ -153,7 +175,7 @@ for executable in "$SYSTEM_POLICY_BACKEND" "$SYSTEM_POLICY_DAEMON"; do
     codesign --verify --strict "$executable"
 done
 if [ -n "$NETWORK_FILTER_PROVISIONING_PROFILE" ]; then
-    install -m 0644 \
+    install -m "$DATA_MODE" \
         "$NETWORK_FILTER_PROVISIONING_PROFILE" \
         "$NETWORK_FILTER_CONTENTS/embedded.provisionprofile"
 fi
@@ -182,50 +204,13 @@ TAMA_HOOK_SOURCE_DIRTY="$HOOK_SOURCE_DIRTY" \
 TAMA_HOOK_SOURCE_REVISION="$HOOK_SOURCE_REVISION" \
 "$TAMA_PROGRAM" hooks seal --source-root "$HOOKS_ROOT" "$HOOK_RELEASE" >/dev/null
 # The release's own bin/tama is its installer (`tama hooks install-release`).
-install -m 0755 "$SCRIPT_DIR/emergency_disable_hooks" "$RESOURCES/emergency_disable_hooks"
+install -m "$EXECUTABLE_MODE" "$SCRIPT_DIR/emergency_disable_hooks" "$RESOURCES/emergency_disable_hooks"
 if [ -f "$DESKTOP_ROOT/App/AppIcon.icns" ]; then
-    install -m 0644 "$DESKTOP_ROOT/App/AppIcon.icns" "$RESOURCES/AppIcon.icns"
+    install -m "$DATA_MODE" "$DESKTOP_ROOT/App/AppIcon.icns" "$RESOURCES/AppIcon.icns"
 else
     sh "$SCRIPT_DIR/app_build/import-brand-icon.sh" tama-desktop "$RESOURCES/AppIcon.icns"
 fi
-TAMA_BUILD_DEPENDENCIES="$DESKTOP_ROOT/Package.resolved" \
-TAMA_BUILD_HOOK_RELEASE="$HOOK_RELEASE/release.json" \
-TAMA_BUILD_CHANNEL="$BUILD_CHANNEL" \
-TAMA_BUILD_DIRTY="$SOURCE_DIRTY" \
-TAMA_BUILD_REVISION="$SOURCE_REVISION" \
-TAMA_BUILD_TARGET_ARCH="$TARGET_ARCH" \
-TAMA_BUILD_VERSION="$PRODUCT_VERSION" \
-python3 - "$RESOURCES/tama-build.json" <<'PY'
-from datetime import datetime, timezone
-import json
-import os
-from pathlib import Path
-import sys
-
-manifest = {
-    "architecture": os.environ["TAMA_BUILD_TARGET_ARCH"],
-    "builtAt": datetime.now(timezone.utc).isoformat(),
-    "channel": os.environ["TAMA_BUILD_CHANNEL"],
-    "platform": "macOS",
-    "productVersion": os.environ["TAMA_BUILD_VERSION"],
-    "schema": "ai.wisent.tama.build",
-    "sourceDirty": os.environ["TAMA_BUILD_DIRTY"] == "true",
-    "sourceRevision": os.environ["TAMA_BUILD_REVISION"],
-}
-resolved = Path(os.environ["TAMA_BUILD_DEPENDENCIES"])
-manifest["dependencies"] = (
-    json.loads(resolved.read_text()).get("pins", [])
-    if resolved.is_file()
-    else []
-)
-manifest["hookRelease"] = json.loads(
-    Path(os.environ["TAMA_BUILD_HOOK_RELEASE"]).read_text()
-)
-target = next(argument for argument in sys.argv if argument != "-")
-Path(target).write_text(
-    json.dumps(manifest, indent=len("  "), sort_keys=True) + "\n"
-)
-PY
+. "$SCRIPT_DIR/app_build/record.sh"
 codesign \
     --force \
     --deep \
@@ -238,7 +223,7 @@ IDENTITY_BUILD_DIR="$DESKTOP_ROOT/.build/identity-helper"
 swift build --package-path "$DESKTOP_ROOT/.build/checkouts/wisent-desktop-auth" \
     --configuration release --product wisent-identity-keychain-helper --scratch-path "$IDENTITY_BUILD_DIR"
 mkdir -p "$(dirname "$IDENTITY_HELPER")"
-install -m 0755 "$IDENTITY_BUILD_DIR/release/wisent-identity-keychain-helper" "$IDENTITY_HELPER"
+install -m "$EXECUTABLE_MODE" "$IDENTITY_BUILD_DIR/release/wisent-identity-keychain-helper" "$IDENTITY_HELPER"
 codesign \
     --force \
     --sign "$CODESIGN_IDENTITY" \
@@ -247,7 +232,7 @@ codesign \
     --identifier ai.wisent.identity.keychain-helper \
     "$IDENTITY_HELPER"
 if [ -n "$APP_PROVISIONING_PROFILE" ]; then
-    install -m 0644 \
+    install -m "$DATA_MODE" \
         "$APP_PROVISIONING_PROFILE" \
         "$CONTENTS/embedded.provisionprofile"
     codesign \
@@ -272,7 +257,8 @@ promote_bundle
 BUILD_STAGING_BUNDLE=
 APP_BUNDLE="$FINAL_APP_BUNDLE"
 printf 'Built %s\n' "$APP_BUNDLE"
-if [ "${TAMA_INSTALL_AFTER_BUILD:-yes}" = no ]; then
+# The build installs unless TAMA_INSTALL_AFTER_BUILD says no.
+if [ -n "${TAMA_INSTALL_AFTER_BUILD+set}" ] && [ "$TAMA_INSTALL_AFTER_BUILD" = no ]; then
     exit
 fi
 mkdir -p "$(dirname "$INSTALLED_BUNDLE")"
@@ -284,10 +270,17 @@ PROMOTION_SOURCE="$INSTALL_STAGING_BUNDLE"
 PROMOTION_TARGET="$INSTALLED_BUNDLE"
 promote_bundle
 INSTALL_STAGING_BUNDLE=
-unregister_bundle "$APP_BUNDLE"
+# While the .build copy stays registered it competes for the app's sign-in URL
+# scheme with the installed copy, so it is unregistered. `lsregister -u` also
+# exits non-zero over the Spotlight importer's own failure to scan the .build
+# copy, after the installed copy is already in place; that failure is said,
+# with lsregister's own output left visible above, and the installed copy is
+# still registered and restarted.
+if ! "$LSREGISTER" -u "$APP_BUNDLE"; then
+    printf '%s\n' "lsregister did not unregister $APP_BUNDLE (its output above says why); registering the installed copy anyway." >&2
+fi
 "$LSREGISTER" -f "$INSTALLED_BUNDLE"
 printf 'Installed %s\n' "$INSTALLED_BUNDLE"
-RESTART_APP=${WISENT_RESTART_APP:-"$SCRIPT_DIR/wisent-restart-app"}
-if [ "${WISENT_RESTART_AFTER_BUILD:-1}" != 0 ] && [ -x "$RESTART_APP" ]; then
-    "$RESTART_APP" --if-running "$INSTALLED_BUNDLE"
-fi
+# Stado owns the restart: a running copy is restarted on the bytes just
+# installed, a stopped one stays stopped.
+stado product restart --if-running "$INSTALLED_BUNDLE"
