@@ -27,6 +27,23 @@ struct IndexEmptied: Decodable, Sendable {
     let restored: Bool
 }
 
+/// An entry that belongs to no state of the checkout (`tama index repair`'s
+/// `strays`): `foreign`, staged for a path neither HEAD nor the working tree
+/// holds, or `dropped`, a tracked path missing from the index whose working
+/// file is present.
+struct IndexStray: Decodable, Sendable, Hashable {
+    let path: String
+    let shape: String
+    let object: String?
+    let repaired: Bool
+
+    var said: String {
+        let done = repaired ? "read back from HEAD" : "choose Repair index to read it back from HEAD"
+        guard let object else { return "\(path): \(shape), \(done)" }
+        return "\(path) \(object): \(shape), \(done)"
+    }
+}
+
 /// The answer of `tama index repair --json` and the `index/repair` request.
 struct IndexRepairReport: Decodable, Sendable {
     let repository: String
@@ -35,6 +52,7 @@ struct IndexRepairReport: Decodable, Sendable {
     let entries: Int
     let missing: [IndexMissingEntry]
     let emptied: IndexEmptied?
+    let strays: [IndexStray]
     let applied: Bool
 }
 
@@ -109,6 +127,9 @@ struct IndexRepairView: View {
                 }
                 ForEach(report.missing, id: \.self) { entry in
                     Text(entry.said).textSelection(.enabled)
+                }
+                ForEach(report.strays, id: \.self) { stray in
+                    Text(stray.said).textSelection(.enabled)
                 }
             }
         }
