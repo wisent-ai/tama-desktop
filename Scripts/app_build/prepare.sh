@@ -174,7 +174,6 @@ for directory in shared-hooks claude-hooks repo-githooks; do
 done
 find "$HOOK_RELEASE" -name '__pycache__' -type d -prune -exec rm -rf {} +
 rm -f \
-    "$HOOK_RELEASE/shared-hooks/generate-configs.mjs" \
     "$HOOK_RELEASE/shared-hooks/providers.json" \
     "$HOOK_RELEASE/shared-hooks/run-one-session-hook.js"
 
