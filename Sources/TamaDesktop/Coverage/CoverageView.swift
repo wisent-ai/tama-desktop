@@ -151,6 +151,7 @@ struct CoverageView: View {
         let coverage = inspection.coverage
         let uncovered = coverage.lazy.filter(\.isUncovered).count
         let partlyWired = coverage.lazy.filter(\.isPartlyWired).count
+        let uninspected = coverage.lazy.filter(\.isUninspected).count
         return WisentCounterRow(counters: [
             WisentCounterRow.Counter(
                 "Providers",
@@ -179,6 +180,10 @@ struct CoverageView: View {
                 detail: "Configs missing declared mappings",
                 tone: partlyWired == .zero ? .neutral : .warning
             ),
+            WisentCounterRow.Counter(
+                "Not inspected", value: uninspected.formatted(.number),
+                detail: "Configs Tama could not read",
+                tone: uninspected == .zero ? .neutral : .warning),
         ])
     }
 
@@ -240,9 +245,7 @@ struct CoverageView: View {
                     label: "Declared mappings", value: coverage.mappingCount.formatted(.number))
                 WisentField(label: "Policies", value: coverage.hookCount.formatted(.number))
                 WisentField(label: "Events", value: coverage.eventCount.formatted(.number))
-                if let summary = coverage.wiringSummary {
-                    WisentField(label: "Installed in its config", value: summary)
-                }
+                WisentField(label: "Installed in its config", value: coverage.wiringSummary)
                 WisentField(
                     label: "Adapter path",
                     value: coverage.adapterPath ?? "No adapter declared"
@@ -288,6 +291,9 @@ struct CoverageView: View {
         }
         if coverage.isPartlyWired {
             badges.append(("Not installed", .warning))
+        }
+        if coverage.isUninspected {
+            badges.append(("Not inspected", .warning))
         }
         return badges
     }

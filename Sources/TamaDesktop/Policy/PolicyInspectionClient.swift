@@ -38,10 +38,18 @@ struct ProviderCoverage: Decodable, Identifiable, Sendable {
         return installedMappingCount < mappingCount
     }
 
-    var wiringSummary: String? {
-        guard let installedMappingCount else { return nil }
-        return
-            "\(installedMappingCount.formatted(.number)) of \(mappingCount.formatted(.number)) installed"
+    /// Tama could not inspect the provider's own configuration; `note` holds
+    /// the path and the read, parse or shape error. Unknown, neither zero
+    /// installed nor an unsupported configuration.
+    var isUninspected: Bool { installedMappingCount == nil }
+
+    var wiringSummary: String {
+        switch installedMappingCount {
+        case let installed?:
+            "\(installed.formatted(.number)) of \(mappingCount.formatted(.number)) installed"
+        case nil:
+            "Not known: inspection failed (see the note below)"
+        }
     }
 }
 
