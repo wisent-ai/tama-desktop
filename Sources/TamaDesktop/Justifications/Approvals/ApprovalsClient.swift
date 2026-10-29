@@ -26,6 +26,15 @@ struct TestApprovalChange: Decodable, Sendable {
     let record: String
 }
 
+/// `tests/restore`: the record written again from the attestation ledger,
+/// and where the record as it stood before is kept.
+struct TestApprovalRestore: Decodable, Sendable {
+    let action: String
+    let approved: [TestApproval]
+    let record: String
+    let previous: String
+}
+
 /// One repository's test code as `tama tests audit` reports it.
 struct TestAuditRepository: Decodable, Identifiable, Sendable {
     let repository: String
@@ -67,8 +76,8 @@ struct TestReview: Decodable, Sendable {
     let message: String
 }
 
-/// `tama request tests/approvals|approve|revoke|audit`: the same record and
-/// the same change `tama tests` makes in the operator's terminal.
+/// `tama request tests/approvals|approve|revoke|restore|audit`: the same
+/// record and the same change `tama tests` makes in the operator's terminal.
 struct TestApprovalClient: Sendable {
     /// Nil runs the binary sealed into this build's hook release.
     var command: TamaCommand?
@@ -89,6 +98,12 @@ struct TestApprovalClient: Sendable {
         try await client().request(
             "tests/revoke", body: ["paths": paths],
             as: TestApprovalChange.self, describing: "Revoking a test approval")
+    }
+
+    func restore() async throws -> TestApprovalRestore {
+        try await client().request(
+            "tests/restore", as: TestApprovalRestore.self,
+            describing: "Restoring test approvals from the attestation ledger")
     }
 
     func audit(roots: [String], remove: Bool) async throws -> TestAudit {

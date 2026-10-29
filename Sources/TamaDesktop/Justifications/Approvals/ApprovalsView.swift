@@ -34,6 +34,11 @@ struct TestApprovalsView: View {
                     HStack {
                         Text("Approved paths").font(WisentTypeScale.body()).bold()
                         Spacer()
+                        Button("Restore from ledger") { Task { await restore() } }
+                            .disabled(busy)
+                            .help(
+                                "Writes the record again from the attestation ledger after something other than Tama removed it."
+                            )
                         Button("Refresh") { Task { await refresh() } }.disabled(busy)
                     }
                     if let listing {
@@ -125,6 +130,19 @@ struct TestApprovalsView: View {
             let result = try await TestApprovalClient().revoke(paths: [approval.path])
             listing = TestApprovalListing(approved: result.approved, record: result.record)
             notice = "Revoked \(result.changed.joined(separator: ", "))."
+        } catch { failure = error.localizedDescription }
+    }
+
+    @MainActor private func restore() async {
+        busy = true
+        failure = nil
+        notice = nil
+        defer { busy = false }
+        do {
+            let result = try await TestApprovalClient().restore()
+            listing = TestApprovalListing(approved: result.approved, record: result.record)
+            notice =
+                "Restored \(result.approved.count) approval(s) from the ledger; the record as it stood is kept as \(result.previous)."
         } catch { failure = error.localizedDescription }
     }
 }
