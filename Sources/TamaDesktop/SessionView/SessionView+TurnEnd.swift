@@ -164,5 +164,6 @@ extension SessionView {
     func turnEnd(_ session: AgentSessionRecord) -> some View {
         TurnEndPanel(session: session)
         TaskScopePanel(session: session.sessionId)
+        ReminderPhrasePanel(session: session.sessionId)
     }
 }
