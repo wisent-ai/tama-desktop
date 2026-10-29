@@ -169,7 +169,7 @@ fi
 HOOK_RELEASE="$RESOURCES/hooks-release"
 mkdir -p "$HOOK_RELEASE"
 install -m "$DATA_MODE" "$HOOKS_ROOT/package.json" "$HOOK_RELEASE/package.json"
-for directory in shared-hooks claude-hooks codex-hooks repo-githooks; do
+for directory in shared-hooks claude-hooks repo-githooks; do
     cp -R "$HOOKS_ROOT/$directory" "$HOOK_RELEASE/$directory"
 done
 find "$HOOK_RELEASE" -name '__pycache__' -type d -prune -exec rm -rf {} +

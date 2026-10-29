@@ -37,7 +37,8 @@
             "The interface is organized by operator decision rather than by data container: a grouped sidebar of eight destinations, a 44 pt context bar on every screen instead of a hero header, three-zone data screens with counted facet rails and inspectors, and the repository under repair selected once in the sidebar header.",
             "Disabling every managed hook, repairing violations with a headless agent, and deactivating local enforcement now open a decision dialog that quotes the exact effect, lists what it touches, and keeps the safe verb as the primary button.",
             "Mutations report the backend's own sentence in place on the screen that started them, instead of a modal alert that closes without a trace.",
-            "Every backend operation runs as one `tama-cli request <operation>` process that exits once it has answered, instead of a resident `tama-cli serve` loopback server kept alive for the whole session; cancelling a scan or cleanup, or quitting the app, ends that operation's process tree."
+            "Every backend operation runs as one `tama-cli request <operation>` process that exits once it has answered, instead of a resident `tama-cli serve` loopback server kept alive for the whole session; cancelling a scan or cleanup, or quitting the app, ends that operation's process tree.",
+            "The bundled Tama backend is the current Tama, which answers every operation the desktop sends under its current name; its hook release carries the hook directories that Tama still ships, without Codex hook scripts or any Python."
           ]
         },
         {
@@ -109,7 +110,7 @@
           "name": "Compatibility requirements",
           "items": [
             "Apple-silicon macOS 14 or newer.",
-            "Python 3 and Node.js 20 or newer for installed runtime and violations workflows."
+            "Node.js 20 or newer for installed runtime and violations workflows."
           ]
         },
         {
