@@ -54,7 +54,7 @@ struct LearningView: View {
                     Text("“\(quote)”").textSelection(.enabled)
                 }
                 Text(
-                    "\(counted(Int(proposal.evidence), "piece")) of evidence, \(proposal.first ?? "?") – \(proposal.last ?? "?")"
+                    "\(counted(Int(proposal.evidence), "piece")) of evidence, \(proposal.seenSpan)"
                 )
                 Text(proposal.action).font(WisentTypeScale.identifierSmall()).textSelection(
                     .enabled)

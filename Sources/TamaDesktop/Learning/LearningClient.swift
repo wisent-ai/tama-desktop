@@ -22,6 +22,18 @@ struct LearningProposal: Decodable, Identifiable, Sendable {
     let quote: String?
     let action: String
     let sources: [LearningEvidence]?
+
+    /// When the evidence was first and last seen, as the digest states it;
+    /// a bound the digest leaves out is said to be unrecorded, not shown as
+    /// a placeholder.
+    var seenSpan: String {
+        switch (first, last) {
+        case let (first?, last?): "\(first) – \(last)"
+        case let (first?, nil): "first seen \(first), last sighting not recorded"
+        case let (nil, last?): "first sighting not recorded, last seen \(last)"
+        case (nil, nil): "sightings not dated"
+        }
+    }
 }
 
 struct LearningSourceFailure: Decodable, Identifiable, Sendable {

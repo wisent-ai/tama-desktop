@@ -87,6 +87,12 @@ final class TamaFirstUseJourney: ObservableObject {
     }
 
     private static func makeClient() throws -> JourneyClient {
+        // The walkthrough is keyed by this user on this computer; a computer
+        // macOS gives no name is refused by name rather than keyed under an
+        // invented one every unnamed computer would share.
+        guard let computer = Host.current().localizedName else {
+            throw TamaFirstUseError.computerUnnamed
+        }
         let fallback = try JourneyRouter.makeBundle(
             canonicalDefinition: String(
                 decoding: try JourneyResource.definitionData(
@@ -102,7 +108,7 @@ final class TamaFirstUseJourney: ObservableObject {
             journeyId: "first-use",
             subjectHash: JourneySubject.scoped([
                 NSUserName(),
-                Host.current().localizedName ?? "unknown-host",
+                computer,
                 "tama-first-use",
             ]),
             scope: .device,
@@ -238,5 +244,16 @@ final class TamaFirstUseJourney: ObservableObject {
         guard let client else { return }
         currentScreen = await client.currentScreen
         status = await client.progress?.status ?? .inProgress
+    }
+}
+
+enum TamaFirstUseError: LocalizedError {
+    case computerUnnamed
+
+    var errorDescription: String? {
+        switch self {
+        case .computerUnnamed:
+            "macOS reports no name for this computer, and Tama keys the first-use walkthrough by user and computer. Name it in System Settings > General > Sharing, then open Tama again."
+        }
     }
 }
