@@ -14,8 +14,9 @@ struct IndexMissingEntry: Decodable, Sendable, Hashable {
     /// The entry as the CLI's text output says it.
     var said: String {
         switch (repair, lost) {
-        case let (.some(done), true): return "\(path) \(object): \(done); its staged content is lost"
-        case let (.some(done), false): return "\(path) \(object): \(done)"
+        case (.some(let done), true):
+            return "\(path) \(object): \(done); its staged content is lost"
+        case (.some(let done), false): return "\(path) \(object): \(done)"
         case (.none, _): return "\(path) \(object): missing (choose Repair index to repair it)"
         }
     }
@@ -38,7 +39,8 @@ struct IndexStray: Decodable, Sendable, Hashable {
     let repaired: Bool
 
     var said: String {
-        let done = repaired ? "read back from HEAD" : "choose Repair index to read it back from HEAD"
+        let done =
+            repaired ? "read back from HEAD" : "choose Repair index to read it back from HEAD"
         guard let object else { return "\(path): \(shape), \(done)" }
         return "\(path) \(object): \(shape), \(done)"
     }
@@ -97,7 +99,9 @@ struct IndexRepairView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: WisentDesign.Space.x3) {
             Text("Index repair").font(WisentTypeScale.body())
-            Text("Reads the checkout's index for entries whose object the store lacks and for an index emptied while HEAD tracks files. Repair writes the index only; working files stay as they are.")
+            Text(
+                "Reads the checkout's index for entries whose object the store lacks and for an index emptied while HEAD tracks files. Repair writes the index only; working files stay as they are."
+            )
             TextField("Repository checkout path", text: $model.repository)
                 .disabled(model.running)
             HStack {
@@ -116,14 +120,19 @@ struct IndexRepairView: View {
                 if let variable = report.index_variable {
                     WisentAlertPanel(
                         tone: .warning, title: "GIT_INDEX_FILE chose this file",
-                        detail: "GIT_INDEX_FILE=\(variable) names \(report.index), not necessarily the checkout's own index."
+                        detail:
+                            "GIT_INDEX_FILE=\(variable) names \(report.index), not necessarily the checkout's own index."
                     )
                 }
-                Text("\(report.entries) entries, \(report.missing.count) naming an object the store does not hold")
+                Text(
+                    "\(report.entries) entries, \(report.missing.count) naming an object the store does not hold"
+                )
                 if let emptied = report.emptied {
-                    Text(emptied.restored
-                        ? "The index held no entry while HEAD tracks \(emptied.head_entries) files; read back from HEAD."
-                        : "The index holds no entry while HEAD tracks \(emptied.head_entries) files; every tracked file reads as staged for deletion.")
+                    Text(
+                        emptied.restored
+                            ? "The index held no entry while HEAD tracks \(emptied.head_entries) files; read back from HEAD."
+                            : "The index holds no entry while HEAD tracks \(emptied.head_entries) files; every tracked file reads as staged for deletion."
+                    )
                 }
                 ForEach(report.missing, id: \.self) { entry in
                     Text(entry.said).textSelection(.enabled)

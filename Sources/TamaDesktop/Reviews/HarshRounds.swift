@@ -43,7 +43,8 @@ enum HarshReviewer: Decodable, Sendable, Hashable {
 /// codebase; one recorded before that second part was asked carries none.
 enum HarshEntry: Decodable, Sendable, Hashable, Identifiable {
     case round(
-        tree: String, reviewer: HarshReviewer, findings: [HarshFinding], improvements: [HarshFinding]?,
+        tree: String, reviewer: HarshReviewer, findings: [HarshFinding],
+        improvements: [HarshFinding]?,
         atMs: UInt64)
     case disposed(quote: String, defect: String, atMs: UInt64)
     case settled(quote: String, reason: String, reviewer: HarshReviewer, atMs: UInt64)
@@ -61,7 +62,8 @@ enum HarshEntry: Decodable, Sendable, Hashable, Identifiable {
                 tree: try values.decode(String.self, forKey: .tree),
                 reviewer: try values.decode(HarshReviewer.self, forKey: .reviewer),
                 findings: try values.decode([HarshFinding].self, forKey: .findings),
-                improvements: try values.decodeIfPresent([HarshFinding].self, forKey: .improvements), atMs: at)
+                improvements: try values.decodeIfPresent(
+                    [HarshFinding].self, forKey: .improvements), atMs: at)
         case "disposed":
             self = .disposed(
                 quote: try values.decode(String.self, forKey: .quote),
@@ -202,11 +204,15 @@ struct HarshRoundsView: View {
                     if let improvements {
                         Text("\(improvements.count) improvements this change suggests")
                         ForEach(improvements, id: \.self) { improvement in
-                            Text("\(improvement.quote) — \(improvement.problem); required: \(improvement.require)")
-                                .textSelection(.enabled)
+                            Text(
+                                "\(improvement.quote) — \(improvement.problem); required: \(improvement.require)"
+                            )
+                            .textSelection(.enabled)
                         }
                     } else {
-                        Text("This round states nothing of what the change suggests, so it lets no commit through.")
+                        Text(
+                            "This round states nothing of what the change suggests, so it lets no commit through."
+                        )
                     }
                 }
             case .disposed(let quote, let defect, _):
@@ -222,8 +228,10 @@ struct HarshRoundsView: View {
         }
         ForEach(document.queue.entries) { entry in
             VStack(alignment: .leading, spacing: WisentDesign.Space.x1) {
-                Text("\(entry.state): tree \(entry.tree) in \(entry.repository), by \(entry.author)")
-                    .textSelection(.enabled)
+                Text(
+                    "\(entry.state): tree \(entry.tree) in \(entry.repository), by \(entry.author)"
+                )
+                .textSelection(.enabled)
                 if let reviewer = entry.reviewer {
                     Text("Reviewer session \(reviewer)").textSelection(.enabled)
                 }

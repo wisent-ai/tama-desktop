@@ -9,7 +9,8 @@ struct FailedCallsSection: View {
     var body: some View {
         WisentSectionBox(
             title: "Failed calls",
-            detail: "A call that failed or a gate refused is refused when repeated unchanged, until a file changes, the hook catalog changes, Oko binds its functionality to a defect, or a retry says why it differs."
+            detail:
+                "A call that failed or a gate refused is refused when repeated unchanged, until a file changes, the hook catalog changes, Oko binds its functionality to a defect, or a retry says why it differs."
         ) {
             VStack(alignment: .leading, spacing: WisentDesign.Space.x3) {
                 TextField("Session", text: $model.session)
@@ -39,7 +40,9 @@ struct FailedCallsSection: View {
                             VStack(alignment: .leading, spacing: WisentDesign.Space.x2) {
                                 Text("\(failed.tool), \(failed.by) at \(failed.at)")
                                 Text(failed.said)
-                                if let answer = failed.answer, !answer.isEmpty, answer != failed.said {
+                                if let answer = failed.answer, !answer.isEmpty,
+                                    answer != failed.said
+                                {
                                     Text(answer).font(WisentTypeScale.identifierSmall())
                                 }
                                 Text(call).font(WisentTypeScale.identifierSmall())
@@ -49,7 +52,11 @@ struct FailedCallsSection: View {
                                     Button("Retry with this reason") {
                                         Task { await model.run(retry: call) }
                                     }
-                                    .disabled(!model.ready || model.because.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                                    .disabled(
+                                        !model.ready
+                                            || model.because.trimmingCharacters(
+                                                in: .whitespacesAndNewlines
+                                            ).isEmpty)
                                 }
                             }
                             .textSelection(.enabled)

@@ -134,7 +134,8 @@ struct RootView: View {
             } else {
                 WisentEmptyPanel(
                     title: "Policy not read",
-                    detail: "Justifications are read with the policy snapshot; refresh the policy to read them.",
+                    detail:
+                        "Justifications are read with the policy snapshot; refresh the policy to read them.",
                     symbol: "text.badge.checkmark"
                 )
             }

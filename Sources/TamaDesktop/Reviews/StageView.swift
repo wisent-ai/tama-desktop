@@ -50,12 +50,15 @@ struct StageView: View {
                 } else if report.omitted.isEmpty {
                     Text("No unstaged recorded changes remain.")
                 } else {
-                    Text("Nothing was staged: \(report.omitted.count) recorded change(s) remain unstaged, left out below with their causes.")
+                    Text(
+                        "Nothing was staged: \(report.omitted.count) recorded change(s) remain unstaged, left out below with their causes."
+                    )
                 }
                 if !report.omitted.isEmpty {
                     WisentAlertPanel(
                         tone: .warning, title: "Left out of this staging",
-                        detail: report.omitted.map { "\($0.path): \($0.cause)" }.joined(separator: "\n")
+                        detail: report.omitted.map { "\($0.path): \($0.cause)" }.joined(
+                            separator: "\n")
                     )
                 }
                 DisclosureGroup("Recorded edit calls") {

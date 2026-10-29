@@ -109,13 +109,13 @@ extension JustificationsView {
                 }
                 TableColumn("WORDS") { entry in
                     Text(words(entry, requirement: requirement))
-                    .font(WisentTypeScale.identifierSmall())
-                    .foregroundStyle(
-                        requirement.minimumWords.map { entry.wordCount < $0 } == true
-                            ? WisentDesign.warning
-                            : WisentDesign.secondary
-                    )
-                    .monospacedDigit()
+                        .font(WisentTypeScale.identifierSmall())
+                        .foregroundStyle(
+                            requirement.minimumWords.map { entry.wordCount < $0 } == true
+                                ? WisentDesign.warning
+                                : WisentDesign.secondary
+                        )
+                        .monospacedDigit()
                 }
                 TableColumn("EXPIRES") { entry in
                     Text(expiryText(entry.expiresAt))
@@ -145,7 +145,7 @@ extension JustificationsView {
     func words(_ entry: JustificationEntry, requirement: JustificationRequirement) -> String {
         let counted = entry.wordCount.formatted(.number)
         switch requirement.minimumWords {
-        case let .some(required): return "\(counted)/\(required.formatted(.number))"
+        case .some(let required): return "\(counted)/\(required.formatted(.number))"
         case .none: return counted
         }
     }

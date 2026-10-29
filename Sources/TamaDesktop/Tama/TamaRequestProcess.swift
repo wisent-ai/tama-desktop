@@ -95,31 +95,32 @@ struct TamaExchange: Sendable {
     let outputErrors: [String]
 
     var diagnostics: String {
-        let terminal = switch end {
-        case .response(let status, let document):
-            "bounded response status: \(status)\nbounded response document:\n\(String(decoding: document, as: UTF8.self))"
-        case .result(let status, let document):
-            "job result status: \(status)\njob result document:\n\(String(decoding: document, as: UTF8.self))"
-        case nil:
-            "no terminal event was observed"
-        }
+        let terminal =
+            switch end {
+            case .response(let status, let document):
+                "bounded response status: \(status)\nbounded response document:\n\(String(decoding: document, as: UTF8.self))"
+            case .result(let status, let document):
+                "job result status: \(status)\njob result document:\n\(String(decoding: document, as: UTF8.self))"
+            case nil:
+                "no terminal event was observed"
+            }
         return """
-        \(terminal)
-        request process exit status: \(exitStatus)
-        request process termination reason: \(terminationReason) (\(terminationReason.rawValue))
-        request input failures:
-        \(inputErrors.joined(separator: "\n"))
-        request output failures:
-        \(outputErrors.joined(separator: "\n"))
-        events that could not be read:
-        \(unreadableEvents.joined(separator: "\n"))
-        request process standard error:
-        \(processError)
-        streamed job standard output:
-        \(stdoutText)
-        streamed job standard error:
-        \(stderrText)
-        """
+            \(terminal)
+            request process exit status: \(exitStatus)
+            request process termination reason: \(terminationReason) (\(terminationReason.rawValue))
+            request input failures:
+            \(inputErrors.joined(separator: "\n"))
+            request output failures:
+            \(outputErrors.joined(separator: "\n"))
+            events that could not be read:
+            \(unreadableEvents.joined(separator: "\n"))
+            request process standard error:
+            \(processError)
+            streamed job standard output:
+            \(stdoutText)
+            streamed job standard error:
+            \(stderrText)
+            """
     }
 }
 
@@ -208,7 +209,8 @@ enum TamaRequestProcess {
                         }
                     } catch {
                         run.outputFailed(
-                            "request \(operation) standard output not read: \(String(reflecting: error))")
+                            "request \(operation) standard output not read: \(String(reflecting: error))"
+                        )
                     }
                     handle.readabilityHandler = nil
                     run.closed(.stdout)
@@ -221,7 +223,8 @@ enum TamaRequestProcess {
                         }
                     } catch {
                         run.outputFailed(
-                            "request \(operation) standard error not read: \(String(reflecting: error))")
+                            "request \(operation) standard error not read: \(String(reflecting: error))"
+                        )
                     }
                     handle.readabilityHandler = nil
                     run.closed(.stderr)
@@ -244,7 +247,8 @@ enum TamaRequestProcess {
             try handle.close()
         } catch {
             run.outputFailed(
-                "request \(operation) \(stream) output not closed after cancellation: \(String(reflecting: error))")
+                "request \(operation) \(stream) output not closed after cancellation: \(String(reflecting: error))"
+            )
         }
     }
 

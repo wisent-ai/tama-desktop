@@ -76,10 +76,13 @@ struct AdmittedCommitView: View {
             }
             switch model.state {
             case .idle:
-                Text("Every commit review-commit admits is kept with the session that made it and its rounds.")
+                Text(
+                    "Every commit review-commit admits is kept with the session that made it and its rounds."
+                )
             case .loading:
                 WisentProgressPanel(
-                    title: "Reading the admission", detail: "Reading the checkout's admission register.")
+                    title: "Reading the admission",
+                    detail: "Reading the checkout's admission register.")
             case .failed(let cause):
                 WisentAlertPanel(tone: .danger, title: "No admission could be read", detail: cause)
             case .ready:

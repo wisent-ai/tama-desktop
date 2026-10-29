@@ -69,12 +69,15 @@ struct AdmissionCutoverView: View {
                 Text("A pushed commit made after the cutover carries review-commit's admission.")
             case .loading:
                 WisentProgressPanel(
-                    title: "Reading the cutover", detail: "Reading the checkout's admission register.")
+                    title: "Reading the cutover",
+                    detail: "Reading the checkout's admission register.")
             case .failed(let cause):
                 WisentAlertPanel(tone: .danger, title: "No cutover could be read", detail: cause)
             case .ready:
                 if let cutover = model.cutover {
-                    Text("Admissions started at \(cutover.at); every commit these tips hold was made before them:")
+                    Text(
+                        "Admissions started at \(cutover.at); every commit these tips hold was made before them:"
+                    )
                     ForEach(cutover.commits, id: \.self) { commit in
                         Text(commit).font(WisentTypeScale.identifier()).textSelection(.enabled)
                     }

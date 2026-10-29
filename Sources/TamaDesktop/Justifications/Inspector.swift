@@ -43,7 +43,7 @@ extension JustificationsView {
                 if requirement.directUserQuoteField != nil {
                     // A record without its quote is stated as missing, by name.
                     switch recordedQuote(entry) {
-                    case let .some(quote): prose("DIRECT USER REQUEST", quote)
+                    case .some(let quote): prose("DIRECT USER REQUEST", quote)
                     case .none: prose("DIRECT USER REQUEST", "This record carries no user request.")
                     }
                 }

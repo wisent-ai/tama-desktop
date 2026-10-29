@@ -25,7 +25,7 @@ struct PendingReport: Decodable, Sendable {
         /// Whether the commit stands and where, as Tama answered it.
         var standing: String {
             switch (stands, carriedIn) {
-            case let (true, place?): return "Stands in its \(place)"
+            case (true, let place?): return "Stands in its \(place)"
             case (true, nil): return "Tama answered that it stands and named no place it is carried"
             case (false, _): return "Does not stand"
             }

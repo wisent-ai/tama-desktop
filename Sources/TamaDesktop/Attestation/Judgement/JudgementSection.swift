@@ -7,7 +7,8 @@ struct JudgementSection: View {
     var body: some View {
         WisentSectionBox(
             title: "Review failures and alternatives",
-            detail: "An explicit local attestation is not an independent model review. It changes no consent or authorization."
+            detail:
+                "An explicit local attestation is not an independent model review. It changes no consent or authorization."
         ) {
             VStack(alignment: .leading, spacing: WisentDesign.Space.x3) {
                 TextField("Judgement request file", text: $model.request)
@@ -48,10 +49,12 @@ struct JudgementSection: View {
                     }
                     if let cause = inspection.historyError {
                         WisentAlertPanel(
-                            tone: .danger, title: "Failure history could not be read", detail: cause)
+                            tone: .danger, title: "Failure history could not be read", detail: cause
+                        )
                     }
                     if let failures = inspection.failures {
-                        let otherAttempts = failures.last == inspection.failure
+                        let otherAttempts =
+                            failures.last == inspection.failure
                             ? failures.dropLast() : failures[...]
                         if !otherAttempts.isEmpty {
                             DisclosureGroup("Other recorded failed attempts") {
@@ -68,14 +71,22 @@ struct JudgementSection: View {
                     }
                     if let failure = inspection.failure {
                         if failure.attestable == nil {
-                            Text("Eligibility for a local attestation is unknown for this failure. Its recorded cause remains available, but no local decision is authorized.")
+                            Text(
+                                "Eligibility for a local attestation is unknown for this failure. Its recorded cause remains available, but no local decision is authorized."
+                            )
                         } else if failure.attestable == false {
-                            Text("This operation requires its original authority. A local statement cannot supply consent, credentials or a successful external action.")
+                            Text(
+                                "This operation requires its original authority. A local statement cannot supply consent, credentials or a successful external action."
+                            )
                         } else if inspection.options.isEmpty {
-                            Text("This question declares no decision options, so no local attestation can be recorded.")
+                            Text(
+                                "This question declares no decision options, so no local attestation can be recorded."
+                            )
                         }
                     } else {
-                        Text("No readable latest failure establishes eligibility for a local attestation. Read the recorded causes before deciding how to repair it.")
+                        Text(
+                            "No readable latest failure establishes eligibility for a local attestation. Read the recorded causes before deciding how to repair it."
+                        )
                     }
                     Picker("Explicit decision", selection: $model.choice) {
                         Text("Choose a declared option").tag("")
@@ -83,17 +94,29 @@ struct JudgementSection: View {
                             Text(option).tag(option)
                         }
                     }
-                    TextField("What was checked and why this decision holds", text: $model.reason, axis: .vertical)
-                        .textFieldStyle(.roundedBorder)
+                    TextField(
+                        "What was checked and why this decision holds", text: $model.reason,
+                        axis: .vertical
+                    )
+                    .textFieldStyle(.roundedBorder)
                     HStack {
                         Button("Record local attestation") {
                             Task { await model.run("judgement/attest") }
                         }
-                        .disabled(!model.ready || inspection.failure?.attestable != true || model.choice.isEmpty || model.reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .disabled(
+                            !model.ready || inspection.failure?.attestable != true
+                                || model.choice.isEmpty
+                                || model.reason.trimmingCharacters(in: .whitespacesAndNewlines)
+                                    .isEmpty
+                        )
                         Button("Withdraw local attestation") {
                             Task { await model.run("judgement/revoke") }
                         }
-                        .disabled(!model.ready || (inspection.attestation == nil && inspection.attestationError == nil))
+                        .disabled(
+                            !model.ready
+                                || (inspection.attestation == nil
+                                    && inspection.attestationError == nil)
+                        )
                     }
                     if let attestation = inspection.attestation {
                         VStack(alignment: .leading, spacing: WisentDesign.Space.x2) {
@@ -128,7 +151,8 @@ struct JudgementSection: View {
             WisentAlertPanel(tone: .danger, title: "Caller could not be identified", detail: cause)
         }
         if let cause = failure.priorFailureError {
-            WisentAlertPanel(tone: .danger, title: "Earlier failure state could not be read", detail: cause)
+            WisentAlertPanel(
+                tone: .danger, title: "Earlier failure state could not be read", detail: cause)
         }
     }
 }

@@ -28,11 +28,15 @@ struct TamaClient: Sendable {
         /// The result document decoded as `type`. A schema mismatch keeps the
         /// whole exchange beside the decoder's cause, as a bounded answer's
         /// does, so a consumer never loses the document, exit and output.
-        func decoded<Value: Decodable>(as type: Value.Type, describing description: String) throws -> Value {
+        func decoded<Value: Decodable>(as type: Value.Type, describing description: String) throws
+            -> Value
+        {
             do {
-                return try TamaClient.decode(document, operation: operation, as: type, describing: description)
+                return try TamaClient.decode(
+                    document, operation: operation, as: type, describing: description)
             } catch TamaBackendError.unreadableOutput(let context, let cause) {
-                throw TamaBackendError.unreadableOutput(context, "\(cause)\n\(exchange.diagnostics)")
+                throw TamaBackendError.unreadableOutput(
+                    context, "\(cause)\n\(exchange.diagnostics)")
             }
         }
     }
@@ -92,7 +96,8 @@ struct TamaClient: Sendable {
         } catch {
             throw TamaBackendError.unreadableOutput(
                 "\(description) [\(operation)]",
-                "JSON formatting failed: \(String(reflecting: error))\n\(response.exchange.diagnostics)")
+                "JSON formatting failed: \(String(reflecting: error))\n\(response.exchange.diagnostics)"
+            )
         }
         return String(decoding: pretty, as: UTF8.self)
     }
@@ -112,7 +117,8 @@ struct TamaClient: Sendable {
             operation, body: body, describing: description, onEvent: onEvent)
         switch exchange.end {
         case .result(let status, let document):
-            try Self.validateExit(exchange, expected: status, operation: operation, describing: description)
+            try Self.validateExit(
+                exchange, expected: status, operation: operation, describing: description)
             return JobResult(
                 status: status,
                 document: document,
@@ -157,7 +163,9 @@ struct TamaClient: Sendable {
                 throw Self.refusal(
                     data: document, status: status, operation: operation, exchange: exchange)
             }
-            try Self.validateExit(exchange, expected: Int(EXIT_SUCCESS), operation: operation, describing: description)
+            try Self.validateExit(
+                exchange, expected: Int(EXIT_SUCCESS), operation: operation, describing: description
+            )
             return (document, exchange)
         case .result:
             throw TamaBackendError.unreadableOutput(
@@ -176,7 +184,8 @@ struct TamaClient: Sendable {
     ) throws {
         if exchange.terminationReason == .exit, Int(exchange.exitStatus) == expected { return }
         let error = TamaBackendError.unexpectedExit(
-            "\(description) [\(operation)] expected normal process exit status \(expected) from its terminal event, but observed \(exchange.terminationReason) with status \(exchange.exitStatus).\n\(exchange.diagnostics)")
+            "\(description) [\(operation)] expected normal process exit status \(expected) from its terminal event, but observed \(exchange.terminationReason) with status \(exchange.exitStatus).\n\(exchange.diagnostics)"
+        )
         TamaFailureReporting.report(
             failurePoint: "tama.backend.exit",
             code: TamaFailureReporting.code(for: error),

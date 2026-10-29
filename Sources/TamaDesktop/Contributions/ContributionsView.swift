@@ -65,7 +65,8 @@ final class ContributionsModel: ObservableObject {
         isWorking = true
         defer { isWorking = false }
         do {
-            let answer = try await TamaClient().request(operation, body: body, as: type, describing: describing)
+            let answer = try await TamaClient().request(
+                operation, body: body, as: type, describing: describing)
             failure = nil
             return answer
         } catch {
@@ -92,12 +93,19 @@ struct ContributionsView: View {
     @ObservedObject var model: ContributionsModel
 
     var body: some View {
-        WisentScreen(title: SidebarDestination.contributions.title, scope: "accepted commits credited to their authors") {
+        WisentScreen(
+            title: SidebarDestination.contributions.title,
+            scope: "accepted commits credited to their authors"
+        ) {
             VStack(alignment: .leading, spacing: WisentDesign.Space.x5) {
                 if let failure = model.failure {
                     WisentErrorBanner(title: "Tama refused this", detail: failure)
                 }
-                WisentSectionBox(title: "Range", detail: "Blank ledger uses TAMA_CONTRIBUTION_LEDGER_URL; with none, commits are listed without asking") {
+                WisentSectionBox(
+                    title: "Range",
+                    detail:
+                        "Blank ledger uses TAMA_CONTRIBUTION_LEDGER_URL; with none, commits are listed without asking"
+                ) {
                     VStack(alignment: .leading, spacing: WisentDesign.Space.x2) {
                         TextField("Repository path", text: $model.repository)
                         TextField("Remote branch, e.g. origin/main", text: $model.reference)
@@ -121,7 +129,11 @@ struct ContributionsView: View {
         WisentSectionBox(title: "Accepted commits", detail: "\(events.count) commits") {
             VStack(alignment: .leading, spacing: WisentDesign.Space.x2) {
                 ForEach(events) { event in
-                    WisentField(label: event.sourceEventId, value: "\(event.contributorId) · \(event.occurredAt) · \(heldText(event.held))")
+                    WisentField(
+                        label: event.sourceEventId,
+                        value:
+                            "\(event.contributorId) · \(event.occurredAt) · \(heldText(event.held))"
+                    )
                 }
             }
         }
@@ -131,7 +143,8 @@ struct ContributionsView: View {
     /// a report refused in part is answered whole, each refusal on its line.
     private func sent(_ report: ContributionReport) -> some View {
         let refused = report.events.filter { $0.refused != nil }.count
-        let detail = "\(report.events.count - refused) recorded, \(refused) refused, \(report.held.count) already held by \(report.ledger)"
+        let detail =
+            "\(report.events.count - refused) recorded, \(refused) refused, \(report.held.count) already held by \(report.ledger)"
         return WisentSectionBox(title: "Last report", detail: detail) {
             VStack(alignment: .leading, spacing: WisentDesign.Space.x2) {
                 ForEach(report.events) { outcome in
@@ -144,8 +157,14 @@ struct ContributionsView: View {
     /// Tama links no one: an author links their address on the Rewards page,
     /// where the account's own verified email is the proof.
     private var linkSection: some View {
-        WisentSectionBox(title: "Linking an author", detail: "Until an author's email is linked to a Wisent account, the ledger credits nobody for their commits") {
-            Text("An author links their own address with Link my email for Tama on the Rewards page of compute.wisent.com, which takes the account's verified email; nobody can link an address that is not theirs.")
+        WisentSectionBox(
+            title: "Linking an author",
+            detail:
+                "Until an author's email is linked to a Wisent account, the ledger credits nobody for their commits"
+        ) {
+            Text(
+                "An author links their own address with Link my email for Tama on the Rewards page of compute.wisent.com, which takes the account's verified email; nobody can link an address that is not theirs."
+            )
         }
     }
 
@@ -159,8 +178,8 @@ struct ContributionsView: View {
 
     private func outcomeText(_ outcome: ContributionOutcome) -> String {
         switch (outcome.answer, outcome.refused) {
-        case let (.some(answer), _): answer.recorded ? "recorded" : "already recorded"
-        case let (.none, .some(refusal)): "refused: \(refusal)"
+        case (.some(let answer), _): answer.recorded ? "recorded" : "already recorded"
+        case (.none, .some(let refusal)): "refused: \(refusal)"
         case (.none, .none): "the ledger's answer carries neither a record nor a refusal"
         }
     }

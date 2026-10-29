@@ -147,7 +147,8 @@ struct AttestationSection: View {
                 if let named = standard.standard.mustName {
                     ForEach(named, id: \.key) { list in
                         VStack(alignment: .leading) {
-                            Text("\(list.key) names at least one item").font(WisentTypeScale.identifierSmall())
+                            Text("\(list.key) names at least one item").font(
+                                WisentTypeScale.identifierSmall())
                             Text(list.why).font(WisentTypeScale.caption())
                                 .foregroundStyle(WisentDesign.muted)
                         }

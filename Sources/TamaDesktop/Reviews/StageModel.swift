@@ -58,7 +58,9 @@ final class StageModel: ObservableObject {
         report = nil
         failure = nil
         defer { running = false }
-        var body: [String: Any] = ["session": session, "repository": repository, "inspect": inspect]
+        var body: [String: Any] = [
+            "session": session, "repository": repository, "inspect": inspect,
+        ]
         let selected = selectedPaths
         if !selected.isEmpty {
             body["paths"] = selected

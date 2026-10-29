@@ -70,7 +70,8 @@ enum TamaFailureReporting {
     static func isReportedAtOrigin(_ error: Error) -> Bool {
         guard let failure = error as? TamaBackendError else { return false }
         return switch failure {
-        case .refused, .startFailed, .backendMissing, .cancelled, .inputFailed, .outputFailed, .unexpectedExit:
+        case .refused, .startFailed, .backendMissing, .cancelled, .inputFailed, .outputFailed,
+            .unexpectedExit:
             true
         case .endedWithoutAnswer, .unreadableOutput:
             false

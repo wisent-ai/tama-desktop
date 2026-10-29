@@ -253,22 +253,24 @@ final class RequestRun: @unchecked Sendable {
             () -> (CheckedContinuation<TamaExchange, Error>, Result<TamaExchange, Error>)? in
             change()
             guard open.isEmpty, let exitStatus, let terminationReason,
-                let waiting = continuation else { return nil }
+                let waiting = continuation
+            else { return nil }
             continuation = nil
             if cancelled { return (waiting, .failure(CancellationError())) }
             return (
                 waiting,
-                .success(TamaExchange(
-                    end: end,
-                    stdoutText: stdoutText,
-                    stderrText: stderrText,
-                    processError: String(decoding: processError, as: UTF8.self),
-                    exitStatus: exitStatus,
-                    terminationReason: terminationReason,
-                    unreadableEvents: unreadableEvents,
-                    inputErrors: inputErrors,
-                    outputErrors: outputErrors
-                ))
+                .success(
+                    TamaExchange(
+                        end: end,
+                        stdoutText: stdoutText,
+                        stderrText: stderrText,
+                        processError: String(decoding: processError, as: UTF8.self),
+                        exitStatus: exitStatus,
+                        terminationReason: terminationReason,
+                        unreadableEvents: unreadableEvents,
+                        inputErrors: inputErrors,
+                        outputErrors: outputErrors
+                    ))
             )
         }
         guard let ready else { return }

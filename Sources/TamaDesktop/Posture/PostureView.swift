@@ -206,7 +206,8 @@ struct PostureView: View {
 
     private func blockingTitle(_ event: SemanticEventSummary) -> String {
         guard let hook = event.blockedHookId else {
-            return "The runtime recorded a block of \(event.event) at \(event.timestamp) without naming its hook"
+            return
+                "The runtime recorded a block of \(event.event) at \(event.timestamp) without naming its hook"
         }
         return "\(hook) blocked \(event.event) at \(event.timestamp)"
     }
