@@ -3,8 +3,8 @@ import Foundation
 
 struct SessionControlClient: Sendable {
     /// An agent id is a short lowercase word; a control key is a 256-bit hex string.
-    private static let maximumAgentIdLength = 32
-    private static let controlKeyHexLength = 64
+    static let maximumAgentIdLength = 32
+    static let controlKeyHexLength = 64
 
     private static let schema = "ai.wisent.tama.session-control.v2"
     private static let legacySchema = "ai.wisent.tama.session-control.v1"
@@ -67,10 +67,19 @@ struct SessionControlClient: Sendable {
                 unreadable.append("\(url.path): \(error)")
                 continue
             }
-            guard
-                isSafeAgentId(session.agentId),
-                isSafeControlKey(session.controlKey)
-            else {
+            // A record whose agent id or control key Tama will not address is
+            // named with the value it refused, never dropped: dropping it made
+            // a running session vanish from the Session screen.
+            guard isSafeAgentId(session.agentId) else {
+                unreadable.append(
+                    "\(url.path): agent id \(session.agentId.debugDescription) is not a lowercase word of at most \(Self.maximumAgentIdLength) characters"
+                )
+                continue
+            }
+            guard isSafeControlKey(session.controlKey) else {
+                unreadable.append(
+                    "\(url.path): control key is not \(Self.controlKeyHexLength) hexadecimal characters"
+                )
                 continue
             }
             // A record whose liveness cannot be told is listed with its reason
@@ -134,10 +143,14 @@ struct SessionControlClient: Sendable {
             )
         }
         let updated = try performRequest(session: session, operation: "reload-adapter")
-        guard updated.pid == session.pid,
-            let digest = updated.runtime?.adapterDigest, !digest.isEmpty
-        else {
-            throw SessionControlError.invalidResponse
+        guard updated.pid == session.pid else {
+            throw SessionControlError.invalidResponse(
+                "the reloaded session answers from \(Self.processLabel(updated.pid)), not \(Self.processLabel(session.pid))"
+            )
+        }
+        guard let digest = updated.runtime?.adapterDigest, !digest.isEmpty else {
+            throw SessionControlError.invalidResponse(
+                "the reloaded session reports no loaded adapter digest")
         }
         return updated
     }
@@ -202,30 +215,37 @@ struct SessionControlClient: Sendable {
                         from: Data(contentsOf: responseURL)
                     )
                 } catch {
-                    throw SessionControlError.invalidResponse
+                    throw SessionControlError.invalidResponse(
+                        "\(responseURL.path) cannot be read as a response: \(error)")
                 }
-                guard
-                    response.schema == Self.schema,
-                    response.requestId == requestID
-                else {
-                    throw SessionControlError.invalidResponse
-                }
-                guard response.ok else {
-                    throw SessionControlError.requestRejected(
-                        response.error ?? "unknown-runtime-error"
+                guard response.schema == Self.schema, response.requestId == requestID else {
+                    throw SessionControlError.invalidResponse(
+                        "\(responseURL.path) answers request \(response.requestId) of schema \(response.schema), not request \(requestID) of schema \(Self.schema)"
                     )
                 }
+                guard response.ok else {
+                    guard let reason = response.error else {
+                        throw SessionControlError.invalidResponse(
+                            "\(responseURL.path) refuses the request without stating why")
+                    }
+                    throw SessionControlError.requestRejected(reason)
+                }
+                guard let state = response.state else {
+                    throw SessionControlError.invalidResponse(
+                        "\(responseURL.path) accepts the request without the session's state")
+                }
                 guard
-                    let state = response.state,
                     state.schema == Self.schema,
                     state.agentId == session.agentId,
                     state.sessionId == session.sessionId,
-                    state.controlKey == session.controlKey,
-                    isSafeAgentId(state.agentId),
-                    isSafeControlKey(state.controlKey),
-                    sessionIsLive(state, now: Date())
+                    state.controlKey == session.controlKey
                 else {
-                    throw SessionControlError.invalidResponse
+                    throw SessionControlError.invalidResponse(
+                        "\(responseURL.path) answers with \(state.agentId) session \(state.sessionId) of schema \(state.schema), not \(session.agentId) session \(session.sessionId)"
+                    )
+                }
+                guard sessionIsLive(state, now: Date()) else {
+                    throw SessionControlError.sessionEnded
                 }
                 return state
             }
@@ -270,69 +290,4 @@ struct SessionControlClient: Sendable {
         }
         return root
     }
-
-    private func sessionIsLive(_ session: AgentSessionRecord, now: Date) -> Bool {
-        switch session.livenessMode {
-        case "process":
-            guard let pid = session.pid else { return false }
-            return processIsAlive(pid)
-        case "heartbeat":
-            guard let updated = Self.date(from: session.updatedAt),
-                let ttl = session.heartbeatTTLSeconds
-            else { return false }
-            return updated.addingTimeInterval(TimeInterval(ttl)) >= now
-        default:
-            return false
-        }
-    }
-
-    private static func date(from value: String) -> Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: value) ?? ISO8601DateFormatter().date(from: value)
-    }
-
-    private func processIsAlive(_ pid: Int32) -> Bool {
-        guard pid > 0 else { return false }
-        if Darwin.kill(pid_t(pid), 0) == 0 { return true }
-        return errno == EPERM
-    }
-
-    private func isSafeAgentId(_ value: String) -> Bool {
-        guard let first = value.first, first.isASCII, first.isLetter,
-            value.count <= Self.maximumAgentIdLength
-        else {
-            return false
-        }
-        return value.allSatisfy { character in
-            character.isASCII && (character.isLowercase || character.isNumber || character == "-")
-        }
-    }
-
-    private func isSafeControlKey(_ value: String) -> Bool {
-        value.count == Self.controlKeyHexLength && value.allSatisfy(\.isHexDigit)
-    }
-}
-
-struct SessionControlSchemaEnvelope: Decodable {
-    let schema: String
-}
-
-struct SessionControlRequest: Encodable {
-    let schema: String
-    let sessionId: String
-    let controlKey: String
-    let requestId: String
-    let confirmed: Bool
-    let operation: String
-    let hookId: String?
-    let enabled: Bool?
-}
-
-struct SessionControlResponse: Decodable {
-    let schema: String
-    let requestId: String
-    let ok: Bool
-    let error: String?
-    let state: AgentSessionRecord?
 }

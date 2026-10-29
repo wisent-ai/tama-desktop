@@ -104,7 +104,8 @@ extension AppModel {
             }.value
             self.merge(updated)
             guard let digest = updated.runtime?.adapterDigest else {
-                throw SessionControlError.invalidResponse
+                throw SessionControlError.invalidResponse(
+                    "session \(session.sessionId) reloaded without reporting its adapter digest")
             }
             return
                 "Session \(session.sessionId) loaded adapter \(digest) without replacing its process."
@@ -135,7 +136,8 @@ extension AppModel {
             }.value
             self.merge(updated)
             guard let inspection = updated.runtime?.runningHooks else {
-                throw SessionControlError.invalidResponse
+                throw SessionControlError.invalidResponse(
+                    "session \(session.sessionId) answered the inspection without its running hooks")
             }
             return
                 "Inspected \(inspection.running.count) hook records; orphan termination outcomes are shown in Session."

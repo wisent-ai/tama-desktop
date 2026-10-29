@@ -3,7 +3,9 @@ import Foundation
 
 enum SessionControlError: LocalizedError {
     case invalidSession
-    case invalidResponse
+    /// What about the runtime's answer was wrong: the response file, the
+    /// field and the value it held.
+    case invalidResponse(String)
     case legacySessionRecords
     case recordsUnreadable([String])
     case requestRejected(String)
@@ -14,8 +16,8 @@ enum SessionControlError: LocalizedError {
         switch self {
         case .invalidSession:
             "Tama rejected an invalid agent session control endpoint."
-        case .invalidResponse:
-            "The agent runtime returned an invalid session-control response."
+        case .invalidResponse(let cause):
+            "The agent runtime returned an invalid session-control response: \(cause)"
         case .legacySessionRecords:
             "Tama found only legacy v1 session records. Reinstall the verified bundled runtime, then stop or resume the affected agent session to publish v2 state."
         case .recordsUnreadable(let records):
