@@ -28,9 +28,9 @@ struct LearningProposal: Decodable, Identifiable, Sendable {
     /// a placeholder.
     var seenSpan: String {
         switch (first, last) {
-        case let (first?, last?): "\(first) – \(last)"
-        case let (first?, nil): "first seen \(first), last sighting not recorded"
-        case let (nil, last?): "first sighting not recorded, last seen \(last)"
+        case (let first?, let last?): "\(first) – \(last)"
+        case (let first?, nil): "first seen \(first), last sighting not recorded"
+        case (nil, let last?): "first sighting not recorded, last seen \(last)"
         case (nil, nil): "sightings not dated"
         }
     }

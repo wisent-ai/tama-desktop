@@ -137,7 +137,8 @@ extension AppModel {
             self.merge(updated)
             guard let inspection = updated.runtime?.runningHooks else {
                 throw SessionControlError.invalidResponse(
-                    "session \(session.sessionId) answered the inspection without its running hooks")
+                    "session \(session.sessionId) answered the inspection without its running hooks"
+                )
             }
             return
                 "Inspected \(inspection.running.count) hook records; orphan termination outcomes are shown in Session."
