@@ -29,6 +29,11 @@ struct StageView: View {
                 text: $model.task
             )
             .disabled(model.running)
+            Toggle(
+                "Read the index from HEAD first (an index read on an older HEAD takes back no later commit)",
+                isOn: $model.fromHead
+            )
+            .disabled(model.running)
             HStack {
                 Button("Inspect changes") { Task { await model.run(inspect: true) } }
                 Button("Stage session changes") { Task { await model.run(inspect: false) } }

@@ -29,6 +29,9 @@ final class StageModel: ObservableObject {
     /// The Oko task this session took over from a stopped co-author, as
     /// `tama stage --task` takes it; empty names none.
     @Published var task = ""
+    /// Read the index from HEAD before staging, as `tama stage --from-head`
+    /// does, so an index read on an older HEAD takes back no later commit.
+    @Published var fromHead = false
     @Published private(set) var running = false
     @Published private(set) var report: StageReport?
     @Published private(set) var failure: String?
@@ -72,6 +75,9 @@ final class StageModel: ObservableObject {
         let takenTask = task.trimmingCharacters(in: .whitespacesAndNewlines)
         if !takenTask.isEmpty {
             body["task"] = takenTask
+        }
+        if fromHead {
+            body["fromHead"] = true
         }
         do {
             report = try await TamaClient().request(
