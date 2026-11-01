@@ -19,6 +19,9 @@ struct Admission: Decodable, Sendable, Hashable {
     let tree: String
     let committer: AdmissionCommitter?
     let rounds: String?
+    /// The defect or task the committing session's scope named; none is a
+    /// commit no declared item covers.
+    let item: String?
     let admittedAt: String
     let committedAt: String
 }
@@ -101,7 +104,18 @@ struct AdmittedCommitView: View {
             )
             .textSelection(.enabled)
         } else {
-            Text("Committed by the operator: no agent session made it")
+            Text(
+                "Committed by no one named agent session: the operator's own commit, or one whose session could not be told when it was admitted"
+            )
+        }
+        if let item = admission.item {
+            Text("Made for \(item)").textSelection(.enabled)
+        } else {
+            WisentAlertPanel(
+                tone: .warning, title: "Made for no item",
+                detail:
+                    "The committing session's scope named no defect or task, or no session was named."
+            )
         }
         if let parent = admission.parent {
             Text("Commit \(admission.commit) (tree \(admission.tree)) after \(parent)")
