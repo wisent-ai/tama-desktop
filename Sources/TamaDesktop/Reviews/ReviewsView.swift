@@ -23,6 +23,7 @@ struct ReviewsView: View {
                         IndexRepairView()
                         HarshRoundsView()
                         AdmittedCommitView()
+                        UntrackedCommitsView()
                         AdmissionCutoverView()
                     }
                 }
