@@ -23,6 +23,14 @@ struct ReminderPhraseEntry: Decodable, Identifiable, Sendable {
     }
 }
 
+/// `tama reminder-phrase list --json`: every phrase, and why Oko's
+/// open-defect register could not be read when it could not (then every
+/// phrase applies).
+struct ReminderPhrases: Decodable, Sendable {
+    let entries: [ReminderPhraseEntry]
+    let unread: String?
+}
+
 struct ReminderPhraseAdded: Decodable, Sendable {
     let id: String
     let sentence: String

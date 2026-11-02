@@ -1,10 +1,11 @@
 import Foundation
 
 /// The writes of the Model service section: declaring that this machine has
-/// no model and returning Tama to Brama. Each is the terminal's own command
-/// as a request (`tama model set --none`, `unset`), so a refusal
-/// shows the sentence the terminal prints. The attestations Tama then reads
-/// are `AttestationModel`'s.
+/// no model, and removing that declaration so Tama hands its requests to
+/// Stado's inference alternatives. Each is the terminal's own command as a
+/// request (`tama model set --none`, `unset`), so a refusal shows the
+/// sentence the terminal prints. The attestations Tama then reads are
+/// `AttestationModel`'s.
 @MainActor
 final class ModelChoiceModel: ObservableObject {
     @Published private(set) var working: String?
@@ -20,8 +21,10 @@ final class ModelChoiceModel: ObservableObject {
     }
 
     /// `tama model unset`, then the service read again.
-    func returnToBrama(then reload: @escaping () async -> Void) {
-        change("Returning Tama to Brama", "model-provider/unset", body: [:], then: reload)
+    func useStadoAlternatives(then reload: @escaping () async -> Void) {
+        change(
+            "Handing Tama's requests to Stado's alternatives", "model-provider/unset", body: [:],
+            then: reload)
     }
 
     private func change(

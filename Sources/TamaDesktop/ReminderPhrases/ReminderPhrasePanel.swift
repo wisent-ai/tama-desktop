@@ -56,7 +56,7 @@ struct ReminderPhrasePanel: View {
                         Spacer()
                         Text(entry.applies ? "applies" : "repaired: no longer applies")
                             .font(WisentTypeScale.caption())
-                            .foregroundStyle(entry.applies ? nil : WisentDesign.secondary)
+                            .foregroundStyle(entry.applies ? WisentDesign.ink : WisentDesign.secondary)
                         Button("Remove") { Task { await remove(entry) } }.disabled(busy)
                     }
                 }

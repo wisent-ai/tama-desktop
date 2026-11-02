@@ -9,9 +9,10 @@ import WisentDesignSystem
 /// plan is read-only: this screen states target paths, and performs none of
 /// the changes. The model service row is `tama model show` and
 /// `check`: which service is asked and whether it accepts this machine. The
-/// sections under it are the ones that write: declaring no model or
-/// returning to Brama (`ModelChoiceSection`), and recording, showing and
-/// removing the attestations Tama reads with no model (`AttestationSection`).
+/// sections under it are the ones that write: declaring no model or handing
+/// requests to Stado's alternatives (`ModelChoiceSection`), and recording,
+/// showing and removing the attestations Tama reads with no model
+/// (`AttestationSection`).
 struct InstallPlanView: View {
     @ObservedObject var inspection: InspectionModel
 
