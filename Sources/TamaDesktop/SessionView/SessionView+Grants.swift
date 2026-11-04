@@ -241,8 +241,7 @@ extension SessionView {
                                     ? session.enabledHookIds.isEmpty
                                         ? "None"
                                         : session.enabledHookIds.joined(separator: ", ")
-                                    : session.disabledHookIds.isEmpty
-                                        ? "All" : "\(session.disabledHookIds.count) disabled"
+                                    : "All"
                             )
                             .font(WisentTypeScale.identifierSmall())
                             .foregroundStyle(WisentDesign.secondary)

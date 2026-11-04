@@ -36,7 +36,6 @@ struct HookRuntimeStatus: Codable, Sendable, Equatable {
     let catalogChecksum: String?
     let registeredHookCount: Int
     let loadedHookCount: Int
-    let disabledHookIds: [String]
     let enabledHookIds: [String]
     let unknownHookIds: [String]
     let reloadRequired: Bool
@@ -151,7 +150,6 @@ struct AgentSessionRecord: Decodable, Identifiable, Sendable {
     /// Why liveness cannot be told, present in `unknown` mode.
     let livenessError: String?
     let globallyDisabled: Bool
-    let disabledHookIds: [String]
     let enabledHookIds: [String]
     let capability: SessionCapability?
     let runtime: HookRuntimeStatus?
@@ -173,10 +171,10 @@ struct AgentSessionRecord: Decodable, Identifiable, Sendable {
         return "\(agentDisplayName) · \(project.isEmpty ? cwd : project) · \(sessionId.prefix(8))"
     }
 
+    /// Whether `hookId` runs in this session. A session only ever adds hooks to
+    /// the machine's selection; under the emergency switch only those it added run.
     func isHookEnabled(_ hookId: String) -> Bool {
-        globallyDisabled
-            ? enabledHookIds.contains(hookId)
-            : !disabledHookIds.contains(hookId)
+        !globallyDisabled || enabledHookIds.contains(hookId)
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -190,7 +188,6 @@ struct AgentSessionRecord: Decodable, Identifiable, Sendable {
         case heartbeatTTLSeconds
         case livenessError
         case globallyDisabled
-        case disabledHookIds
         case enabledHookIds
         case capability
         case runtime
@@ -211,7 +208,6 @@ struct AgentSessionRecord: Decodable, Identifiable, Sendable {
         heartbeatTTLSeconds = try values.decodeIfPresent(Int.self, forKey: .heartbeatTTLSeconds)
         livenessError = try values.decodeIfPresent(String.self, forKey: .livenessError)
         globallyDisabled = try values.decode(Bool.self, forKey: .globallyDisabled)
-        disabledHookIds = try values.decode([String].self, forKey: .disabledHookIds)
         enabledHookIds = try values.decode([String].self, forKey: .enabledHookIds)
         capability = try values.decodeIfPresent(SessionCapability.self, forKey: .capability)
         runtime = try values.decodeIfPresent(HookRuntimeStatus.self, forKey: .runtime)

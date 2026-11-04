@@ -71,7 +71,6 @@ final class AppModel: ObservableObject {
                 && runtime.loadedHookCount == runtime.registeredHookCount
                 && runtime.unknownHookIds.isEmpty
                 && !session.globallyDisabled
-                && session.disabledHookIds.isEmpty
                 && policy.ready
                 && policy.mode == "kernel-gated"
                 && policy.error == nil

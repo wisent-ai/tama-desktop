@@ -212,10 +212,7 @@ struct SessionView: View {
 
     func counters(_ session: AgentSessionRecord) -> some View {
         let runtime = session.runtime
-        let overrides =
-            session.globallyDisabled
-            ? session.enabledHookIds.count
-            : session.disabledHookIds.count
+        let overrides = session.enabledHookIds.count
         return WisentCounterRow(counters: [
             WisentCounterRow.Counter(
                 "Available",
@@ -234,8 +231,7 @@ struct SessionView: View {
             WisentCounterRow.Counter(
                 "Overrides",
                 value: overrides.formatted(.number),
-                detail: session.globallyDisabled
-                    ? "Selected for this session" : "Disabled for this session",
+                detail: "Added for this session",
                 tone: overrides == .zero ? .neutral : .warning
             ),
             WisentCounterRow.Counter(
