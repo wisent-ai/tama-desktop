@@ -170,13 +170,21 @@ struct SessionControlClient: Sendable {
     ) throws -> AgentSessionRecord {
         let manager = FileManager.default
         let root = try controlRoot(manager: manager, create: true)
+        // The session lists only its own request directory (the OMP
+        // adapter's `sessionRequestDirectory`), not the control directory
+        // every session's records share.
+        let requests =
+            root
+            .appendingPathComponent("requests", isDirectory: true)
+            .appendingPathComponent(session.controlKey, isDirectory: true)
+        try manager.createDirectory(
+            at: requests,
+            withIntermediateDirectories: true,
+            attributes: [.posixPermissions: Self.privateDirectoryPermissions]
+        )
         let requestID = UUID().uuidString.lowercased()
-        let requestURL = root.appendingPathComponent(
-            "\(session.controlKey).\(requestID).request.json"
-        )
-        let responseURL = root.appendingPathComponent(
-            "\(session.controlKey).\(requestID).response.json"
-        )
+        let requestURL = requests.appendingPathComponent("\(requestID).request.json")
+        let responseURL = requests.appendingPathComponent("\(requestID).response.json")
         defer {
             try? manager.removeItem(at: requestURL)
             try? manager.removeItem(at: responseURL)
@@ -194,7 +202,7 @@ struct SessionControlClient: Sendable {
         // Armed before the request is written, so the runtime's answer cannot
         // land between writing and watching.
         let watch = try ControlDirectoryWatch(
-            directory: root,
+            directory: requests,
             processes: session.livenessMode == "process" ? [session.pid].compactMap { $0 } : []
         )
         let encoder = JSONEncoder()
