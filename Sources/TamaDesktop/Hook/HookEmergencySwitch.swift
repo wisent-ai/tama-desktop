@@ -111,50 +111,26 @@ struct HookEmergencySwitch: @unchecked Sendable {
         }
     }
 
-    /// Throw or lift the switch. A disable names its reason and how many
-    /// minutes it holds; the switch records the account that threw it, and
-    /// the hooks run again once the minutes have passed.
+    /// Throw or lift the switch through the bundled release's own `tama
+    /// enforcement emergency on|off`. A disable names its reason and how many
+    /// minutes it holds; `tama` records the account that threw it and
+    /// schedules the hooks' return once the minutes have passed.
     func setDisabled(_ disabled: Bool, reason: String = "", minutes: Int = 0) throws {
-        guard
-            let scriptURL = Bundle.main.url(
-                forResource: "emergency_disable_hooks",
-                withExtension: nil
-            )
-        else {
-            throw HookEmergencyError.scriptMissing
-        }
-
-        var environment = ProcessInfo.processInfo.environment
-        environment["TAMA_EMERGENCY_ACTION"] = disabled ? "disable" : "enable"
+        let (installerURL, releaseURL) = try bundledRelease()
+        var arguments = ["enforcement", "emergency", disabled ? "on" : "off"]
         if disabled {
-            environment["TAMA_EMERGENCY_SET_BY"] = NSUserName()
-            environment["TAMA_EMERGENCY_REASON"] = reason
-            environment["TAMA_EMERGENCY_MINUTES"] = String(minutes)
+            arguments += ["--reason", reason, "--minutes", String(minutes)]
         }
+        arguments += ["--release", releaseURL.path, "--home", NSHomeDirectory()]
         try runCommand(
-            executableURL: URL(fileURLWithPath: "/bin/sh"),
-            arguments: [scriptURL.path],
-            environment: environment
+            executableURL: installerURL,
+            arguments: arguments,
+            environment: ProcessInfo.processInfo.environment
         )
     }
-    func installSessionController() throws {
-        guard let resourcesURL = Bundle.main.resourceURL else {
-            throw HookEmergencyError.controllerInstallerMissing
-        }
-        let releaseURL = resourcesURL.appendingPathComponent(
-            "hooks-release",
-            isDirectory: true
-        )
-        // The approved release's own `tama` is its installer.
-        let installerURL = releaseURL.appendingPathComponent("bin/tama")
-        guard manager.isExecutableFile(atPath: installerURL.path) else {
-            throw HookEmergencyError.controllerInstallerMissing
-        }
-        guard manager.fileExists(atPath: releaseURL.appendingPathComponent("release.json").path)
-        else {
-            throw HookEmergencyError.controllerReleaseMissing
-        }
 
+    func installSessionController() throws {
+        let (installerURL, releaseURL) = try bundledRelease()
         try runCommand(
             executableURL: installerURL,
             arguments: [
@@ -165,6 +141,24 @@ struct HookEmergencySwitch: @unchecked Sendable {
             ],
             environment: ProcessInfo.processInfo.environment
         )
+    }
+
+    /// The approved release bundled in the app and its own `tama`, which
+    /// installs it and runs the switch.
+    private func bundledRelease() throws -> (tama: URL, release: URL) {
+        guard let resourcesURL = Bundle.main.resourceURL else {
+            throw HookEmergencyError.controllerInstallerMissing
+        }
+        let releaseURL = resourcesURL.appendingPathComponent("hooks-release", isDirectory: true)
+        let installerURL = releaseURL.appendingPathComponent("bin/tama")
+        guard manager.isExecutableFile(atPath: installerURL.path) else {
+            throw HookEmergencyError.controllerInstallerMissing
+        }
+        guard manager.fileExists(atPath: releaseURL.appendingPathComponent("release.json").path)
+        else {
+            throw HookEmergencyError.controllerReleaseMissing
+        }
+        return (installerURL, releaseURL)
     }
 
     private func runCommand(
@@ -236,7 +230,6 @@ struct HookEmergencySwitch: @unchecked Sendable {
 
 enum HookEmergencyError: LocalizedError {
     case stateDidNotPersist
-    case scriptMissing
     case controllerInstallerMissing
     case controllerReleaseMissing
     case commandFailed(String)
@@ -247,12 +240,10 @@ enum HookEmergencyError: LocalizedError {
         switch self {
         case .stateDidNotPersist:
             "Tama could not persist the emergency hook state."
-        case .scriptMissing:
-            "The Tama bundle does not contain the emergency hook controller."
         case .controllerInstallerMissing:
-            "The Tama bundle does not contain the agent session-controller installer."
+            "The Tama bundle does not contain the bundled hook release's tama, which runs the emergency switch and installs agent session control."
         case .controllerReleaseMissing:
-            "The Tama bundle does not contain an approved hook release for agent session control."
+            "The Tama bundle does not contain an approved hook release for the emergency switch and agent session control."
         case .commandFailed(let message):
             message.isEmpty
                 ? "Tama could not update the installed hook configuration."
