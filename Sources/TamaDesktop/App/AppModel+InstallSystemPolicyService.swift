@@ -20,28 +20,32 @@ extension AppModel {
             self.systemPolicyServiceStatus = await SystemPolicyServiceManager().status()
         }
     }
-    func deactivateLocalSetup() {
+    /// Turns off every hook and the privileged backend for `minutes`, recording
+    /// `reason` and this account on the switch.
+    func deactivateLocalSetup(reason: String, minutes: Int) {
         mutate("Deactivating the local policy setup…") {
             try await Task.detached(priority: .userInitiated) {
-                try HookEmergencySwitch().setDisabled(true)
+                try HookEmergencySwitch().setDisabled(true, reason: reason, minutes: minutes)
             }.value
             self.refreshLocalPolicyState()
             let status = try await SystemPolicyServiceManager().unregister()
             self.systemPolicyServiceStatus = status
-            return "Managed dispatchers disabled. Privileged backend: \(status)."
+            return "Managed dispatchers disabled for \(minutes) minutes. Privileged backend: \(status)."
         } recover: {
             self.refreshLocalPolicyState()
             self.systemPolicyServiceStatus = await SystemPolicyServiceManager().status()
         }
     }
-    func setHooksDisabled(_ disabled: Bool) {
+    /// Throws the switch for `minutes` with `reason`, or lifts it; a lift
+    /// takes neither.
+    func setHooksDisabled(_ disabled: Bool, reason: String = "", minutes: Int = 0) {
         let verb =
             disabled
             ? "Disabling every managed hook dispatcher…"
             : "Verifying the bundled release and restoring every managed dispatcher…"
         mutate(verb) {
             try await Task.detached(priority: .userInitiated) {
-                try HookEmergencySwitch().setDisabled(disabled)
+                try HookEmergencySwitch().setDisabled(disabled, reason: reason, minutes: minutes)
             }.value
             self.refreshLocalPolicyState()
             if let failure = self.localPolicyStateError {
@@ -197,8 +201,10 @@ extension AppModel {
     func refreshLocalPolicyState() {
         var failures: [String] = []
         do {
-            hooksDisabledState = try emergencySwitch.disabledState()
+            emergencyRecord = try emergencySwitch.record()
+            hooksDisabledState = emergencyRecord?.holds == true
         } catch {
+            emergencyRecord = nil
             hooksDisabledState = nil
             failures.append(Self.sentence(error))
         }

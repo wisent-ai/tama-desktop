@@ -56,23 +56,32 @@ extension SettingsView {
     /// restart before the System Extension is actually gone. What ran unchecked
     /// in between cannot be recalled.
     var deactivationDecision: some View {
-        WisentDecisionDialog(
-            tone: .danger,
-            title: "Turn off policy protection on this machine",
-            lines: [
-                "Unsafe actions will no longer be blocked.",
-                "Current sessions will keep running without policy checks.",
-                "macOS may require a restart.",
-            ],
-            actions: [
-                WisentAction("Turn off protection", kind: .destructive) {
-                    isDecidingDeactivation = false
-                    model.deactivateLocalSetup()
-                },
-                WisentAction("Keep protection", kind: .primary) {
-                    isDecidingDeactivation = false
-                },
-            ]
-        )
+        VStack(alignment: .leading, spacing: WisentDesign.Space.x3) {
+            WisentDecisionDialog(
+                tone: .danger,
+                title: "Turn off policy protection on this machine",
+                lines: [
+                    "Unsafe actions will no longer be blocked.",
+                    "Current sessions will keep running without policy checks.",
+                    "The hooks return by themselves when the time below has passed.",
+                    "macOS may require a restart.",
+                ],
+                actions: [
+                    WisentAction(
+                        "Turn off protection", kind: .destructive,
+                        isEnabled: deactivationTerms.isComplete
+                    ) {
+                        isDecidingDeactivation = false
+                        if let reason = deactivationTerms.statedReason {
+                            model.deactivateLocalSetup(reason: reason, minutes: deactivationTerms.minutes)
+                        }
+                    },
+                    WisentAction("Keep protection", kind: .primary) {
+                        isDecidingDeactivation = false
+                    },
+                ]
+            )
+            HookEmergencyTermsFields(terms: $deactivationTerms)
+        }
     }
 }

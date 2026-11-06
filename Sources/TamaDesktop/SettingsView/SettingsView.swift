@@ -14,6 +14,7 @@ struct SettingsView: View {
     let continueToSignIn: (() -> Void)?
 
     @State var isDecidingDeactivation = false
+    @State var deactivationTerms = HookEmergencyTerms()
     @State var walkthroughOutcome: WalkthroughOutcome?
     @State var isReopeningWalkthrough = false
 

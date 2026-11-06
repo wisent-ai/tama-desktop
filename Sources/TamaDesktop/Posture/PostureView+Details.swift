@@ -246,17 +246,20 @@ extension PostureView {
     /// approved release, and everything the policy would have stopped in the
     /// meantime is already done. That earns a dialog, not a toolbar button.
     var bypassDecision: some View {
-        WisentDecisionDialog(
-            tone: .danger,
-            title: "Disable all policies on this machine",
-            lines: [
-                "Unsafe actions will no longer be blocked.",
-                "Current sessions will keep running.",
-                "Re-enable the policies to restore protection.",
-            ],
-            listing: model.hooks.filter(\.isBlocking).map(\.id),
-            actions: bypassActions
-        )
+        VStack(alignment: .leading, spacing: WisentDesign.Space.x3) {
+            WisentDecisionDialog(
+                tone: .danger,
+                title: "Disable all policies on this machine",
+                lines: [
+                    "Unsafe actions will no longer be blocked.",
+                    "Current sessions will keep running.",
+                    "The policies return by themselves when the time below has passed.",
+                ],
+                listing: model.hooks.filter(\.isBlocking).map(\.id),
+                actions: bypassActions
+            )
+            HookEmergencyTermsFields(terms: $bypassTerms)
+        }
     }
 
     /// The safe verb keeps the primary button and the rightmost position; the
@@ -272,9 +275,11 @@ extension PostureView {
             )
         }
         actions.append(
-            WisentAction("Disable all policies", kind: .destructive) {
+            WisentAction("Disable all policies", kind: .destructive, isEnabled: bypassTerms.isComplete) {
                 isDecidingBypass = false
-                model.setHooksDisabled(true)
+                if let reason = bypassTerms.statedReason {
+                    model.setHooksDisabled(true, reason: reason, minutes: bypassTerms.minutes)
+                }
             }
         )
         actions.append(

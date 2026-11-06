@@ -205,6 +205,7 @@ TAMA_HOOK_SOURCE_REVISION="$HOOK_SOURCE_REVISION" \
 "$TAMA_PROGRAM" hooks seal --source-root "$HOOKS_ROOT" "$HOOK_RELEASE" >/dev/null
 # The release's own bin/tama is its installer (`tama hooks install-release`).
 install -m "$EXECUTABLE_MODE" "$SCRIPT_DIR/emergency_disable_hooks" "$RESOURCES/emergency_disable_hooks"
+install -m "$EXECUTABLE_MODE" "$SCRIPT_DIR/emergency_expiry_agent" "$RESOURCES/emergency_expiry_agent"
 if [ -f "$DESKTOP_ROOT/App/AppIcon.icns" ]; then
     install -m "$DATA_MODE" "$DESKTOP_ROOT/App/AppIcon.icns" "$RESOURCES/AppIcon.icns"
 else

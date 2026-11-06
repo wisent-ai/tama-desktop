@@ -15,6 +15,7 @@ struct PostureView: View {
     @StateObject var machineSelection = EnforcementSelectionModel()
 
     @State var isDecidingBypass = false
+    @State var bypassTerms = HookEmergencyTerms()
 
     var buildIdentity: BuildIdentity { .current }
 
@@ -127,7 +128,7 @@ struct PostureView: View {
             WisentAlertPanel(
                 tone: .danger,
                 title: "Policy protection is off",
-                detail: "Unsafe actions will not be blocked until protection is restored.",
+                detail: offDetail,
                 actions: [
                     WisentAction(
                         "Re-enable all policies",
@@ -139,6 +140,14 @@ struct PostureView: View {
                 ]
             )
         }
+    }
+
+    /// Who set the switch, why and until when, as its record says it.
+    private var offDetail: String {
+        guard let record = model.emergencyRecord else {
+            return "Unsafe actions will not be blocked until protection is restored."
+        }
+        return record.sentence
     }
 
     @ViewBuilder private func validationAlerts(_ validation: ValidationResult) -> some View {

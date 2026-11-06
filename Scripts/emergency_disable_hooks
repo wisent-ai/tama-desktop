@@ -12,6 +12,11 @@ fi
 # The approved release's own tama is its installer (`tama hooks install-release`).
 TAMA_HOOK_INSTALLER=${TAMA_HOOK_INSTALLER:-"$TAMA_HOOK_RELEASE_ROOT/bin/tama"}
 export TAMA_HOOK_RELEASE_ROOT TAMA_HOOK_INSTALLER
+# The expiry agent (`emergency_expiry_agent`, bundled beside this file) runs
+# this same file again, by its absolute path, and lifts the switch at its end.
+TAMA_EMERGENCY_SCRIPT="$SCRIPT_DIR/$(basename -- "$0")"
+EXPIRY_AGENT="$SCRIPT_DIR/emergency_expiry_agent"
+export TAMA_EMERGENCY_SCRIPT EXPIRY_AGENT
 
 ACTION=${TAMA_EMERGENCY_ACTION:-disable}
 case "$ACTION" in
@@ -19,10 +24,31 @@ case "$ACTION" in
     *) printf '%s\n' "Unsupported Tama emergency action: $ACTION" >&2; exit 2 ;;
 esac
 export TAMA_EMERGENCY_ACTION="$ACTION"
+# A disable names who throws the switch, why, and how many minutes it holds:
+# a switch nobody can attribute or that never ends is how every guard stayed
+# off unseen. The hooks read `expiresAt` and run again once it has passed.
+if [ "$ACTION" = disable ]; then
+    for required in TAMA_EMERGENCY_SET_BY TAMA_EMERGENCY_REASON TAMA_EMERGENCY_MINUTES; do
+        eval "value=\${$required:-}"
+        if [ -z "$value" ]; then
+            printf '%s\n' "Tama will not disable its hooks without $required: the switch records who set it (TAMA_EMERGENCY_SET_BY), why (TAMA_EMERGENCY_REASON) and for how many minutes it holds (TAMA_EMERGENCY_MINUTES), after which the hooks run again." >&2
+            exit 2
+        fi
+    done
+    case "$TAMA_EMERGENCY_MINUTES" in
+        ''|*[!0-9]*|0) printf '%s\n' "TAMA_EMERGENCY_MINUTES is $TAMA_EMERGENCY_MINUTES; it must be a whole number of minutes above zero." >&2; exit 2 ;;
+    esac
+fi
+if [ "$ACTION" = enable ] && [ "${TAMA_EMERGENCY_TRIGGER:-}" = expiry ]; then
+    # The agent's own run: before the end, or with nothing to lift, it is done.
+    status=0
+    python3 "$EXPIRY_AGENT" due || status=$?
+    [ "$status" -eq 0 ] || exit 0
+fi
 
 python3 - <<'PY'
 from pathlib import Path
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 import os
 import shutil
@@ -36,6 +62,7 @@ home = Path(os.environ.get("TAMA_HOME") or Path.home())
 tama = home / "Library/Application Support/Tama"
 backup = tama / "emergency-backup"
 backup.mkdir(parents=True, exist_ok=True)
+state_path = tama / "hook-emergency-state.json"
 
 
 
@@ -93,7 +120,20 @@ def disable_entrypoint(path, manifest):
 manifest_path = backup / "manifest.json"
 if action == "enable":
     if not manifest_path.exists():
-        raise SystemExit("Tama has no emergency backup manifest to restore.")
+        # A switch written without this script set nothing aside, so there is
+        # nothing to restore: lifting it is removing it. Without a switch
+        # either, there is nothing to lift.
+        if not state_path.exists():
+            raise SystemExit(
+                "Tama has no emergency switch set and no emergency backup manifest to restore."
+            )
+        state_path.unlink()
+        print(
+            "Lifted an emergency switch that set nothing aside (no emergency-backup/manifest.json): "
+            "every hook runs again. Running agent sessions read the cleared emergency state at once "
+            "and keep running."
+        )
+        raise SystemExit(0)
     json.loads(manifest_path.read_text())
 elif manifest_path.exists():
     print("Tama hooks are already disabled.")
@@ -202,18 +242,25 @@ else:
             check=False,
         )
 
-state_path = tama / "hook-emergency-state.json"
 if action == "disable":
     atomic_json(manifest_path, manifest)
+    now = datetime.now(timezone.utc)
+    minutes = int(os.environ["TAMA_EMERGENCY_MINUTES"])
     atomic_json(
         state_path,
         {
             "schema": "ai.wisent.tama.hook-emergency-state.v1",
             "disabled": True,
-            "changedAt": datetime.now(timezone.utc).isoformat(),
+            "setBy": os.environ["TAMA_EMERGENCY_SET_BY"],
+            "reason": os.environ["TAMA_EMERGENCY_REASON"],
+            "changedAt": now.isoformat(timespec="milliseconds").replace("+00:00", "Z"),
+            "expiresAt": (now + timedelta(minutes=minutes)).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
         },
     )
-    print("Disabled hooks. Running agent sessions read the emergency state at once and keep running.")
+    print(
+        f"Disabled hooks for {minutes} minutes. Running agent sessions read the emergency "
+        "state at once and keep running; the hooks run again when it expires."
+    )
 else:
     state_path.unlink(missing_ok=True)
     manifest_path.unlink(missing_ok=True)
@@ -231,3 +278,10 @@ shutil.rmtree(
     ignore_errors=True,
 )
 PY
+# A disable schedules the switch's own lifting; an enable, by hand or by the
+# agent itself, takes the agent away once the switch is gone.
+if [ "$ACTION" = disable ]; then
+    python3 "$EXPIRY_AGENT" install
+elif [ ! -e "${TAMA_HOME:-$HOME}/Library/Application Support/Tama/hook-emergency-state.json" ]; then
+    python3 "$EXPIRY_AGENT" remove
+fi

@@ -29,6 +29,8 @@ final class AppModel: ObservableObject {
 
     /// The emergency switch as read; `nil` while its state cannot be read.
     @Published var hooksDisabledState: Bool? = false
+    /// Who set the switch, why, since and until when, while it is set.
+    @Published var emergencyRecord: HookEmergencySwitch.Record?
     /// Protection is not confirmed on: the switch is set or cannot be read.
     var areHooksDisabled: Bool { hooksDisabledState != false }
     /// Why the emergency switch or installed release record could not be read.
@@ -167,6 +169,7 @@ final class AppModel: ObservableObject {
         sessionError = nil
         systemPolicyServiceStatus = "Not registered"
         hooksDisabledState = false
+        emergencyRecord = nil
         installedHookReleaseID = nil
         installedNodeExecutable = nil
         installedNodeVersion = nil

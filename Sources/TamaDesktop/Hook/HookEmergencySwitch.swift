@@ -7,19 +7,77 @@ struct HookEmergencySwitch: @unchecked Sendable {
     /// close; its failure is its exit status and everything it printed.
     private let manager = FileManager.default
 
-    /// Whether the emergency switch is set. No manifest or no state file is
-    /// "not disabled"; a state file that exists but cannot be read or decoded
-    /// throws, since protection that may be off must not be shown as on.
-    func disabledState() throws -> Bool {
-        guard manager.fileExists(atPath: manifestURL.path) else { return false }
-        guard let data = try Self.contents(of: stateURL) else { return false }
+    /// The switch as its file records it: who set it, why, since and until
+    /// when, and whether it holds every hook off now. The hooks decide by the
+    /// state file alone — a switch written without the script's backup
+    /// manifest still holds them off — so the desktop reads the same file
+    /// the same way: set, and not past `expiresAt`.
+    struct Record: Equatable {
+        let holds: Bool
+        let setBy: String?
+        let reason: String?
+        let changedAt: String?
+        let expiresAt: String?
+        /// What the record leaves unsaid, as the hooks name it.
+        let gaps: [String]
+    }
+
+    /// The switch on this machine. No state file is a switch not set; one
+    /// that exists but cannot be read or decoded throws, since protection that
+    /// may be off must not be shown as on.
+    func record(now: Date = Date()) throws -> Record? {
+        guard let data = try Self.contents(of: stateURL) else { return nil }
         let state: State
         do {
             state = try JSONDecoder().decode(State.self, from: data)
         } catch {
             throw HookEmergencyError.localStateUnreadable(stateURL.path, error.localizedDescription)
         }
-        return state.schema == Self.schema && state.disabled
+        guard state.schema == Self.schema, state.disabled else { return nil }
+        let text = { (value: String?) in
+            value.map { $0.trimmingCharacters(in: .whitespaces) }.flatMap { $0.isEmpty ? nil : $0 }
+        }
+        let (setBy, reason) = (text(state.setBy), text(state.reason))
+        let (changedAt, expiresAt) = (text(state.changedAt), text(state.expiresAt))
+        let expiry = expiresAt.flatMap(Self.instant)
+        var gaps: [String] = []
+        if setBy == nil { gaps.append("names no one who set it (setBy)") }
+        if reason == nil { gaps.append("gives no reason (reason)") }
+        if let changedAt {
+            if Self.instant(changedAt) == nil {
+                gaps.append("records its time as \"\(changedAt)\", which is no ISO-8601 time (changedAt)")
+            }
+        } else {
+            gaps.append("records no time it was set (changedAt)")
+        }
+        if let expiresAt {
+            if expiry == nil {
+                gaps.append(
+                    "records its end as \"\(expiresAt)\", which is no ISO-8601 time, so nothing lifts it but the operator (expiresAt)")
+            }
+        } else {
+            gaps.append("names no time it ends, so nothing lifts it but the operator (expiresAt)")
+        }
+        // A switch with no readable end holds until the operator lifts it.
+        let holds: Bool
+        if let expiry { holds = now < expiry } else { holds = true }
+        return Record(
+            holds: holds, setBy: setBy, reason: reason, changedAt: changedAt, expiresAt: expiresAt,
+            gaps: gaps)
+    }
+
+    /// Whether the switch holds every hook off now.
+    func disabledState() throws -> Bool {
+        try record()?.holds == true
+    }
+
+    /// An ISO-8601 instant, with or without fractional seconds, as the script
+    /// and the hooks write it.
+    private static func instant(_ text: String) -> Date? {
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = fractional.date(from: text) { return date }
+        return ISO8601DateFormatter().date(from: text)
     }
 
     /// The installed hook release, or nil when none is installed; a record that
@@ -53,7 +111,10 @@ struct HookEmergencySwitch: @unchecked Sendable {
         }
     }
 
-    func setDisabled(_ disabled: Bool) throws {
+    /// Throw or lift the switch. A disable names its reason and how many
+    /// minutes it holds; the switch records the account that threw it, and
+    /// the hooks run again once the minutes have passed.
+    func setDisabled(_ disabled: Bool, reason: String = "", minutes: Int = 0) throws {
         guard
             let scriptURL = Bundle.main.url(
                 forResource: "emergency_disable_hooks",
@@ -65,6 +126,11 @@ struct HookEmergencySwitch: @unchecked Sendable {
 
         var environment = ProcessInfo.processInfo.environment
         environment["TAMA_EMERGENCY_ACTION"] = disabled ? "disable" : "enable"
+        if disabled {
+            environment["TAMA_EMERGENCY_SET_BY"] = NSUserName()
+            environment["TAMA_EMERGENCY_REASON"] = reason
+            environment["TAMA_EMERGENCY_MINUTES"] = String(minutes)
+        }
         try runCommand(
             executableURL: URL(fileURLWithPath: "/bin/sh"),
             arguments: [scriptURL.path],
@@ -146,12 +212,6 @@ struct HookEmergencySwitch: @unchecked Sendable {
         supportURL.appendingPathComponent("hook-emergency-state.json")
     }
 
-    private var manifestURL: URL {
-        supportURL
-            .appendingPathComponent("emergency-backup", isDirectory: true)
-            .appendingPathComponent("manifest.json")
-    }
-
     private var installedReleaseURL: URL {
         supportURL
             .appendingPathComponent("hooks-runtime", isDirectory: true)
@@ -161,7 +221,10 @@ struct HookEmergencySwitch: @unchecked Sendable {
     private struct State: Codable {
         let schema: String
         let disabled: Bool
-        let changedAt: String
+        let setBy: String?
+        let reason: String?
+        let changedAt: String?
+        let expiresAt: String?
     }
 
     private struct InstalledRelease: Decodable {
