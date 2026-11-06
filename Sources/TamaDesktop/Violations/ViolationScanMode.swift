@@ -1,6 +1,7 @@
 /// Which pass of `tama violations find` a scan runs: the hook replay, or one
 /// of the in-process passes the CLI offers as `--size-only`, `--duplicates`,
-/// `--internal-names`, `--time-limits`, `--fallbacks` and `--generic-errors`.
+/// `--internal-names`, `--time-limits`, `--fallbacks`, `--generic-errors`
+/// and `--state-machines`.
 /// The screen offers
 /// every pass the command has, and `requestValue` is the `mode` the
 /// `violations/scan` request takes.
@@ -12,6 +13,7 @@ enum ViolationScanMode: String, CaseIterable, Identifiable, Sendable {
     case timeLimits
     case fallbacks
     case genericErrors
+    case stateMachines
 
     var id: String { rawValue }
 
@@ -24,6 +26,7 @@ enum ViolationScanMode: String, CaseIterable, Identifiable, Sendable {
         case .timeLimits: "Waits and time limits"
         case .fallbacks: "Fallbacks and dropped errors"
         case .genericErrors: "Errors that name no failure"
+        case .stateMachines: "Implicit state machines"
         }
     }
 
@@ -37,6 +40,7 @@ enum ViolationScanMode: String, CaseIterable, Identifiable, Sendable {
         case .timeLimits: "time-limits"
         case .fallbacks: "fallbacks"
         case .genericErrors: "generic-errors"
+        case .stateMachines: "state-machines"
         }
     }
 }
