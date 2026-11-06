@@ -222,7 +222,7 @@ struct SessionView: View {
             WisentCounterRow.Counter(
                 "Enabled",
                 value: (runtime?.loadedHookCount ?? .zero).formatted(.number),
-                detail: "Policies active now",
+                detail: session.enforcementDetail,
                 tone: runtime.map {
                     $0.loadedHookCount == $0.registeredHookCount ? .neutral : .warning
                 }

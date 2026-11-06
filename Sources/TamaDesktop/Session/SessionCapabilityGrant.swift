@@ -36,6 +36,10 @@ struct HookRuntimeStatus: Codable, Sendable, Equatable {
     let catalogChecksum: String?
     let registeredHookCount: Int
     let loadedHookCount: Int
+    /// The hooks that still run while the emergency switch holds (the
+    /// session's allowlist and the kept stop hook); absent from a session
+    /// whose adapter predates it.
+    let enforcedUnderEmergency: [String]?
     let enabledHookIds: [String]
     let unknownHookIds: [String]
     let reloadRequired: Bool
@@ -175,6 +179,21 @@ struct AgentSessionRecord: Decodable, Identifiable, Sendable {
     /// the machine's selection; under the emergency switch only those it added run.
     func isHookEnabled(_ hookId: String) -> Bool {
         !globallyDisabled || enabledHookIds.contains(hookId)
+    }
+
+    /// What the Enabled counter says under it: under the emergency switch, the
+    /// hooks that still check this session, as its runtime names them.
+    var enforcementDetail: String {
+        switch (globallyDisabled, runtime?.enforcedUnderEmergency) {
+        case (false, _):
+            return "Policies active now"
+        case (true, .none):
+            return "Emergency switch on; this session's adapter does not name what still runs"
+        case (true, .some(let ids)) where ids.isEmpty:
+            return "Emergency switch on; no policy checks this session"
+        case (true, .some(let ids)):
+            return "Still active under the emergency switch: " + ids.joined(separator: ", ")
+        }
     }
 
     private enum CodingKeys: String, CodingKey {
